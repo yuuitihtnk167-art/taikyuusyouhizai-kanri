@@ -1,0 +1,32 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "local-server-5501",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$port = 5501; $exists = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue; if ($exists) { Write-Host 'Serving HTTP on 127.0.0.1 port 5501 already running'; while ($true) { Start-Sleep -Seconds 3600 } } else { python -m http.server $port --bind 127.0.0.1 }"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "python-http-server",
+        "pattern": {
+          "regexp": ".*"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Serving HTTP on.*"
+        }
+      }
+    }
+  ]
+}
