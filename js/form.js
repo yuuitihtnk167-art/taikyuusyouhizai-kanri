@@ -23,6 +23,7 @@ const modelInput = document.getElementById("model");
 const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
+const endOfUseDateInput = document.getElementById("end-of-use-date");
 const monthlyRunningCostInput = document.getElementById("monthly-running-cost");
 
 const state = {
@@ -37,6 +38,7 @@ function fillForm(item) {
   purchaseDateInput.value = item.purchaseDate;
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
+  endOfUseDateInput.value = item.endOfUseDate;
   monthlyRunningCostInput.value = item.monthlyRunningCost;
 }
 
@@ -60,6 +62,7 @@ form.addEventListener("submit", async (event) => {
     purchaseDate: purchaseDateInput.value,
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
+    endOfUseDate: endOfUseDateInput.value,
     monthlyRunningCost: Number(monthlyRunningCostInput.value),
   };
   const validation = validateItem(item);

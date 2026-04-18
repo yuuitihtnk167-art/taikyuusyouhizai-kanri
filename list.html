@@ -32,7 +32,11 @@
     <dialog id="detail-dialog" class="detail-dialog">
       <article class="detail-card">
         <h3 id="detail-name"></h3>
-        <button id="detail-close-button" type="button" class="primary-button">閉じる</button>
+        <div class="detail-actions">
+          <button id="detail-edit-button" type="button" class="primary-button">編集</button>
+          <button id="detail-delete-button" type="button" class="danger-button">削除</button>
+          <button id="detail-close-button" type="button" class="ghost-button">閉じる</button>
+        </div>
       </article>
     </dialog>
     <script type="module" src="js/list.js"></script>

@@ -2,8 +2,11 @@ import {
   onAuthChanged,
   logout,
   loadItems,
+  removeItem,
   calculateMonthlyCost,
   calculateTotalMonthlyCost,
+  calculateUsageMonths,
+  calculateActualMonthlyCost,
   formatCurrency,
   escapeHtml,
   firebaseErrorMessage,
@@ -18,11 +21,14 @@ const itemList = document.getElementById("item-list");
 
 const detailDialog = document.getElementById("detail-dialog");
 const detailName = document.getElementById("detail-name");
+const detailEditButton = document.getElementById("detail-edit-button");
+const detailDeleteButton = document.getElementById("detail-delete-button");
 const detailCloseButton = document.getElementById("detail-close-button");
 
 const state = {
   uid: null,
   items: [],
+  selectedItemId: null,
 };
 
 function renderList(items) {
@@ -33,14 +39,22 @@ function renderList(items) {
   }
 
   for (const item of items) {
+    const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+    const actualMonthlyCost = calculateActualMonthlyCost(item);
+    const usageMonthsText = usageMonths ? `${usageMonths}か月` : "未入力";
+    const actualCostText = actualMonthlyCost !== null ? formatCurrency(actualMonthlyCost) : "未入力";
+
     const card = document.createElement("article");
     card.className = "item-card";
     card.dataset.id = item.id;
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `${item.name}の操作を開く`);
 
     card.innerHTML = `
       <div class="item-header">
         <h3 class="item-name">
-          <button type="button" class="item-name-button" data-action="open-name" data-id="${item.id}">
+          <button type="button" class="item-name-button" data-id="${item.id}">
             ${escapeHtml(item.name)}
           </button>
         </h3>
@@ -58,13 +72,21 @@ function renderList(items) {
       </div>
       <p class="item-meta">購入価格: ${formatCurrency(item.purchasePrice)}</p>
       <p class="item-meta">使用年数: ${item.yearsOfUse}年</p>
+      <p class="item-meta">使用終了日: ${item.endOfUseDate ? escapeHtml(item.endOfUseDate) : "未入力"}</p>
+      <p class="item-meta">使用月数: ${usageMonthsText}</p>
       <p class="item-meta">月間ランニングコスト: ${formatCurrency(item.monthlyRunningCost)}</p>
+      <p class="item-meta">実質月額コスト: ${actualCostText}</p>
     `;
     itemList.appendChild(card);
   }
 }
 
+function selectedItem() {
+  return state.items.find((item) => item.id === state.selectedItemId) ?? null;
+}
+
 function openDetail(item) {
+  state.selectedItemId = item.id;
   detailName.textContent = item.name;
   detailDialog.showModal();
 }
@@ -72,6 +94,14 @@ function openDetail(item) {
 async function refreshList() {
   state.items = await loadItems(state.uid);
   renderList(state.items);
+}
+
+function findCardItem(target) {
+  const card = target.closest(".item-card");
+  if (!card) return null;
+  const id = card.dataset.id;
+  if (!id) return null;
+  return state.items.find((item) => item.id === id) ?? null;
 }
 
 createButton.addEventListener("click", () => {
@@ -91,16 +121,52 @@ logoutButton.addEventListener("click", async () => {
 itemList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-  const nameButton = target.closest(".item-name-button");
-  if (!nameButton) return;
-  const id = nameButton.dataset.id;
-  if (!id) return;
-  const item = state.items.find((x) => x.id === id);
+  const item = findCardItem(target);
   if (item) openDetail(item);
+});
+
+itemList.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const item = findCardItem(target);
+  if (!item) return;
+  event.preventDefault();
+  openDetail(item);
+});
+
+detailEditButton.addEventListener("click", () => {
+  const item = selectedItem();
+  if (!item) return;
+  window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
+});
+
+detailDeleteButton.addEventListener("click", async () => {
+  const item = selectedItem();
+  if (!item || !state.uid) return;
+  const shouldDelete = confirm(`「${item.name}」を削除しますか？`);
+  if (!shouldDelete) return;
+
+  authError.textContent = "";
+  try {
+    detailDeleteButton.disabled = true;
+    await removeItem(state.uid, item.id);
+    detailDialog.close();
+    state.selectedItemId = null;
+    await refreshList();
+  } catch (error) {
+    authError.textContent = firebaseErrorMessage(error, "削除に失敗しました。");
+  } finally {
+    detailDeleteButton.disabled = false;
+  }
 });
 
 detailCloseButton.addEventListener("click", () => {
   detailDialog.close();
+});
+
+detailDialog.addEventListener("close", () => {
+  state.selectedItemId = null;
 });
 
 onAuthChanged(async (user) => {

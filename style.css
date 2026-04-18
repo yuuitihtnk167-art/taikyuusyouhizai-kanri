@@ -231,8 +231,13 @@ button {
   padding: 16px;
 }
 
-#detail-close-button {
+.detail-actions {
+  display: grid;
+  gap: 8px;
   margin-top: 10px;
+}
+
+.detail-actions button {
   width: 100%;
 }
 

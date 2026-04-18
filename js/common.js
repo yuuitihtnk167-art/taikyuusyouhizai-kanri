@@ -77,6 +77,26 @@ export function calculateTotalMonthlyCost(item) {
   return calculateMonthlyCost(item) + item.monthlyRunningCost;
 }
 
+export function calculateUsageMonths(purchaseDate, endOfUseDate) {
+  if (!purchaseDate || !endOfUseDate) return null;
+  const startDate = new Date(`${purchaseDate}T00:00:00`);
+  const endDate = new Date(`${endOfUseDate}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  if (endDate < startDate) return 0;
+
+  let months =
+    (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+    (endDate.getMonth() - startDate.getMonth());
+  if (endDate.getDate() < startDate.getDate()) months -= 1;
+  return Math.max(months, 1);
+}
+
+export function calculateActualMonthlyCost(item) {
+  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+  if (!usageMonths) return null;
+  return item.purchasePrice / usageMonths;
+}
+
 export function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -104,6 +124,7 @@ export async function loadItems(uid) {
       purchaseDate: data.purchaseDate ?? "",
       purchasePrice: Number(data.purchasePrice ?? 0),
       yearsOfUse: Number(data.yearsOfUse ?? 0),
+      endOfUseDate: data.endOfUseDate ?? "",
       monthlyRunningCost: Number(data.monthlyRunningCost ?? 0),
       createdAt: data.createdAt ?? null,
       updatedAt: data.updatedAt ?? null,
@@ -124,6 +145,7 @@ export async function loadItem(uid, itemId) {
     purchaseDate: data.purchaseDate ?? "",
     purchasePrice: Number(data.purchasePrice ?? 0),
     yearsOfUse: Number(data.yearsOfUse ?? 0),
+    endOfUseDate: data.endOfUseDate ?? "",
     monthlyRunningCost: Number(data.monthlyRunningCost ?? 0),
   };
 }
@@ -135,6 +157,7 @@ export async function saveItem(uid, item) {
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
+    endOfUseDate: item.endOfUseDate,
     monthlyRunningCost: item.monthlyRunningCost,
     updatedAt: serverTimestamp(),
   };
@@ -153,6 +176,9 @@ export function validateItem(item) {
   if (!item.purchaseDate) return "購入日を入力してください。";
   if (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0) return "購入価格は0以上で入力してください。";
   if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用年数は1以上で入力してください。";
+  if (item.endOfUseDate && calculateUsageMonths(item.purchaseDate, item.endOfUseDate) === 0) {
+    return "使用終了日は購入日以降の日付を入力してください。";
+  }
   if (!Number.isFinite(item.monthlyRunningCost) || item.monthlyRunningCost < 0) {
     return "月間ランニングコストは0以上で入力してください。";
   }
