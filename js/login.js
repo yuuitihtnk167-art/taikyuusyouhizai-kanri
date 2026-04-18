@@ -29,7 +29,7 @@ loginButton.addEventListener("click", async () => {
   try {
     setButtonsDisabled(true);
     await login(email, password);
-    window.location.href = "/list.html";
+    window.location.href = "list.html";
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "ログインに失敗しました。");
   } finally {
@@ -51,7 +51,7 @@ signupButton.addEventListener("click", async () => {
   try {
     setButtonsDisabled(true);
     await signup(email, password);
-    window.location.href = "/list.html";
+    window.location.href = "list.html";
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "新規登録に失敗しました。");
   } finally {
@@ -61,7 +61,7 @@ signupButton.addEventListener("click", async () => {
 
 onAuthChanged((user) => {
   if (user) {
-    window.location.href = "/list.html";
+    window.location.href = "list.html";
     return;
   }
   authStatus.textContent = "状態: 未ログイン";

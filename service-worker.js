@@ -1,19 +1,21 @@
-const CACHE_NAME = "durable-goods-pwa-v2";
+const CACHE_NAME = "durable-goods-pwa-v3";
+const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
-  "/",
-  "/index.html",
-  "/login.html",
-  "/list.html",
-  "/form.html",
-  "/style.css",
-  "/js/common.js",
-  "/js/login.js",
-  "/js/list.js",
-  "/js/form.js",
-  "/manifest.webmanifest",
-  "/icons/icon-192.svg",
-  "/icons/icon-512.svg",
-];
+  "./",
+  "index.html",
+  "login.html",
+  "list.html",
+  "form.html",
+  "style.css",
+  "js/common.js",
+  "js/login.js",
+  "js/list.js",
+  "js/form.js",
+  "manifest.webmanifest",
+  "icons/icon-192.svg",
+  "icons/icon-512.svg",
+].map((path) => new URL(path, BASE_URL).toString());
+const FALLBACK_URL = new URL("login.html", BASE_URL).toString();
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -54,7 +56,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
           return networkResponse;
         })
-        .catch(() => caches.match("/login.html"));
+        .catch(() => caches.match(FALLBACK_URL));
     })
   );
 });

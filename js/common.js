@@ -36,7 +36,9 @@ export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", async () => {
     try {
-      await navigator.serviceWorker.register("/service-worker.js");
+      await navigator.serviceWorker.register(new URL("../service-worker.js", import.meta.url), {
+        scope: "../",
+      });
     } catch (_error) {
       // SW registration failure is non-fatal.
     }
@@ -159,12 +161,12 @@ export function validateItem(item) {
 
 export function firebaseErrorMessage(error, fallback) {
   const code = typeof error === "object" && error && "code" in error ? error.code : "";
-  if (code === "permission-denied") return "権限エラー（permission-denied）。ルールを確認してください。";
+  if (code === "permission-denied") return "権限エラー（permission-denied）です。Firestoreルールを確認してください。";
   if (code === "auth/invalid-credential") return "メールアドレスまたはパスワードが正しくありません。";
   if (code === "auth/email-already-in-use") return "そのメールアドレスは既に登録されています。";
   if (code === "auth/weak-password") return "パスワードは6文字以上で入力してください。";
   if (code === "auth/invalid-email") return "メールアドレスの形式が正しくありません。";
-  if (code === "unavailable") return "Firebase接続エラー（unavailable）。ネットワークを確認してください。";
+  if (code === "unavailable") return "Firebase接続エラー（unavailable）です。ネットワークを確認してください。";
   return fallback;
 }
 

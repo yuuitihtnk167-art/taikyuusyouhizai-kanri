@@ -41,11 +41,11 @@ function fillForm(item) {
 }
 
 toListButton.addEventListener("click", () => {
-  window.location.href = "/list.html";
+  window.location.href = "list.html";
 });
 
 cancelButton.addEventListener("click", () => {
-  window.location.href = "/list.html";
+  window.location.href = "list.html";
 });
 
 form.addEventListener("submit", async (event) => {
@@ -70,7 +70,7 @@ form.addEventListener("submit", async (event) => {
   try {
     submitButton.disabled = true;
     await saveItem(state.uid, item);
-    window.location.href = "/list.html";
+    window.location.href = "list.html";
   } catch (error) {
     formError.textContent = firebaseErrorMessage(error, "保存に失敗しました。");
   } finally {
@@ -80,7 +80,7 @@ form.addEventListener("submit", async (event) => {
 
 onAuthChanged(async (user) => {
   if (!user) {
-    window.location.href = "/login.html";
+    window.location.href = "login.html";
     return;
   }
   state.uid = user.uid;

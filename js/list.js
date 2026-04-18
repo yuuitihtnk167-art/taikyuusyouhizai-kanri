@@ -75,14 +75,14 @@ async function refreshList() {
 }
 
 createButton.addEventListener("click", () => {
-  window.location.href = "/form.html";
+  window.location.href = "form.html";
 });
 
 logoutButton.addEventListener("click", async () => {
   authError.textContent = "";
   try {
     await logout();
-    window.location.href = "/login.html";
+    window.location.href = "login.html";
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "ログアウトに失敗しました。");
   }
@@ -105,7 +105,7 @@ detailCloseButton.addEventListener("click", () => {
 
 onAuthChanged(async (user) => {
   if (!user) {
-    window.location.href = "/login.html";
+    window.location.href = "login.html";
     return;
   }
   state.uid = user.uid;
