@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>耐久消費財管理</title>
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>耐久消費財管理</h1>
+        <p class="subtitle">購入品の月額コストをシンプルに管理</p>
+      </header>
+
+      <section class="panel" aria-labelledby="auth-title">
+        <h2 id="auth-title">ログイン</h2>
+        <p id="auth-status" class="form-mode">状態: 未ログイン</p>
+        <form id="auth-form" novalidate>
+          <label for="auth-email">メールアドレス</label>
+          <input id="auth-email" type="email" autocomplete="email" required />
+
+          <label for="auth-password">パスワード（6文字以上）</label>
+          <input id="auth-password" type="password" minlength="6" autocomplete="current-password" required />
+
+          <p id="auth-error" class="form-error" aria-live="polite"></p>
+          <div class="form-actions">
+            <button id="login-button" class="primary-button" type="button">ログイン</button>
+            <button id="signup-button" class="ghost-button" type="button">新規登録</button>
+          </div>
+          <button id="logout-button" class="danger-button" type="button" hidden>ログアウト</button>
+        </form>
+      </section>
+
+      <div id="app-content" hidden>
+      <section class="panel" aria-labelledby="form-title">
+        <h2 id="form-title">登録・編集</h2>
+        <p id="form-mode" class="form-mode">現在: 新規登録</p>
+
+        <form id="item-form" novalidate>
+          <input id="item-id" type="hidden" />
+
+          <label for="name">商品名</label>
+          <input id="name" name="name" type="text" required autocomplete="off" />
+
+          <label for="model">型番</label>
+          <input id="model" name="model" type="text" required autocomplete="off" />
+
+          <label for="purchase-date">購入日</label>
+          <input id="purchase-date" name="purchaseDate" type="date" required />
+
+          <label for="purchase-price">購入価格（円）</label>
+          <input
+            id="purchase-price"
+            name="purchasePrice"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            required
+          />
+
+          <label for="years-of-use">使用年数（年）</label>
+          <input
+            id="years-of-use"
+            name="yearsOfUse"
+            type="number"
+            inputmode="numeric"
+            min="1"
+            step="1"
+            required
+          />
+
+          <label for="monthly-running-cost">月間ランニングコスト（円）</label>
+          <input
+            id="monthly-running-cost"
+            name="monthlyRunningCost"
+            type="number"
+            inputmode="numeric"
+            min="0"
+            step="1"
+            required
+          />
+
+          <p id="form-error" class="form-error" aria-live="polite"></p>
+
+          <div class="form-actions">
+            <button id="submit-button" class="primary-button" type="submit">登録する</button>
+            <button id="cancel-button" class="ghost-button" type="button" hidden>編集をキャンセル</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="list-title">
+        <h2 id="list-title">一覧</h2>
+        <div id="item-list" class="card-list"></div>
+      </section>
+      </div>
+    </main>
+
+    <dialog id="detail-dialog" class="detail-dialog">
+      <article class="detail-card">
+        <h3 id="detail-name"></h3>
+        <p id="detail-meta" class="item-meta"></p>
+        <div class="costs">
+          <div class="cost-row">
+            <span class="cost-label">月額コスト</span>
+            <span id="detail-monthly" class="cost-value"></span>
+          </div>
+          <div class="cost-row">
+            <span class="cost-label">総月額コスト</span>
+            <span id="detail-total" class="cost-value"></span>
+          </div>
+        </div>
+        <p id="detail-price" class="item-meta"></p>
+        <p id="detail-years" class="item-meta"></p>
+        <p id="detail-running" class="item-meta"></p>
+        <div class="card-actions">
+          <button id="detail-edit-button" type="button" class="ghost-button">編集</button>
+          <button id="detail-delete-button" type="button" class="danger-button">削除</button>
+        </div>
+        <button id="detail-close-button" type="button" class="primary-button">閉じる</button>
+      </article>
+    </dialog>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
