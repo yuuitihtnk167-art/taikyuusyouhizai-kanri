@@ -1,9 +1,15 @@
-const CACHE_NAME = "durable-goods-pwa-v1";
+const CACHE_NAME = "durable-goods-pwa-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
+  "/login.html",
+  "/list.html",
+  "/form.html",
   "/style.css",
-  "/script.js",
+  "/js/common.js",
+  "/js/login.js",
+  "/js/list.js",
+  "/js/form.js",
   "/manifest.webmanifest",
   "/icons/icon-192.svg",
   "/icons/icon-512.svg",
@@ -48,7 +54,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
           return networkResponse;
         })
-        .catch(() => caches.match("/index.html"));
+        .catch(() => caches.match("/login.html"));
     })
   );
 });

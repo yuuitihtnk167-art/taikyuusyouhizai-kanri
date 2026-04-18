@@ -2,7 +2,7 @@
   "name": "耐久消費財管理",
   "short_name": "耐久消費財",
   "description": "耐久消費財の月額コストを管理するアプリ",
-  "start_url": "/index.html",
+  "start_url": "/list.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f7f8fb",

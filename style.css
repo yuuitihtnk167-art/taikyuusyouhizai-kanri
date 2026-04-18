@@ -141,7 +141,6 @@ button {
   border-radius: 12px;
   padding: 14px;
   background: #fff;
-  cursor: pointer;
 }
 
 .item-header {
@@ -154,6 +153,18 @@ button {
 .item-name {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.item-name-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary-strong);
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .item-meta {

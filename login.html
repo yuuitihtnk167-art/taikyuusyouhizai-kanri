@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ログイン | 耐久消費財管理</title>
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>耐久消費財管理</h1>
+        <p class="subtitle">メール/パスワードでログイン</p>
+      </header>
+
+      <section class="panel" aria-labelledby="auth-title">
+        <h2 id="auth-title">ログイン</h2>
+        <p id="auth-status" class="form-mode">状態: 未ログイン</p>
+        <label for="auth-email">メールアドレス</label>
+        <input id="auth-email" type="email" autocomplete="email" required />
+        <label for="auth-password">パスワード（6文字以上）</label>
+        <input id="auth-password" type="password" autocomplete="current-password" required />
+        <p id="auth-error" class="form-error"></p>
+        <div class="form-actions">
+          <button id="login-button" class="primary-button" type="button">ログイン</button>
+          <button id="signup-button" class="ghost-button" type="button">新規登録</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="js/login.js"></script>
+  </body>
+</html>
