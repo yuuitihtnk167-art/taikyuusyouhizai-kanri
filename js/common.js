@@ -7,6 +7,7 @@ import {
   setDoc,
   deleteDoc,
   doc,
+  deleteField,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
@@ -73,8 +74,24 @@ export function calculateMonthlyCost(item) {
   return item.purchasePrice / (item.yearsOfUse * 12);
 }
 
-export function calculateTotalMonthlyCost(item) {
-  return calculateMonthlyCost(item) + item.monthlyRunningCost;
+export function normalizeAdditionalCosts(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((cost) => ({
+    id: cost?.id || createId(),
+    amount: Number(cost?.amount ?? 0),
+    memo: String(cost?.memo ?? ""),
+  }));
+}
+
+export function calculateAdditionalCostTotal(item) {
+  return normalizeAdditionalCosts(item.additionalCosts).reduce((total, cost) => {
+    if (!Number.isFinite(cost.amount)) return total;
+    return total + cost.amount;
+  }, 0);
+}
+
+export function calculateMonthlyCostWithAdditionalCosts(item) {
+  return (item.purchasePrice + calculateAdditionalCostTotal(item)) / (item.yearsOfUse * 12);
 }
 
 export function calculateUsageMonths(purchaseDate, endOfUseDate) {
@@ -94,7 +111,7 @@ export function calculateUsageMonths(purchaseDate, endOfUseDate) {
 export function calculateActualMonthlyCost(item) {
   const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
   if (!usageMonths) return null;
-  return item.purchasePrice / usageMonths;
+  return (item.purchasePrice + calculateAdditionalCostTotal(item)) / usageMonths;
 }
 
 export function createId() {
@@ -125,7 +142,7 @@ export async function loadItems(uid) {
       purchasePrice: Number(data.purchasePrice ?? 0),
       yearsOfUse: Number(data.yearsOfUse ?? 0),
       endOfUseDate: data.endOfUseDate ?? "",
-      monthlyRunningCost: Number(data.monthlyRunningCost ?? 0),
+      additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
       createdAt: data.createdAt ?? null,
       updatedAt: data.updatedAt ?? null,
     });
@@ -146,7 +163,7 @@ export async function loadItem(uid, itemId) {
     purchasePrice: Number(data.purchasePrice ?? 0),
     yearsOfUse: Number(data.yearsOfUse ?? 0),
     endOfUseDate: data.endOfUseDate ?? "",
-    monthlyRunningCost: Number(data.monthlyRunningCost ?? 0),
+    additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
   };
 }
 
@@ -158,9 +175,10 @@ export async function saveItem(uid, item) {
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
-    monthlyRunningCost: item.monthlyRunningCost,
+    additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     updatedAt: serverTimestamp(),
   };
+  if (item.isUpdate) payload.monthlyRunningCost = deleteField();
   if (!item.id) item.id = createId();
   if (!item.isUpdate) payload.createdAt = serverTimestamp();
   await setDoc(userItemDocRef(uid, item.id), payload, { merge: true });
@@ -179,8 +197,10 @@ export function validateItem(item) {
   if (item.endOfUseDate && calculateUsageMonths(item.purchaseDate, item.endOfUseDate) === 0) {
     return "使用終了日は購入日以降の日付を入力してください。";
   }
-  if (!Number.isFinite(item.monthlyRunningCost) || item.monthlyRunningCost < 0) {
-    return "月間ランニングコストは0以上で入力してください。";
+  for (const cost of normalizeAdditionalCosts(item.additionalCosts)) {
+    if (!Number.isFinite(cost.amount) || cost.amount < 0) {
+      return "追加費用の金額は0以上で入力してください。";
+    }
   }
   return null;
 }

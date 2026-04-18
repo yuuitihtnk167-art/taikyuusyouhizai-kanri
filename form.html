@@ -37,8 +37,14 @@
           <input id="years-of-use" type="number" inputmode="numeric" min="1" step="1" required />
           <label for="end-of-use-date">使用終了日</label>
           <input id="end-of-use-date" type="date" />
-          <label for="monthly-running-cost">月間ランニングコスト（円）</label>
-          <input id="monthly-running-cost" type="number" inputmode="numeric" min="0" step="1" required />
+
+          <section class="additional-costs-section" aria-labelledby="additional-costs-title">
+            <div class="section-heading">
+              <h3 id="additional-costs-title">追加費用</h3>
+              <button id="add-cost-button" class="ghost-button small-button" type="button">追加</button>
+            </div>
+            <div id="additional-cost-list" class="additional-cost-list"></div>
+          </section>
 
           <p id="form-error" class="form-error"></p>
           <div class="form-actions">

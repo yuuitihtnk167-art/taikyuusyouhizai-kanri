@@ -4,7 +4,8 @@ import {
   loadItems,
   removeItem,
   calculateMonthlyCost,
-  calculateTotalMonthlyCost,
+  calculateAdditionalCostTotal,
+  calculateMonthlyCostWithAdditionalCosts,
   calculateUsageMonths,
   calculateActualMonthlyCost,
   formatCurrency,
@@ -40,6 +41,7 @@ function renderList(items) {
 
   for (const item of items) {
     const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+    const additionalCostTotal = calculateAdditionalCostTotal(item);
     const actualMonthlyCost = calculateActualMonthlyCost(item);
     const usageMonthsText = usageMonths ? `${usageMonths}か月` : "未入力";
     const actualCostText = actualMonthlyCost !== null ? formatCurrency(actualMonthlyCost) : "未入力";
@@ -62,20 +64,23 @@ function renderList(items) {
       <p class="item-meta">型番: ${escapeHtml(item.model)} / 購入日: ${escapeHtml(item.purchaseDate)}</p>
       <div class="costs">
         <div class="cost-row">
-          <span class="cost-label">月額コスト</span>
+          <span class="cost-label">本体のみの月額コスト</span>
           <span class="cost-value">${formatCurrency(calculateMonthlyCost(item))}</span>
         </div>
         <div class="cost-row">
-          <span class="cost-label">総月額コスト</span>
-          <span class="cost-value">${formatCurrency(calculateTotalMonthlyCost(item))}</span>
+          <span class="cost-label">追加費用込みの月額コスト</span>
+          <span class="cost-value">${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))}</span>
+        </div>
+        <div class="cost-row">
+          <span class="cost-label">実質月額コスト</span>
+          <span class="cost-value">${actualCostText}</span>
         </div>
       </div>
       <p class="item-meta">購入価格: ${formatCurrency(item.purchasePrice)}</p>
+      <p class="item-meta">追加費用合計: ${formatCurrency(additionalCostTotal)}</p>
       <p class="item-meta">使用年数: ${item.yearsOfUse}年</p>
       <p class="item-meta">使用終了日: ${item.endOfUseDate ? escapeHtml(item.endOfUseDate) : "未入力"}</p>
       <p class="item-meta">使用月数: ${usageMonthsText}</p>
-      <p class="item-meta">月間ランニングコスト: ${formatCurrency(item.monthlyRunningCost)}</p>
-      <p class="item-meta">実質月額コスト: ${actualCostText}</p>
     `;
     itemList.appendChild(card);
   }

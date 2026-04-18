@@ -4,6 +4,7 @@ import {
   saveItem,
   validateItem,
   createId,
+  normalizeAdditionalCosts,
   firebaseErrorMessage,
   registerServiceWorker,
 } from "./common.js";
@@ -24,12 +25,76 @@ const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
-const monthlyRunningCostInput = document.getElementById("monthly-running-cost");
+const addCostButton = document.getElementById("add-cost-button");
+const additionalCostList = document.getElementById("additional-cost-list");
 
 const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
 };
+
+function createAdditionalCostRow(cost = {}) {
+  const row = document.createElement("div");
+  row.className = "additional-cost-row";
+  row.dataset.id = cost.id || createId();
+
+  const amountInput = document.createElement("input");
+  amountInput.className = "additional-cost-amount";
+  amountInput.type = "number";
+  amountInput.inputMode = "numeric";
+  amountInput.min = "0";
+  amountInput.step = "1";
+  amountInput.placeholder = "金額";
+  amountInput.value = cost.amount ?? "";
+  amountInput.setAttribute("aria-label", "追加費用の金額");
+
+  const memoInput = document.createElement("input");
+  memoInput.className = "additional-cost-memo";
+  memoInput.type = "text";
+  memoInput.autocomplete = "off";
+  memoInput.placeholder = "メモ";
+  memoInput.value = cost.memo ?? "";
+  memoInput.setAttribute("aria-label", "追加費用のメモ");
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "danger-button small-button additional-cost-delete";
+  deleteButton.type = "button";
+  deleteButton.textContent = "削除";
+
+  row.append(amountInput, memoInput, deleteButton);
+  return row;
+}
+
+function renderAdditionalCosts(costs) {
+  additionalCostList.innerHTML = "";
+  for (const cost of normalizeAdditionalCosts(costs)) {
+    additionalCostList.appendChild(createAdditionalCostRow(cost));
+  }
+  if (additionalCostList.children.length === 0) {
+    additionalCostList.appendChild(createAdditionalCostRow());
+  }
+}
+
+function collectAdditionalCosts() {
+  const costs = [];
+  const rows = additionalCostList.querySelectorAll(".additional-cost-row");
+  for (const row of rows) {
+    const amountInput = row.querySelector(".additional-cost-amount");
+    const memoInput = row.querySelector(".additional-cost-memo");
+    if (!(amountInput instanceof HTMLInputElement) || !(memoInput instanceof HTMLInputElement)) continue;
+
+    const rawAmount = amountInput.value.trim();
+    const memo = memoInput.value.trim();
+    if (!rawAmount && !memo) continue;
+
+    costs.push({
+      id: row.dataset.id || createId(),
+      amount: rawAmount ? Number(rawAmount) : Number.NaN,
+      memo,
+    });
+  }
+  return costs;
+}
 
 function fillForm(item) {
   idInput.value = item.id;
@@ -39,7 +104,7 @@ function fillForm(item) {
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
-  monthlyRunningCostInput.value = item.monthlyRunningCost;
+  renderAdditionalCosts(item.additionalCosts);
 }
 
 toListButton.addEventListener("click", () => {
@@ -48,6 +113,20 @@ toListButton.addEventListener("click", () => {
 
 cancelButton.addEventListener("click", () => {
   window.location.href = "list.html";
+});
+
+addCostButton.addEventListener("click", () => {
+  additionalCostList.appendChild(createAdditionalCostRow());
+});
+
+additionalCostList.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  if (!target.classList.contains("additional-cost-delete")) return;
+  target.closest(".additional-cost-row")?.remove();
+  if (additionalCostList.children.length === 0) {
+    additionalCostList.appendChild(createAdditionalCostRow());
+  }
 });
 
 form.addEventListener("submit", async (event) => {
@@ -63,7 +142,7 @@ form.addEventListener("submit", async (event) => {
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
-    monthlyRunningCost: Number(monthlyRunningCostInput.value),
+    additionalCosts: collectAdditionalCosts(),
   };
   const validation = validateItem(item);
   if (validation) {
@@ -93,6 +172,7 @@ onAuthChanged(async (user) => {
     formMode.textContent = "現在: 新規登録";
     submitButton.textContent = "登録する";
     cancelButton.hidden = true;
+    renderAdditionalCosts([]);
     return;
   }
 
