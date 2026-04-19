@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v8";
+const CACHE_NAME = "durable-goods-pwa-v9";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -12,8 +12,8 @@ const APP_SHELL = [
   "js/list.js",
   "js/form.js",
   "manifest.webmanifest",
-  "icons/icon-192.svg",
-  "icons/icon-512.svg",
+  "icons/icon-192.png",
+  "icons/icon-512.png",
 ].map((path) => new URL(path, BASE_URL).toString());
 const FALLBACK_URL = new URL("login.html", BASE_URL).toString();
 
