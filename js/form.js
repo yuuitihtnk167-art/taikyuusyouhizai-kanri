@@ -57,6 +57,9 @@ function createAdditionalCostRow(cost = {}) {
   const row = document.createElement("div");
   row.className = "additional-cost-row";
   row.dataset.id = cost.id || createId();
+  if (Number.isFinite(Number(cost.createdAt))) {
+    row.dataset.createdAt = String(cost.createdAt);
+  }
 
   const amountInput = document.createElement("input");
   amountInput.className = "additional-cost-amount";
@@ -85,13 +88,24 @@ function createAdditionalCostRow(cost = {}) {
   return row;
 }
 
+function sortAdditionalCostsForDisplay(costs) {
+  return normalizeAdditionalCosts(costs)
+    .map((cost, index) => ({ ...cost, index }))
+    .sort((a, b) => {
+      const aCreatedAt = Number(a.createdAt ?? 0);
+      const bCreatedAt = Number(b.createdAt ?? 0);
+      if (aCreatedAt || bCreatedAt) return bCreatedAt - aCreatedAt;
+      return b.index - a.index;
+    });
+}
+
 function renderAdditionalCosts(costs) {
   additionalCostList.innerHTML = "";
-  for (const cost of normalizeAdditionalCosts(costs)) {
+  for (const cost of sortAdditionalCostsForDisplay(costs)) {
     additionalCostList.appendChild(createAdditionalCostRow(cost));
   }
   if (additionalCostList.children.length === 0) {
-    additionalCostList.appendChild(createAdditionalCostRow());
+    additionalCostList.appendChild(createAdditionalCostRow({ createdAt: Date.now() }));
   }
 }
 
@@ -105,12 +119,14 @@ function collectAdditionalCosts() {
 
     const rawAmount = amountInput.value.trim();
     const memo = memoInput.value.trim();
+    const createdAt = Number(row.dataset.createdAt);
     if (!rawAmount && !memo) continue;
 
     costs.push({
       id: row.dataset.id || createId(),
       amount: rawAmount ? Number(rawAmount) : Number.NaN,
       memo,
+      createdAt: Number.isFinite(createdAt) ? createdAt : null,
     });
   }
   return costs;
@@ -140,7 +156,9 @@ cancelButton.addEventListener("click", () => {
 });
 
 addCostButton.addEventListener("click", () => {
-  additionalCostList.appendChild(createAdditionalCostRow());
+  const row = createAdditionalCostRow({ createdAt: Date.now() });
+  additionalCostList.prepend(row);
+  row.querySelector(".additional-cost-amount")?.focus();
 });
 
 additionalCostList.addEventListener("click", (event) => {
@@ -149,7 +167,7 @@ additionalCostList.addEventListener("click", (event) => {
   if (!target.classList.contains("additional-cost-delete")) return;
   target.closest(".additional-cost-row")?.remove();
   if (additionalCostList.children.length === 0) {
-    additionalCostList.appendChild(createAdditionalCostRow());
+    additionalCostList.appendChild(createAdditionalCostRow({ createdAt: Date.now() }));
   }
 });
 

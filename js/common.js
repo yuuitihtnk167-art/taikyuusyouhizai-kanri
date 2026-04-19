@@ -100,6 +100,7 @@ export function normalizeAdditionalCosts(value) {
     id: cost?.id || createId(),
     amount: Number(cost?.amount ?? 0),
     memo: String(cost?.memo ?? ""),
+    createdAt: Number.isFinite(Number(cost?.createdAt)) ? Number(cost.createdAt) : null,
   }));
 }
 
