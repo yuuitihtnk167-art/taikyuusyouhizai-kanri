@@ -9,6 +9,8 @@ import {
   calculateUsageMonths,
   calculateActualMonthlyCost,
   formatCurrency,
+  getCategoryLabel,
+  CATEGORY_OPTIONS,
   escapeHtml,
   firebaseErrorMessage,
   registerServiceWorker,
@@ -18,6 +20,7 @@ const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const createButton = document.getElementById("create-button");
+const categoryButtons = document.getElementById("category-buttons");
 const itemList = document.getElementById("item-list");
 
 const detailDialog = document.getElementById("detail-dialog");
@@ -30,12 +33,46 @@ const state = {
   uid: null,
   items: [],
   selectedItemId: null,
+  selectedCategory: "",
 };
+
+function renderCategoryPrompt() {
+  itemList.innerHTML = '<div class="empty">分類を選択してください。</div>';
+}
+
+function calculateActiveMonthlyCostTotal(categoryValue) {
+  return state.items
+    .filter((item) => item.category === categoryValue && !item.endOfUseDate)
+    .reduce((total, item) => total + calculateMonthlyCostWithAdditionalCosts(item), 0);
+}
+
+function renderCategoryButtons() {
+  categoryButtons.innerHTML = "";
+
+  for (const category of CATEGORY_OPTIONS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "category-button";
+    button.dataset.category = category.value;
+    button.setAttribute("aria-pressed", String(state.selectedCategory === category.value));
+
+    const label = document.createElement("span");
+    label.className = "category-button-label";
+    label.textContent = category.label;
+
+    const total = document.createElement("span");
+    total.className = "category-button-total";
+    total.textContent = formatCurrency(calculateActiveMonthlyCostTotal(category.value));
+
+    button.append(label, total);
+    categoryButtons.appendChild(button);
+  }
+}
 
 function renderList(items) {
   itemList.innerHTML = "";
   if (items.length === 0) {
-    itemList.innerHTML = '<div class="empty">まだ登録がありません。「新規登録」から追加してください。</div>';
+    itemList.innerHTML = '<div class="empty">この分類の商品はまだ登録されていません。</div>';
     return;
   }
 
@@ -48,6 +85,7 @@ function renderList(items) {
 
     const card = document.createElement("article");
     card.className = "item-card";
+    if (item.endOfUseDate) card.classList.add("ended-use");
     card.dataset.id = item.id;
     card.tabIndex = 0;
     card.setAttribute("role", "button");
@@ -61,7 +99,7 @@ function renderList(items) {
           </button>
         </h3>
       </div>
-      <p class="item-meta">型番: ${escapeHtml(item.model)} / 購入日: ${escapeHtml(item.purchaseDate)}</p>
+      <p class="item-meta">型番: ${escapeHtml(item.model)} / 分類: ${escapeHtml(getCategoryLabel(item.category))} / 購入日: ${escapeHtml(item.purchaseDate)}</p>
       <div class="costs">
         <div class="cost-row">
           <span class="cost-label">本体のみの月額コスト</span>
@@ -86,6 +124,14 @@ function renderList(items) {
   }
 }
 
+function renderFilteredList() {
+  if (!state.selectedCategory) {
+    renderCategoryPrompt();
+    return;
+  }
+  renderList(state.items.filter((item) => item.category === state.selectedCategory));
+}
+
 function selectedItem() {
   return state.items.find((item) => item.id === state.selectedItemId) ?? null;
 }
@@ -98,7 +144,7 @@ function openDetail(item) {
 
 async function refreshList() {
   state.items = await loadItems(state.uid);
-  renderList(state.items);
+  renderFilteredList();
 }
 
 function findCardItem(target) {
@@ -109,8 +155,23 @@ function findCardItem(target) {
   return state.items.find((item) => item.id === id) ?? null;
 }
 
+renderCategoryButtons();
+renderCategoryPrompt();
+
 createButton.addEventListener("click", () => {
   window.location.href = "form.html";
+});
+
+categoryButtons.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+
+  const button = target.closest(".category-button");
+  if (!(button instanceof HTMLButtonElement)) return;
+
+  state.selectedCategory = button.dataset.category ?? "";
+  renderCategoryButtons();
+  renderFilteredList();
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -183,6 +244,7 @@ onAuthChanged(async (user) => {
   authStatus.textContent = `状態: ログイン中 (${user.email ?? "メール未設定"})`;
   try {
     await refreshList();
+    renderCategoryButtons();
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
   }

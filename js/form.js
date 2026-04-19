@@ -5,6 +5,9 @@ import {
   validateItem,
   createId,
   normalizeAdditionalCosts,
+  normalizeCategory,
+  CATEGORY_OPTIONS,
+  DEFAULT_CATEGORY,
   firebaseErrorMessage,
   registerServiceWorker,
 } from "./common.js";
@@ -13,6 +16,7 @@ const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const toListButton = document.getElementById("to-list-button");
 const form = document.getElementById("item-form");
+const formPanel = document.getElementById("form-panel");
 const formMode = document.getElementById("form-mode");
 const formError = document.getElementById("form-error");
 const submitButton = document.getElementById("submit-button");
@@ -21,6 +25,7 @@ const cancelButton = document.getElementById("cancel-button");
 const idInput = document.getElementById("item-id");
 const nameInput = document.getElementById("name");
 const modelInput = document.getElementById("model");
+const categoryInput = document.getElementById("category");
 const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
@@ -32,6 +37,21 @@ const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
 };
+
+function populateCategorySelect() {
+  categoryInput.innerHTML = "";
+  for (const category of CATEGORY_OPTIONS) {
+    const option = document.createElement("option");
+    option.value = category.value;
+    option.textContent = category.label;
+    categoryInput.appendChild(option);
+  }
+  categoryInput.value = DEFAULT_CATEGORY;
+}
+
+function updateEndedUseStyle() {
+  formPanel.classList.toggle("ended-use", Boolean(endOfUseDateInput.value));
+}
 
 function createAdditionalCostRow(cost = {}) {
   const row = document.createElement("div");
@@ -100,12 +120,16 @@ function fillForm(item) {
   idInput.value = item.id;
   nameInput.value = item.name;
   modelInput.value = item.model;
+  categoryInput.value = normalizeCategory(item.category);
   purchaseDateInput.value = item.purchaseDate;
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
+  updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
 }
+
+populateCategorySelect();
 
 toListButton.addEventListener("click", () => {
   window.location.href = "list.html";
@@ -129,6 +153,10 @@ additionalCostList.addEventListener("click", (event) => {
   }
 });
 
+endOfUseDateInput.addEventListener("input", () => {
+  updateEndedUseStyle();
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   formError.textContent = "";
@@ -138,6 +166,7 @@ form.addEventListener("submit", async (event) => {
     isUpdate: Boolean(state.editingId),
     name: nameInput.value.trim(),
     model: modelInput.value.trim(),
+    category: categoryInput.value,
     purchaseDate: purchaseDateInput.value,
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
@@ -172,6 +201,7 @@ onAuthChanged(async (user) => {
     formMode.textContent = "現在: 新規登録";
     submitButton.textContent = "登録する";
     cancelButton.hidden = true;
+    updateEndedUseStyle();
     renderAdditionalCosts([]);
     return;
   }

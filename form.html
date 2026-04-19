@@ -17,7 +17,7 @@
         <p class="subtitle">登録・編集</p>
       </header>
 
-      <section class="panel" aria-labelledby="form-title">
+      <section id="form-panel" class="panel" aria-labelledby="form-title">
         <h2 id="form-title">入力フォーム</h2>
         <p id="auth-status" class="form-mode"></p>
         <p id="auth-error" class="form-error"></p>
@@ -29,6 +29,8 @@
           <input id="name" type="text" autocomplete="off" required />
           <label for="model">型番</label>
           <input id="model" type="text" autocomplete="off" required />
+          <label for="category">分類</label>
+          <select id="category" required></select>
           <label for="purchase-date">購入日</label>
           <input id="purchase-date" type="date" required />
           <label for="purchase-price">購入価格（円）</label>

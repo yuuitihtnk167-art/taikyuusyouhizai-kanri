@@ -32,6 +32,14 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const ITEMS_COLLECTION = "durableGoodsItems";
+export const DEFAULT_CATEGORY = "other";
+export const CATEGORY_OPTIONS = [
+  { value: "home_appliance", label: "家電" },
+  { value: "car", label: "自動車" },
+  { value: "smartphone", label: "スマホ" },
+  { value: "pc", label: "パソコン" },
+  { value: "other", label: "その他" },
+];
 
 export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
@@ -68,6 +76,18 @@ export function formatCurrency(value) {
     currency: "JPY",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+export function normalizeCategory(value) {
+  const normalizedValue = String(value ?? "");
+  return CATEGORY_OPTIONS.some((category) => category.value === normalizedValue)
+    ? normalizedValue
+    : DEFAULT_CATEGORY;
+}
+
+export function getCategoryLabel(value) {
+  const normalizedValue = normalizeCategory(value);
+  return CATEGORY_OPTIONS.find((category) => category.value === normalizedValue)?.label ?? "その他";
 }
 
 export function calculateMonthlyCost(item) {
@@ -138,6 +158,7 @@ export async function loadItems(uid) {
       id: documentSnapshot.id,
       name: data.name ?? "",
       model: data.model ?? "",
+      category: normalizeCategory(data.category),
       purchaseDate: data.purchaseDate ?? "",
       purchasePrice: Number(data.purchasePrice ?? 0),
       yearsOfUse: Number(data.yearsOfUse ?? 0),
@@ -147,7 +168,11 @@ export async function loadItems(uid) {
       updatedAt: data.updatedAt ?? null,
     });
   });
-  items.sort((a, b) => Number(b.updatedAt?.seconds ?? 0) - Number(a.updatedAt?.seconds ?? 0));
+  items.sort((a, b) => {
+    const dateCompare = String(b.purchaseDate).localeCompare(String(a.purchaseDate));
+    if (dateCompare !== 0) return dateCompare;
+    return Number(b.updatedAt?.seconds ?? 0) - Number(a.updatedAt?.seconds ?? 0);
+  });
   return items;
 }
 
@@ -159,6 +184,7 @@ export async function loadItem(uid, itemId) {
     id: snapshot.id,
     name: data.name ?? "",
     model: data.model ?? "",
+    category: normalizeCategory(data.category),
     purchaseDate: data.purchaseDate ?? "",
     purchasePrice: Number(data.purchasePrice ?? 0),
     yearsOfUse: Number(data.yearsOfUse ?? 0),
@@ -171,6 +197,7 @@ export async function saveItem(uid, item) {
   const payload = {
     name: item.name,
     model: item.model,
+    category: normalizeCategory(item.category),
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
@@ -191,6 +218,7 @@ export async function removeItem(uid, itemId) {
 export function validateItem(item) {
   if (!item.name.trim()) return "商品名を入力してください。";
   if (!item.model.trim()) return "型番を入力してください。";
+  if (normalizeCategory(item.category) !== item.category) return "分類を選択してください。";
   if (!item.purchaseDate) return "購入日を入力してください。";
   if (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0) return "購入価格は0以上で入力してください。";
   if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用年数は1以上で入力してください。";
