@@ -198,6 +198,8 @@ button {
   color: var(--text);
   border: 1px solid var(--line);
   background: #fff;
+  text-align: center;
+  text-decoration: none;
 }
 
 .category-button[aria-pressed="true"] {
@@ -220,6 +222,31 @@ button {
   border-radius: 12px;
   padding: 14px;
   background: #fff;
+}
+
+.pc-launch-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  border-radius: 12px;
+  padding: 14px;
+  background: #f4f8ff;
+}
+
+.pc-launch-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.pc-launch-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.pc-launch-button {
+  width: 100%;
 }
 
 .item-header {

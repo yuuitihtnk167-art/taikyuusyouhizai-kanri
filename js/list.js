@@ -29,6 +29,8 @@ const detailEditButton = document.getElementById("detail-edit-button");
 const detailDeleteButton = document.getElementById("detail-delete-button");
 const detailCloseButton = document.getElementById("detail-close-button");
 
+const PC_MANAGEMENT_URL = "pc-management/index.html";
+
 const state = {
   uid: null,
   items: [],
@@ -67,6 +69,22 @@ function renderCategoryButtons() {
     button.append(label, total);
     categoryButtons.appendChild(button);
   }
+
+  const pcManagementLink = document.createElement("a");
+  pcManagementLink.className = "category-button pc-management-category-link";
+  pcManagementLink.href = PC_MANAGEMENT_URL;
+  pcManagementLink.setAttribute("aria-label", "パソコン管理を開く");
+
+  const label = document.createElement("span");
+  label.className = "category-button-label";
+  label.textContent = "パソコン管理";
+
+  const total = document.createElement("span");
+  total.className = "category-button-total";
+  total.textContent = "開く";
+
+  pcManagementLink.append(label, total);
+  categoryButtons.appendChild(pcManagementLink);
 }
 
 function renderList(items) {
@@ -124,12 +142,38 @@ function renderList(items) {
   }
 }
 
+function createPcManagementLauncher() {
+  const card = document.createElement("article");
+  card.className = "pc-launch-card";
+
+  const title = document.createElement("h3");
+  title.textContent = "自作PC管理";
+
+  const description = document.createElement("p");
+  description.textContent =
+    "CPU・GPU・メモリ・SSDなどのスペック、追加購入費、総投資額をPC専用画面で管理します。";
+
+  const launchButton = document.createElement("button");
+  launchButton.type = "button";
+  launchButton.className = "primary-button pc-launch-button";
+  launchButton.textContent = "PC管理アプリを起動";
+  launchButton.addEventListener("click", () => {
+    window.location.href = PC_MANAGEMENT_URL;
+  });
+
+  card.append(title, description, launchButton);
+  return card;
+}
+
 function renderFilteredList() {
   if (!state.selectedCategory) {
     renderCategoryPrompt();
     return;
   }
   renderList(state.items.filter((item) => item.category === state.selectedCategory));
+  if (state.selectedCategory === "pc") {
+    itemList.prepend(createPcManagementLauncher());
+  }
 }
 
 function selectedItem() {
