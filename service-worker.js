@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v28";
+const CACHE_NAME = "durable-goods-pwa-v29";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -19,6 +19,14 @@ const APP_SHELL = [
   "icons/icon-512.png",
 ].map((path) => new URL(path, BASE_URL).toString());
 const FALLBACK_URL = new URL("login.html", BASE_URL).toString();
+
+function isSameOriginRequest(request) {
+  return new URL(request.url).origin === BASE_URL.origin;
+}
+
+function isNavigationRequest(request) {
+  return request.mode === "navigate";
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -47,6 +55,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  if (!isSameOriginRequest(event.request)) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -59,7 +72,9 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => {
         return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || caches.match(FALLBACK_URL);
+          if (cachedResponse) return cachedResponse;
+          if (isNavigationRequest(event.request)) return caches.match(FALLBACK_URL);
+          return Response.error();
         });
       })
   );
