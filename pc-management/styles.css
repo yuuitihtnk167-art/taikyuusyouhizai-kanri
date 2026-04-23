@@ -289,6 +289,37 @@ button {
   font-size: 0.88rem;
 }
 
+.part-summary-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  text-align: left;
+}
+
+.part-summary-card:hover,
+.part-summary-card:focus-visible {
+  border-color: var(--primary);
+  outline: 3px solid rgba(33, 110, 95, 0.14);
+}
+
+.part-summary-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.part-summary-card strong {
+  color: var(--primary-strong);
+  font-size: 1.06rem;
+}
+
 .pc-cost-summary {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -368,6 +399,49 @@ button {
   overflow-wrap: anywhere;
 }
 
+.parts-dialog {
+  width: min(760px, calc(100% - 32px));
+  max-height: min(80vh, 680px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.parts-dialog::backdrop {
+  background: rgba(23, 32, 51, 0.42);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-header h2 {
+  margin: 2px 0 0;
+  font-size: 1.18rem;
+}
+
+.dialog-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.dialog-body {
+  display: grid;
+  gap: 10px;
+  max-height: calc(min(80vh, 680px) - 84px);
+  overflow: auto;
+  padding: 16px;
+}
+
 .empty {
   padding: 16px;
   color: var(--muted);
@@ -393,6 +467,15 @@ button {
   .part-row,
   .history-row {
     grid-template-columns: 1fr;
+  }
+
+  .part-summary-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-header {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .toolbar,

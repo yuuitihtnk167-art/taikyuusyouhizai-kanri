@@ -67,6 +67,10 @@ const elements = {
   addPartButton: document.getElementById("add-part-button"),
   partList: document.getElementById("part-list"),
   partRowTemplate: document.getElementById("part-row-template"),
+  partsDialog: document.getElementById("parts-dialog"),
+  partsDialogTitle: document.getElementById("parts-dialog-title"),
+  partsDialogBody: document.getElementById("parts-dialog-body"),
+  partsDialogClose: document.getElementById("parts-dialog-close"),
   exportButton: document.getElementById("export-button"),
   importFile: document.getElementById("import-file"),
   id: document.getElementById("pc-id"),
@@ -112,6 +116,17 @@ function normalizeUsage(value) {
 
 function normalizePartType(value) {
   return partTypeLabels[value] ? value : "other";
+}
+
+function toMillis(value, fallback = Date.now()) {
+  const timestampSeconds = Number(value?.seconds);
+  if (Number.isFinite(timestampSeconds)) {
+    const timestampNanoseconds = Number(value?.nanoseconds ?? 0);
+    return (timestampSeconds * 1000) + Math.floor(timestampNanoseconds / 1000000);
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
 }
 
 function normalizeLegacySpecs(value) {
@@ -250,8 +265,8 @@ function normalizePcItem(value) {
     yearsOfUse: Number(item.yearsOfUse ?? 5),
     specs: deriveCurrentSpecs(parts, legacySpecs),
     parts,
-    createdAt: Number.isFinite(Number(item.createdAt)) ? Number(item.createdAt) : Date.now(),
-    updatedAt: Number.isFinite(Number(item.updatedAt)) ? Number(item.updatedAt) : Date.now(),
+    createdAt: toMillis(item.createdAt),
+    updatedAt: toMillis(item.updatedAt),
   };
   return {
     ...normalized,
@@ -271,12 +286,19 @@ function toFirestorePayload(item) {
   const normalized = normalizePcItem(item);
   const totalInvestment = calculateTotalInvestment(normalized);
   return {
+    sourceType: SOURCE_TYPE,
     name: normalized.itemName,
     model: encodePcModel(normalized),
     category: "pc",
+    itemName: normalized.itemName,
+    usage: normalized.usage,
     purchaseDate: normalized.purchaseDate,
+    price: totalInvestment,
     purchasePrice: totalInvestment,
     yearsOfUse: normalized.yearsOfUse,
+    monthlyCost: calculateMonthlyCost(normalized),
+    specs: normalized.specs,
+    parts: normalized.parts,
     endOfUseDate: "",
     additionalCosts: normalized.parts.map((part) => ({
       id: part.id,
@@ -284,7 +306,7 @@ function toFirestorePayload(item) {
       memo: encodePartMemo(part),
       createdAt: Number.isFinite(Number(part.createdAt)) ? Number(part.createdAt) : Date.now(),
     })),
-    createdAt: serverTimestamp(),
+    createdAt: normalized.createdAt,
     updatedAt: serverTimestamp(),
   };
 }
@@ -305,7 +327,7 @@ async function loadFirestoreItems(uid) {
 
 async function saveFirestoreItem(uid, item) {
   const normalized = normalizePcItem(item);
-  await setDoc(pcItemDocRef(uid, normalized.id), toFirestorePayload(normalized), { merge: true });
+  await setDoc(pcItemDocRef(uid, normalized.id), toFirestorePayload(normalized));
 }
 
 async function removeFirestoreItem(uid, itemId) {
@@ -519,6 +541,18 @@ function renderSpecGrid(specs) {
     .join("");
 }
 
+function showPartsDialog(item) {
+  elements.partsDialogTitle.textContent = `${item.itemName}のパーツ一覧`;
+  elements.partsDialogBody.innerHTML = renderParts(item.parts);
+
+  if (typeof elements.partsDialog.showModal === "function") {
+    elements.partsDialog.showModal();
+    return;
+  }
+
+  elements.partsDialog.setAttribute("open", "");
+}
+
 function renderList() {
   elements.pcList.innerHTML = "";
   if (state.items.length === 0) {
@@ -561,10 +595,15 @@ function renderList() {
         ${renderSpecGrid(item.specs)}
       </dl>
 
-      <section aria-label="${escapeHtml(item.itemName)}のパーツ一覧">
-        <h4>パーツ一覧</h4>
-        ${renderParts(item.parts)}
-      </section>
+      <button
+        class="part-summary-card parts-dialog-button"
+        type="button"
+        data-id="${escapeHtml(item.id)}"
+        aria-label="${escapeHtml(item.itemName)}のパーツ一覧を表示"
+      >
+        <span>パーツ一覧</span>
+        <strong>${item.parts.length}件</strong>
+      </button>
     `;
     elements.pcList.appendChild(card);
   }
@@ -598,6 +637,16 @@ elements.partList.addEventListener("click", (event) => {
   target.closest(".part-row")?.remove();
   if (elements.partList.children.length === 0) {
     elements.partList.appendChild(createPartRow({ createdAt: Date.now() }));
+  }
+});
+
+elements.partsDialogClose.addEventListener("click", () => {
+  elements.partsDialog.close();
+});
+
+elements.partsDialog.addEventListener("click", (event) => {
+  if (event.target === elements.partsDialog) {
+    elements.partsDialog.close();
   }
 });
 
@@ -646,6 +695,13 @@ elements.pcList.addEventListener("click", async (event) => {
   if (editButton instanceof HTMLButtonElement) {
     const item = state.items.find((currentItem) => currentItem.id === editButton.dataset.id);
     if (item) fillForm(item);
+    return;
+  }
+
+  const partsDialogButton = target.closest(".parts-dialog-button");
+  if (partsDialogButton instanceof HTMLButtonElement) {
+    const item = state.items.find((currentItem) => currentItem.id === partsDialogButton.dataset.id);
+    if (item) showPartsDialog(item);
     return;
   }
 

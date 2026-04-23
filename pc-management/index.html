@@ -94,6 +94,17 @@
       </section>
     </main>
 
+    <dialog id="parts-dialog" class="parts-dialog" aria-labelledby="parts-dialog-title">
+      <div class="dialog-header">
+        <div>
+          <p class="dialog-subtitle">パーツ一覧</p>
+          <h2 id="parts-dialog-title">パーツ一覧</h2>
+        </div>
+        <button id="parts-dialog-close" class="ghost-button small-button" type="button">閉じる</button>
+      </div>
+      <div id="parts-dialog-body" class="dialog-body"></div>
+    </dialog>
+
     <template id="part-row-template">
       <div class="part-row">
         <select class="part-type" aria-label="パーツ種別">
