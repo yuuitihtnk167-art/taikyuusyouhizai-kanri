@@ -9,7 +9,10 @@ import {
 import {
   db,
   onAuthChanged,
+  decodePcManagementModel,
+  decodePcPartMemo,
   firebaseErrorMessage,
+  pcPartMemoDisplayText,
   registerServiceWorker,
 } from "../js/common.js";
 
@@ -145,25 +148,18 @@ function normalizeLegacySpecs(value) {
 
 function normalizeParts(value) {
   if (!Array.isArray(value)) return [];
-  return value.map((part) => ({
-    id: part?.id || createId(),
-    partType: normalizePartType(part?.partType),
-    partName: String(part?.partName ?? ""),
-    purchaseDate: String(part?.purchaseDate ?? ""),
-    price: Number(part?.price ?? 0),
-    memo: String(part?.memo ?? ""),
-    createdAt: Number.isFinite(Number(part?.createdAt)) ? Number(part.createdAt) : Date.now(),
-  }));
-}
-
-function parsePrefixedJson(value, prefix) {
-  const text = String(value ?? "");
-  if (!text.startsWith(prefix)) return null;
-  try {
-    return JSON.parse(text.slice(prefix.length));
-  } catch (_error) {
-    return null;
-  }
+  return value.map((part) => {
+    const decodedMemo = decodePcPartMemo(part?.memo);
+    return {
+      id: part?.id || createId(),
+      partType: normalizePartType(decodedMemo?.partType ?? part?.partType),
+      partName: String(decodedMemo?.partName ?? part?.partName ?? ""),
+      purchaseDate: String(decodedMemo?.purchaseDate ?? part?.purchaseDate ?? ""),
+      price: Number(part?.price ?? 0),
+      memo: String(decodedMemo?.memo ?? part?.memo ?? ""),
+      createdAt: Number.isFinite(Number(part?.createdAt)) ? Number(part.createdAt) : Date.now(),
+    };
+  });
 }
 
 function encodePcModel(item) {
@@ -177,7 +173,7 @@ function encodePcModel(item) {
 }
 
 function decodePcModel(value) {
-  return parsePrefixedJson(value, PC_MODEL_PREFIX);
+  return decodePcManagementModel(value);
 }
 
 function encodePartMemo(part) {
@@ -193,7 +189,7 @@ function decodePartsFromAdditionalCosts(value) {
   if (!Array.isArray(value)) return [];
   return value
     .map((cost) => {
-      const decoded = parsePrefixedJson(cost?.memo, PART_MEMO_PREFIX);
+      const decoded = decodePcPartMemo(cost?.memo);
       if (!decoded) return null;
       return {
         id: cost?.id || createId(),
@@ -404,16 +400,17 @@ function validatePcItem(item) {
 }
 
 function createPartRow(part = {}) {
+  const decodedMemo = decodePcPartMemo(part.memo);
   const fragment = elements.partRowTemplate.content.cloneNode(true);
   const row = fragment.querySelector(".part-row");
   row.dataset.id = part.id || createId();
   row.dataset.createdAt = Number.isFinite(Number(part.createdAt)) ? String(part.createdAt) : String(Date.now());
-  row.querySelector(".part-type").value = normalizePartType(part.partType);
-  row.querySelector(".part-purchase-date").value = part.purchaseDate ?? "";
-  row.querySelector(".part-name").value = part.partName ?? "";
+  row.querySelector(".part-type").value = normalizePartType(decodedMemo?.partType ?? part.partType);
+  row.querySelector(".part-purchase-date").value = decodedMemo?.purchaseDate ?? part.purchaseDate ?? "";
+  row.querySelector(".part-name").value = decodedMemo?.partName ?? part.partName ?? "";
   row.querySelector(".part-price").value =
     Number.isFinite(Number(part.price)) && Number(part.price) >= 0 ? part.price : "";
-  row.querySelector(".part-memo").value = part.memo ?? "";
+  row.querySelector(".part-memo").value = decodedMemo?.memo ?? pcPartMemoDisplayText(part.memo);
   return row;
 }
 
@@ -514,11 +511,11 @@ function renderParts(parts) {
         .map(
           (part) => `
             <div class="history-row">
-              <span>${escapeHtml(part.purchaseDate)}</span>
-              <span>${escapeHtml(partTypeLabels[part.partType] ?? "その他")}</span>
-              <strong>${escapeHtml(part.partName)}</strong>
-              <span>${formatCurrency(part.price)}</span>
-              <span>${escapeHtml(part.memo)}</span>
+              <span data-label="購入日">${escapeHtml(part.purchaseDate)}</span>
+              <span data-label="種別">${escapeHtml(partTypeLabels[part.partType] ?? "その他")}</span>
+              <strong data-label="パーツ名">${escapeHtml(part.partName)}</strong>
+              <span data-label="費用">${formatCurrency(part.price)}</span>
+              <span data-label="メモ">${escapeHtml(part.memo)}</span>
             </div>
           `
         )

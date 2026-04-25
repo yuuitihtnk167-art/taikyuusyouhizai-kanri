@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v31";
+const CACHE_NAME = "durable-goods-pwa-v34";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -17,7 +17,7 @@ const APP_SHELL = [
   "manifest.webmanifest",
   "icons/icon-192.png",
   "icons/icon-512.png",
-].map((path) => new URL(path, BASE_URL).toString());
+].map((path) => new Request(new URL(path, BASE_URL).toString(), { cache: "reload" }));
 const FALLBACK_URL = new URL("login.html", BASE_URL).toString();
 
 function isSameOriginRequest(request) {
@@ -61,7 +61,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then((networkResponse) => {
         if (!networkResponse || networkResponse.status !== 200) {
           return networkResponse;

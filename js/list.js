@@ -106,17 +106,7 @@ function resolveTimelineRange(items) {
 }
 
 function displayApplianceType(item) {
-  const text = `${item.name ?? ""} ${item.model ?? ""} ${getCategoryLabel(item.category)}`.toLowerCase();
-  if (item.category === "tv") return "テレビ";
-  if (item.category === "cooking_appliance") return "調理家電";
-  if (item.category === "washing_machine") return "洗濯機";
-  if (item.category === "pc" || /pc|パソコン|ノート|デスクトップ|mac|windows/.test(text)) return "パソコン";
-  if (/テレビ|tv|有機el|液晶/.test(text)) return "テレビ";
-  if (/洗濯|乾燥機|ランドリー/.test(text)) return "洗濯機";
-  if (/炊飯|電子レンジ|レンジ|オーブン|トースター|ih|調理|コンロ|ミキサー|ホットプレート/.test(text)) {
-    return "調理家電";
-  }
-  return "その他";
+  return getCategoryLabel(item.category);
 }
 
 function calculateLifecycleProgress(item) {
@@ -182,18 +172,38 @@ function renderAxis(grid, minYear, maxYear, positionClass) {
 }
 
 function renderCurrentLine(grid, minYear, maxYear) {
+  const currentPosition = currentLinePosition(minYear, maxYear);
+
+  if (currentPosition === null) return;
+
+  const currentLine = createElement("div", "timeline-current-line");
+  currentLine.style.left = `${currentPosition}px`;
+  currentLine.innerHTML = '<span>現在</span>';
+  grid.appendChild(currentLine);
+}
+
+function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const now = new Date();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
   const nowPosition = toMonthIndex(now) + now.getDate() / 31;
 
-  if (nowPosition < minMonth || nowPosition > maxMonth) return;
+  if (nowPosition < minMonth || nowPosition > maxMonth) return null;
+  return labelWidth + ((nowPosition - minMonth) / 12) * yearWidth;
+}
 
-  const currentLine = createElement("div", "timeline-current-line");
-  currentLine.style.left = `${labelWidth + ((nowPosition - minMonth) / 12) * yearWidth}px`;
-  currentLine.innerHTML = '<span>現在</span>';
-  grid.appendChild(currentLine);
+function centerCurrentLine(scroll, minYear, maxYear) {
+  const currentPosition = currentLinePosition(minYear, maxYear);
+  if (currentPosition === null) return;
+  const { labelWidth } = timelineLayout();
+
+  requestAnimationFrame(() => {
+    const maxScrollLeft = Math.max(scroll.scrollWidth - scroll.clientWidth, 0);
+    const visibleTimelineWidth = Math.max(scroll.clientWidth - labelWidth, 1);
+    const targetScrollLeft = currentPosition - labelWidth - visibleTimelineWidth / 2;
+    scroll.scrollLeft = Math.min(Math.max(targetScrollLeft, 0), maxScrollLeft);
+  });
 }
 
 function renderTimeline(items) {
@@ -261,6 +271,7 @@ function renderTimeline(items) {
   renderAxis(grid, minYear, maxYear, "timeline-axis-bottom");
   scroll.appendChild(grid);
   itemList.appendChild(scroll);
+  centerCurrentLine(scroll, minYear, maxYear);
 }
 
 function selectedItem() {

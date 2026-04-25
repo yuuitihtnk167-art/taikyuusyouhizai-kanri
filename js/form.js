@@ -8,7 +8,11 @@ import {
   normalizeCategory,
   CATEGORY_OPTIONS,
   DEFAULT_CATEGORY,
+  decodePcManagementModel,
+  decodePcPartMemo,
   firebaseErrorMessage,
+  pcManagementModelDisplayText,
+  pcPartMemoDisplayText,
   registerServiceWorker,
 } from "./common.js";
 
@@ -76,8 +80,13 @@ function createAdditionalCostRow(cost = {}) {
   memoInput.type = "text";
   memoInput.autocomplete = "off";
   memoInput.placeholder = "メモ";
-  memoInput.value = cost.memo ?? "";
+  memoInput.value = pcPartMemoDisplayText(cost.memo);
   memoInput.setAttribute("aria-label", "追加費用のメモ");
+  if (decodePcPartMemo(cost.memo)) {
+    row.dataset.encodedMemo = cost.memo;
+    memoInput.readOnly = true;
+    memoInput.title = "PC管理のパーツ情報です。編集はパソコン管理画面で行ってください。";
+  }
 
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-button small-button additional-cost-delete";
@@ -118,7 +127,7 @@ function collectAdditionalCosts() {
     if (!(amountInput instanceof HTMLInputElement) || !(memoInput instanceof HTMLInputElement)) continue;
 
     const rawAmount = amountInput.value.trim();
-    const memo = memoInput.value.trim();
+    const memo = row.dataset.encodedMemo || memoInput.value.trim();
     const createdAt = Number(row.dataset.createdAt);
     if (!rawAmount && !memo) continue;
 
@@ -135,7 +144,17 @@ function collectAdditionalCosts() {
 function fillForm(item) {
   idInput.value = item.id;
   nameInput.value = item.name;
-  modelInput.value = item.model;
+  if (decodePcManagementModel(item.model)) {
+    modelInput.value = pcManagementModelDisplayText(item.model);
+    modelInput.dataset.encodedModel = item.model;
+    modelInput.readOnly = true;
+    modelInput.title = "PC管理の内部データです。編集はパソコン管理画面で行ってください。";
+  } else {
+    modelInput.value = item.model;
+    delete modelInput.dataset.encodedModel;
+    modelInput.readOnly = false;
+    modelInput.title = "";
+  }
   categoryInput.value = normalizeCategory(item.category);
   purchaseDateInput.value = item.purchaseDate;
   purchasePriceInput.value = item.purchasePrice;
@@ -183,7 +202,7 @@ form.addEventListener("submit", async (event) => {
     id: idInput.value || createId(),
     isUpdate: Boolean(state.editingId),
     name: nameInput.value.trim(),
-    model: modelInput.value.trim(),
+    model: modelInput.dataset.encodedModel || modelInput.value.trim(),
     category: categoryInput.value,
     purchaseDate: purchaseDateInput.value,
     purchasePrice: Number(purchasePriceInput.value),

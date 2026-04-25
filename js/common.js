@@ -33,6 +33,8 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const ITEMS_COLLECTION = "durableGoodsItems";
 export const DEFAULT_CATEGORY = "other";
+export const PC_MODEL_PREFIX = "[pcManagement]";
+export const PC_PART_MEMO_PREFIX = "[pcPart]";
 export const CATEGORY_OPTIONS = [
   { value: "home_appliance", label: "家電" },
   { value: "tv", label: "テレビ" },
@@ -46,11 +48,19 @@ export const CATEGORY_OPTIONS = [
 
 export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
+  let isReloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (isReloadingForUpdate) return;
+    isReloadingForUpdate = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", async () => {
     try {
-      await navigator.serviceWorker.register(new URL("../service-worker.js", import.meta.url), {
+      const registration = await navigator.serviceWorker.register(new URL("../service-worker.js", import.meta.url), {
         scope: "../",
       });
+      await registration.update();
     } catch (_error) {
       // SW registration failure is non-fatal.
     }
@@ -91,6 +101,45 @@ export function normalizeCategory(value) {
 export function getCategoryLabel(value) {
   const normalizedValue = normalizeCategory(value);
   return CATEGORY_OPTIONS.find((category) => category.value === normalizedValue)?.label ?? "その他";
+}
+
+export function decodePcPartMemo(value) {
+  return parsePrefixedJson(value, PC_PART_MEMO_PREFIX);
+}
+
+export function decodePcManagementModel(value) {
+  return parsePrefixedJson(value, PC_MODEL_PREFIX);
+}
+
+function parsePrefixedJson(value, prefix) {
+  const text = String(value ?? "");
+  if (!text.startsWith(prefix)) return null;
+  const jsonText = text.slice(prefix.length);
+  try {
+    return JSON.parse(jsonText);
+  } catch (_error) {
+    try {
+      return JSON.parse(jsonText.replace(/("[^"]+"\s*:\s*"[^"]*")\.(\s*"[^"]+"\s*:)/g, "$1,$2"));
+    } catch (_fallbackError) {
+      return null;
+    }
+  }
+}
+
+export function pcPartMemoDisplayText(value) {
+  const decoded = decodePcPartMemo(value);
+  if (!decoded) return String(value ?? "");
+  const partName = String(decoded.partName ?? "").trim();
+  const memo = String(decoded.memo ?? "").trim();
+  if (partName && memo) return `${partName} / ${memo}`;
+  return partName || memo || "PCパーツ";
+}
+
+export function pcManagementModelDisplayText(value) {
+  const decoded = decodePcManagementModel(value);
+  if (!decoded) return String(value ?? "");
+  const itemName = String(decoded.itemName ?? "").trim();
+  return itemName ? `PC管理データ（${itemName}）` : "PC管理データ";
 }
 
 export function calculateMonthlyCost(item) {

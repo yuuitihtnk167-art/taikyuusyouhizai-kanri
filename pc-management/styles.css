@@ -469,6 +469,26 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .history-row {
+    gap: 6px;
+  }
+
+  .history-row span,
+  .history-row strong {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  .history-row span::before,
+  .history-row strong::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
   .part-summary-card {
     grid-template-columns: 1fr;
   }
