@@ -558,7 +558,7 @@ button {
       rgba(226, 232, 240, 0.12) 0,
       rgba(226, 232, 240, 0.12) 1px,
       transparent 1px,
-      transparent 168px
+      transparent var(--year-width)
     ),
     linear-gradient(90deg, rgba(17, 24, 32, 0.38), rgba(42, 55, 67, 0.26));
 }
@@ -929,6 +929,45 @@ button {
   background: rgba(63, 78, 92, 0.86);
 }
 
+.item-name-dialog {
+  width: min(420px, calc(100% - 32px));
+  padding: 0;
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.24);
+  border-radius: 8px;
+  background: rgba(31, 42, 53, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.item-name-dialog::backdrop {
+  background: rgba(6, 10, 14, 0.62);
+}
+
+.item-name-dialog-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+}
+
+.item-name-dialog-card h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  overflow-wrap: anywhere;
+}
+
+.dialog-item-meta {
+  margin: 0;
+  color: #b9c6d3;
+  font-size: 0.95rem;
+}
+
+.item-name-dialog-card .ghost-button {
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 5px;
+  background: rgba(44, 55, 66, 0.78);
+}
+
 @media (max-width: 980px) {
   .dashboard-header {
     grid-template-columns: 1fr;
@@ -945,28 +984,182 @@ button {
 
 @media (max-width: 640px) {
   .dashboard-app {
-    padding: 14px 10px 22px;
+    padding: 6px 6px 16px;
+  }
+
+  .dashboard-header {
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+
+  .dashboard-title h1 {
+    font-size: 0.95rem;
+  }
+
+  .dashboard-body .subtitle {
+    display: none;
   }
 
   .summary-panel {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1.3fr 1fr 0.7fr;
+    min-height: 38px;
   }
 
   .summary-item {
-    padding: 14px 16px;
-    border-top: 1px solid rgba(203, 213, 225, 0.2);
-    border-left: none;
+    gap: 2px;
+    padding: 5px 6px;
+    border-top: none;
+    border-left: 1px solid rgba(203, 213, 225, 0.2);
   }
 
   .summary-item:first-child {
-    border-top: none;
+    border-left: none;
+  }
+
+  .summary-label {
+    font-size: 0.58rem;
+  }
+
+  .summary-item strong,
+  .summary-item:not(.summary-item-primary) strong {
+    font-size: 0.78rem;
+  }
+
+  .dashboard-actions {
+    grid-template-columns: 1fr 34px;
+    gap: 6px;
+  }
+
+  .dashboard-actions button {
+    min-height: 30px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+  }
+
+  .dashboard-actions .ghost-button::before {
+    font-size: 0.98rem;
+  }
+
+  .dashboard-body .panel {
+    margin-top: 8px;
   }
 
   .timeline-panel > h2,
   .timeline-panel > .form-mode,
   .timeline-panel > .form-error {
-    margin-left: 12px;
-    margin-right: 12px;
+    margin-left: 8px;
+    margin-right: 8px;
+  }
+
+  .timeline-panel > h2 {
+    margin-top: 8px;
+    margin-bottom: 4px;
+    font-size: 0.78rem;
+  }
+
+  .timeline-panel > .form-mode,
+  .timeline-panel > .form-error {
+    margin-bottom: 4px;
+    font-size: 0.62rem;
+  }
+
+  .timeline-shell {
+    min-height: 188px;
+  }
+
+  .timeline-grid {
+    min-height: 174px;
+    padding: 30px 0;
+  }
+
+  .timeline-grid::before {
+    top: 30px;
+    bottom: 30px;
+  }
+
+  .timeline-axis {
+    height: 30px;
+  }
+
+  .timeline-year {
+    font-size: 0.68rem;
+  }
+
+  .timeline-axis-top .timeline-year {
+    top: 8px;
+  }
+
+  .timeline-axis-bottom .timeline-year {
+    bottom: 8px;
+  }
+
+  .timeline-tick {
+    height: 3px;
+  }
+
+  .timeline-tick.major {
+    height: 7px;
+  }
+
+  .timeline-current-line {
+    top: 24px;
+    bottom: 24px;
+    width: 1px;
+  }
+
+  .timeline-current-line::before,
+  .timeline-current-line::after {
+    border-right-width: 5px;
+    border-left-width: 5px;
+  }
+
+  .timeline-current-line::before {
+    top: 4px;
+    border-bottom-width: 8px;
+  }
+
+  .timeline-current-line::after {
+    bottom: 4px;
+    border-top-width: 8px;
+  }
+
+  .timeline-current-line span {
+    margin-top: 14px;
+    font-size: 0.54rem;
+  }
+
+  .timeline-row {
+    height: 40px;
+  }
+
+  .timeline-row-label {
+    gap: 4px;
+    padding: 0 5px;
+  }
+
+  .timeline-row-label strong {
+    font-size: 0.58rem;
+  }
+
+  .status-swatch {
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+  }
+
+  .lifecycle-band {
+    top: 7px;
+    gap: 4px;
+    height: 24px;
+    min-height: 24px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 0.56rem;
+  }
+
+  .band-cost,
+  .timeline-end-label {
+    display: none;
   }
 
   .selected-detail-panel {

@@ -35,6 +35,9 @@ export const ITEMS_COLLECTION = "durableGoodsItems";
 export const DEFAULT_CATEGORY = "other";
 export const CATEGORY_OPTIONS = [
   { value: "home_appliance", label: "家電" },
+  { value: "tv", label: "テレビ" },
+  { value: "cooking_appliance", label: "調理家電" },
+  { value: "washing_machine", label: "洗濯機" },
   { value: "car", label: "自動車" },
   { value: "smartphone", label: "スマホ" },
   { value: "pc", label: "パソコン" },

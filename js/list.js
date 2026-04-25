@@ -25,16 +25,23 @@ const detailName = document.getElementById("detail-name");
 const detailContent = document.getElementById("detail-content");
 const detailEditButton = document.getElementById("detail-edit-button");
 const detailDeleteButton = document.getElementById("detail-delete-button");
+const itemNameDialog = document.getElementById("item-name-dialog");
+const dialogItemName = document.getElementById("dialog-item-name");
+const dialogItemMeta = document.getElementById("dialog-item-meta");
+const dialogCloseButton = document.getElementById("dialog-close-button");
 
 const TIMELINE_MIN_YEAR = 2015;
 const TIMELINE_MAX_YEAR = 2055;
-const YEAR_WIDTH = 168;
-const LABEL_WIDTH = 230;
+const DESKTOP_YEAR_WIDTH = 168;
+const DESKTOP_LABEL_WIDTH = 230;
+const MOBILE_YEAR_WIDTH = 28;
+const MOBILE_LABEL_WIDTH = 72;
 
 const state = {
   uid: null,
   items: [],
   selectedItemId: null,
+  resizeTimer: null,
 };
 
 function createElement(tagName, className, textContent = "") {
@@ -69,6 +76,15 @@ function itemEndMonth(item) {
   return itemStartMonth(item) + Math.max(Number(item.yearsOfUse) || 1, 1) * 12;
 }
 
+function timelineLayout() {
+  const isCompact = window.matchMedia("(max-width: 640px)").matches;
+  return {
+    isCompact,
+    labelWidth: isCompact ? MOBILE_LABEL_WIDTH : DESKTOP_LABEL_WIDTH,
+    yearWidth: isCompact ? MOBILE_YEAR_WIDTH : DESKTOP_YEAR_WIDTH,
+  };
+}
+
 function resolveTimelineRange(items) {
   let minYear = TIMELINE_MIN_YEAR;
   let maxYear = TIMELINE_MAX_YEAR;
@@ -79,6 +95,20 @@ function resolveTimelineRange(items) {
   }
 
   return { minYear, maxYear };
+}
+
+function displayApplianceType(item) {
+  const text = `${item.name ?? ""} ${item.model ?? ""} ${getCategoryLabel(item.category)}`.toLowerCase();
+  if (item.category === "tv") return "テレビ";
+  if (item.category === "cooking_appliance") return "調理家電";
+  if (item.category === "washing_machine") return "洗濯機";
+  if (item.category === "pc" || /pc|パソコン|ノート|デスクトップ|mac|windows/.test(text)) return "パソコン";
+  if (/テレビ|tv|有機el|液晶/.test(text)) return "テレビ";
+  if (/洗濯|乾燥機|ランドリー/.test(text)) return "洗濯機";
+  if (/炊飯|電子レンジ|レンジ|オーブン|トースター|ih|調理|コンロ|ミキサー|ホットプレート/.test(text)) {
+    return "調理家電";
+  }
+  return "その他";
 }
 
 function calculateLifecycleProgress(item) {
@@ -123,18 +153,20 @@ function renderEmptyTimeline() {
 }
 
 function renderAxis(grid, minYear, maxYear, positionClass) {
+  const { isCompact, labelWidth, yearWidth } = timelineLayout();
   const axis = createElement("div", `timeline-axis ${positionClass}`);
   const yearCount = maxYear - minYear;
 
   for (let year = minYear; year <= maxYear; year += 1) {
+    if (isCompact && year % 5 !== 0) continue;
     const marker = createElement("span", "timeline-year", String(year));
-    marker.style.left = `${LABEL_WIDTH + (year - minYear) * YEAR_WIDTH}px`;
+    marker.style.left = `${labelWidth + (year - minYear) * yearWidth}px`;
     axis.appendChild(marker);
   }
 
   for (let index = 0; index <= yearCount * 12; index += 1) {
     const tick = createElement("span", index % 12 === 0 ? "timeline-tick major" : "timeline-tick");
-    tick.style.left = `${LABEL_WIDTH + (index / 12) * YEAR_WIDTH}px`;
+    tick.style.left = `${labelWidth + (index / 12) * yearWidth}px`;
     axis.appendChild(tick);
   }
 
@@ -142,6 +174,7 @@ function renderAxis(grid, minYear, maxYear, positionClass) {
 }
 
 function renderCurrentLine(grid, minYear, maxYear) {
+  const { labelWidth, yearWidth } = timelineLayout();
   const now = new Date();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
@@ -150,7 +183,7 @@ function renderCurrentLine(grid, minYear, maxYear) {
   if (nowPosition < minMonth || nowPosition > maxMonth) return;
 
   const currentLine = createElement("div", "timeline-current-line");
-  currentLine.style.left = `${LABEL_WIDTH + ((nowPosition - minMonth) / 12) * YEAR_WIDTH}px`;
+  currentLine.style.left = `${labelWidth + ((nowPosition - minMonth) / 12) * yearWidth}px`;
   currentLine.innerHTML = '<span>現在</span>';
   grid.appendChild(currentLine);
 }
@@ -163,7 +196,8 @@ function renderTimeline(items) {
   }
 
   const { minYear, maxYear } = resolveTimelineRange(items);
-  const timelineWidth = LABEL_WIDTH + (maxYear - minYear) * YEAR_WIDTH;
+  const { labelWidth, yearWidth } = timelineLayout();
+  const timelineWidth = labelWidth + (maxYear - minYear) * yearWidth;
   const minMonth = minYear * 12;
 
   const scroll = createElement("div", "timeline-scroll");
@@ -172,7 +206,8 @@ function renderTimeline(items) {
 
   const grid = createElement("div", "timeline-grid");
   grid.style.width = `${timelineWidth}px`;
-  grid.style.setProperty("--label-width", `${LABEL_WIDTH}px`);
+  grid.style.setProperty("--label-width", `${labelWidth}px`);
+  grid.style.setProperty("--year-width", `${yearWidth}px`);
 
   renderAxis(grid, minYear, maxYear, "timeline-axis-top");
   renderCurrentLine(grid, minYear, maxYear);
@@ -182,14 +217,14 @@ function renderTimeline(items) {
     const startMonth = itemStartMonth(item);
     const endMonth = itemEndMonth(item);
     const status = lifecycleStatus(item);
-    const left = LABEL_WIDTH + ((startMonth - minMonth) / 12) * YEAR_WIDTH;
-    const width = Math.max(((endMonth - startMonth) / 12) * YEAR_WIDTH, 84);
+    const left = labelWidth + ((startMonth - minMonth) / 12) * yearWidth;
+    const width = Math.max(((endMonth - startMonth) / 12) * yearWidth, timelineLayout().isCompact ? 32 : 84);
     const isSelected = item.id === state.selectedItemId;
 
     const row = createElement("div", "timeline-row");
     const label = createElement("div", "timeline-row-label");
     label.innerHTML = `<span class="status-swatch status-${status}"></span><strong></strong>`;
-    label.querySelector("strong").textContent = item.name;
+    label.querySelector("strong").textContent = displayApplianceType(item);
 
     const band = createElement("button", `lifecycle-band status-${status}`);
     band.type = "button";
@@ -265,7 +300,18 @@ function selectedItem() {
 function selectItem(itemId) {
   state.selectedItemId = itemId;
   renderTimeline(state.items);
-  renderDetail(selectedItem());
+  const item = selectedItem();
+  renderDetail(item);
+  openItemNameDialog(item);
+}
+
+function openItemNameDialog(item) {
+  if (!item || !itemNameDialog) return;
+  dialogItemName.textContent = item.name || "商品名未入力";
+  dialogItemMeta.textContent = `${displayApplianceType(item)} / ${formatCurrency(
+    calculateMonthlyCostWithAdditionalCosts(item)
+  )} /月`;
+  itemNameDialog.showModal();
 }
 
 async function refreshList() {
@@ -329,6 +375,21 @@ detailDeleteButton.addEventListener("click", async () => {
   } finally {
     detailDeleteButton.disabled = false;
   }
+});
+
+dialogCloseButton.addEventListener("click", () => {
+  itemNameDialog.close();
+});
+
+itemNameDialog.addEventListener("click", (event) => {
+  if (event.target === itemNameDialog) itemNameDialog.close();
+});
+
+window.addEventListener("resize", () => {
+  window.clearTimeout(state.resizeTimer);
+  state.resizeTimer = window.setTimeout(() => {
+    renderTimeline(state.items);
+  }, 120);
 });
 
 onAuthChanged(async (user) => {
