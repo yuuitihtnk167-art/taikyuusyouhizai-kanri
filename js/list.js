@@ -3,7 +3,6 @@ import {
   logout,
   loadItems,
   removeItem,
-  calculateAdditionalCostTotal,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
   getCategoryLabel,
@@ -21,13 +20,11 @@ const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
 const summaryItemCount = document.getElementById("summary-item-count");
 
-const detailName = document.getElementById("detail-name");
-const detailContent = document.getElementById("detail-content");
-const detailEditButton = document.getElementById("detail-edit-button");
-const detailDeleteButton = document.getElementById("detail-delete-button");
 const itemNameDialog = document.getElementById("item-name-dialog");
 const dialogItemName = document.getElementById("dialog-item-name");
 const dialogItemMeta = document.getElementById("dialog-item-meta");
+const dialogEditButton = document.getElementById("dialog-edit-button");
+const dialogDeleteButton = document.getElementById("dialog-delete-button");
 const dialogCloseButton = document.getElementById("dialog-close-button");
 
 const TIMELINE_MIN_YEAR = 2015;
@@ -73,7 +70,18 @@ function itemStartMonth(item) {
 }
 
 function itemEndMonth(item) {
+  const endOfUseDate = parseDate(item.endOfUseDate);
+  if (endOfUseDate) {
+    return Math.max(itemStartMonth(item), toMonthIndex(endOfUseDate));
+  }
   return itemStartMonth(item) + Math.max(Number(item.yearsOfUse) || 1, 1) * 12;
+}
+
+function itemEndLabel(item, endMonth) {
+  if (item.endOfUseDate) {
+    return `${formatYearMonthFromIndex(endMonth)} (使用終了)`;
+  }
+  return `${formatYearMonthFromIndex(endMonth)} (${item.yearsOfUse}年)`;
 }
 
 function timelineLayout() {
@@ -241,7 +249,7 @@ function renderTimeline(items) {
     const endLabel = createElement(
       "span",
       `timeline-end-label status-${status}`,
-      `${formatYearMonthFromIndex(endMonth)} (${item.yearsOfUse}年)`
+      itemEndLabel(item, endMonth)
     );
     endLabel.style.left = `${left + width + 10}px`;
 
@@ -255,44 +263,6 @@ function renderTimeline(items) {
   itemList.appendChild(scroll);
 }
 
-function createDetailMetric(label, value) {
-  const wrapper = createElement("div", "detail-metric");
-  const labelElement = createElement("span", "", label);
-  const valueElement = createElement("strong", "", value);
-  wrapper.append(labelElement, valueElement);
-  return wrapper;
-}
-
-function renderDetail(item) {
-  if (!item) {
-    detailName.textContent = "商品を選択してください";
-    detailContent.innerHTML = '<p class="empty">帯をタップすると詳細を表示します。</p>';
-    detailEditButton.disabled = true;
-    detailDeleteButton.disabled = true;
-    return;
-  }
-
-  const startMonth = itemStartMonth(item);
-  const endMonth = itemEndMonth(item);
-  const additionalCostTotal = calculateAdditionalCostTotal(item);
-
-  detailName.textContent = item.name;
-  detailContent.innerHTML = "";
-  detailContent.append(
-    createDetailMetric("分類", getCategoryLabel(item.category)),
-    createDetailMetric("型番", item.model || "未入力"),
-    createDetailMetric("購入日", item.purchaseDate || "未入力"),
-    createDetailMetric("耐用終了予定", formatYearMonthFromIndex(endMonth)),
-    createDetailMetric("予定耐用年数", `${item.yearsOfUse} 年`),
-    createDetailMetric("購入金額", formatCurrency(item.purchasePrice)),
-    createDetailMetric("追加費用", formatCurrency(additionalCostTotal)),
-    createDetailMetric("月額コスト", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`),
-    createDetailMetric("ライフサイクル", `${formatYearMonthFromIndex(startMonth)} - ${formatYearMonthFromIndex(endMonth)}`)
-  );
-  detailEditButton.disabled = false;
-  detailDeleteButton.disabled = false;
-}
-
 function selectedItem() {
   return state.items.find((item) => item.id === state.selectedItemId) ?? null;
 }
@@ -301,7 +271,6 @@ function selectItem(itemId) {
   state.selectedItemId = itemId;
   renderTimeline(state.items);
   const item = selectedItem();
-  renderDetail(item);
   openItemNameDialog(item);
 }
 
@@ -321,12 +290,10 @@ async function refreshList() {
   }
   summarizeItems(state.items);
   renderTimeline(state.items);
-  renderDetail(selectedItem());
 }
 
 summarizeItems([]);
 renderEmptyTimeline();
-renderDetail(null);
 
 createButton.addEventListener("click", () => {
   window.location.href = "form.html";
@@ -352,13 +319,13 @@ itemList.addEventListener("click", (event) => {
   selectItem(band.dataset.id ?? "");
 });
 
-detailEditButton.addEventListener("click", () => {
+dialogEditButton.addEventListener("click", () => {
   const item = selectedItem();
   if (!item) return;
   window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
 });
 
-detailDeleteButton.addEventListener("click", async () => {
+dialogDeleteButton.addEventListener("click", async () => {
   const item = selectedItem();
   if (!item || !state.uid) return;
   const shouldDelete = confirm(`「${item.name}」を削除しますか？`);
@@ -366,14 +333,15 @@ detailDeleteButton.addEventListener("click", async () => {
 
   authError.textContent = "";
   try {
-    detailDeleteButton.disabled = true;
+    dialogDeleteButton.disabled = true;
     await removeItem(state.uid, item.id);
+    itemNameDialog.close();
     state.selectedItemId = null;
     await refreshList();
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "削除に失敗しました。");
   } finally {
-    detailDeleteButton.disabled = false;
+    dialogDeleteButton.disabled = false;
   }
 });
 

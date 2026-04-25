@@ -44,22 +44,6 @@
         <div id="item-list" class="timeline-shell"></div>
       </section>
 
-      <section id="detail-panel" class="panel selected-detail-panel" aria-labelledby="detail-name">
-        <div class="selected-detail-heading">
-          <div>
-            <p class="detail-kicker">選択中</p>
-            <h2 id="detail-name">商品を選択してください</h2>
-          </div>
-          <div class="detail-actions">
-            <button id="detail-edit-button" type="button" class="primary-button" disabled>編集</button>
-            <button id="detail-delete-button" type="button" class="danger-button" disabled>削除</button>
-          </div>
-        </div>
-        <div id="detail-content" class="detail-grid">
-          <p class="empty">帯をタップすると詳細を表示します。</p>
-        </div>
-      </section>
-
       <section class="pc-management-launch" aria-label="パソコン管理">
         <a class="pc-management-button" href="pc-management/index.html">パソコン管理を開く</a>
       </section>
@@ -70,7 +54,11 @@
         <p class="detail-kicker">商品名</p>
         <h2 id="dialog-item-name"></h2>
         <p id="dialog-item-meta" class="dialog-item-meta"></p>
-        <button id="dialog-close-button" type="button" class="ghost-button">閉じる</button>
+        <div class="dialog-actions">
+          <button id="dialog-edit-button" type="button" class="primary-button">編集</button>
+          <button id="dialog-delete-button" type="button" class="danger-button">削除</button>
+          <button id="dialog-close-button" type="button" class="ghost-button">閉じる</button>
+        </div>
       </article>
     </dialog>
     <script type="module" src="js/list.js"></script>

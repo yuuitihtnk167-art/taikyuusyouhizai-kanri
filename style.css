@@ -823,79 +823,12 @@ button {
   font-size: 1.2rem;
 }
 
-.selected-detail-panel {
-  padding: 20px 24px;
-}
-
-.selected-detail-heading {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-}
-
 .detail-kicker {
   margin: 0 0 8px;
   color: #8fb5d8;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
-}
-
-.selected-detail-heading h2 {
-  margin: 0;
-  font-size: 1.28rem;
-}
-
-.selected-detail-heading .detail-actions {
-  display: flex;
-  gap: 10px;
-  margin: 0;
-}
-
-.selected-detail-heading .detail-actions button {
-  width: auto;
-  min-width: 96px;
-  min-height: 44px;
-  border-radius: 5px;
-}
-
-.selected-detail-heading .detail-actions button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(9, minmax(118px, 1fr));
-  gap: 0;
-  margin-top: 18px;
-  overflow-x: auto;
-}
-
-.detail-metric {
-  display: grid;
-  gap: 8px;
-  min-width: 128px;
-  padding: 0 22px;
-  border-left: 1px solid rgba(226, 232, 240, 0.2);
-}
-
-.detail-metric:first-child {
-  border-left: none;
-  padding-left: 0;
-}
-
-.detail-metric span {
-  color: #b9c6d3;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.detail-metric strong {
-  overflow-wrap: anywhere;
-  color: #f8fafc;
-  font-size: 1.06rem;
 }
 
 .dashboard-body .empty {
@@ -966,6 +899,18 @@ button {
   border: 1px solid rgba(226, 232, 240, 0.26);
   border-radius: 5px;
   background: rgba(44, 55, 66, 0.78);
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.dialog-actions button {
+  min-height: 44px;
+  border-radius: 5px;
+  font-size: 0.95rem;
 }
 
 @media (max-width: 980px) {
@@ -1162,20 +1107,11 @@ button {
     display: none;
   }
 
-  .selected-detail-panel {
+  .item-name-dialog-card {
     padding: 16px;
   }
 
-  .selected-detail-heading {
+  .dialog-actions {
     grid-template-columns: 1fr;
-  }
-
-  .selected-detail-heading .detail-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .selected-detail-heading .detail-actions button {
-    width: 100%;
   }
 }
