@@ -12,14 +12,21 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "local-server",
-        "pattern": {
-          "regexp": ".*"
-        },
+        "pattern": [
+          {
+            "regexp": ".+"
+          }
+        ],
         "background": {
           "activeOnStart": true,
           "beginsPattern": ".*",
-          "endsPattern": "Serving HTTP on.*"
+          "endsPattern": "Serving HTTP on .* port 5501"
         }
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "clear": true
       }
     }
   ]

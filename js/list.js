@@ -3,15 +3,10 @@ import {
   logout,
   loadItems,
   removeItem,
-  calculateMonthlyCost,
   calculateAdditionalCostTotal,
   calculateMonthlyCostWithAdditionalCosts,
-  calculateUsageMonths,
-  calculateActualMonthlyCost,
   formatCurrency,
   getCategoryLabel,
-  CATEGORY_OPTIONS,
-  escapeHtml,
   firebaseErrorMessage,
   registerServiceWorker,
 } from "./common.js";
@@ -20,202 +15,275 @@ const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const createButton = document.getElementById("create-button");
-const categoryButtons = document.getElementById("category-buttons");
 const itemList = document.getElementById("item-list");
 
-const detailDialog = document.getElementById("detail-dialog");
+const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
+const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
+const summaryItemCount = document.getElementById("summary-item-count");
+
 const detailName = document.getElementById("detail-name");
+const detailContent = document.getElementById("detail-content");
 const detailEditButton = document.getElementById("detail-edit-button");
 const detailDeleteButton = document.getElementById("detail-delete-button");
-const detailCloseButton = document.getElementById("detail-close-button");
 
-const PC_MANAGEMENT_URL = "pc-management/index.html";
+const TIMELINE_MIN_YEAR = 2015;
+const TIMELINE_MAX_YEAR = 2055;
+const YEAR_WIDTH = 168;
+const LABEL_WIDTH = 230;
 
 const state = {
   uid: null,
   items: [],
   selectedItemId: null,
-  selectedCategory: "",
 };
 
-function renderCategoryPrompt() {
-  itemList.innerHTML = '<div class="empty">分類を選択してください。</div>';
+function createElement(tagName, className, textContent = "") {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  if (textContent) element.textContent = textContent;
+  return element;
 }
 
-function calculateActiveMonthlyCostTotal(categoryValue) {
-  return state.items
-    .filter((item) => item.category === categoryValue && !item.endOfUseDate)
-    .reduce((total, item) => total + calculateMonthlyCostWithAdditionalCosts(item), 0);
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function renderCategoryButtons() {
-  categoryButtons.innerHTML = "";
-
-  for (const category of CATEGORY_OPTIONS) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "category-button";
-    button.dataset.category = category.value;
-    button.setAttribute("aria-pressed", String(state.selectedCategory === category.value));
-
-    const label = document.createElement("span");
-    label.className = "category-button-label";
-    label.textContent = category.label;
-
-    const total = document.createElement("span");
-    total.className = "category-button-total";
-    total.textContent = formatCurrency(calculateActiveMonthlyCostTotal(category.value));
-
-    button.append(label, total);
-    categoryButtons.appendChild(button);
-  }
-
-  const pcManagementLink = document.createElement("a");
-  pcManagementLink.className = "category-button pc-management-category-link";
-  pcManagementLink.href = PC_MANAGEMENT_URL;
-  pcManagementLink.setAttribute("aria-label", "パソコン管理を開く");
-
-  const label = document.createElement("span");
-  label.className = "category-button-label";
-  label.textContent = "パソコン管理";
-
-  const total = document.createElement("span");
-  total.className = "category-button-total";
-  total.textContent = "開く";
-
-  pcManagementLink.append(label, total);
-  categoryButtons.appendChild(pcManagementLink);
+function toMonthIndex(date) {
+  return date.getFullYear() * 12 + date.getMonth();
 }
 
-function renderList(items) {
-  itemList.innerHTML = "";
-  if (items.length === 0) {
-    itemList.innerHTML = '<div class="empty">この分類の商品はまだ登録されていません。</div>';
-    return;
-  }
+function formatYearMonthFromIndex(monthIndex) {
+  const year = Math.floor(monthIndex / 12);
+  const month = (monthIndex % 12) + 1;
+  return `${year}/${String(month).padStart(2, "0")}`;
+}
+
+function itemStartMonth(item) {
+  const purchaseDate = parseDate(item.purchaseDate);
+  return purchaseDate ? toMonthIndex(purchaseDate) : TIMELINE_MIN_YEAR * 12;
+}
+
+function itemEndMonth(item) {
+  return itemStartMonth(item) + Math.max(Number(item.yearsOfUse) || 1, 1) * 12;
+}
+
+function resolveTimelineRange(items) {
+  let minYear = TIMELINE_MIN_YEAR;
+  let maxYear = TIMELINE_MAX_YEAR;
 
   for (const item of items) {
-    const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
-    const additionalCostTotal = calculateAdditionalCostTotal(item);
-    const actualMonthlyCost = calculateActualMonthlyCost(item);
-    const usageMonthsText = usageMonths ? `${usageMonths}か月` : "未入力";
-    const actualCostText = actualMonthlyCost !== null ? formatCurrency(actualMonthlyCost) : "未入力";
-
-    const card = document.createElement("article");
-    card.className = "item-card";
-    if (item.endOfUseDate) card.classList.add("ended-use");
-    card.dataset.id = item.id;
-    card.tabIndex = 0;
-    card.setAttribute("role", "button");
-    card.setAttribute("aria-label", `${item.name}の操作を開く`);
-
-    card.innerHTML = `
-      <div class="item-header">
-        <h3 class="item-name">
-          <button type="button" class="item-name-button" data-id="${item.id}">
-            ${escapeHtml(item.name)}
-          </button>
-        </h3>
-      </div>
-      <p class="item-meta">型番: ${escapeHtml(item.model)} / 分類: ${escapeHtml(getCategoryLabel(item.category))} / 購入日: ${escapeHtml(item.purchaseDate)}</p>
-      <div class="costs">
-        <div class="cost-row">
-          <span class="cost-label">本体のみの月額コスト</span>
-          <span class="cost-value">${formatCurrency(calculateMonthlyCost(item))}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">追加費用込みの月額コスト</span>
-          <span class="cost-value">${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">実質月額コスト</span>
-          <span class="cost-value">${actualCostText}</span>
-        </div>
-      </div>
-      <p class="item-meta">購入価格: ${formatCurrency(item.purchasePrice)}</p>
-      <p class="item-meta">追加費用合計: ${formatCurrency(additionalCostTotal)}</p>
-      <p class="item-meta">使用年数: ${item.yearsOfUse}年</p>
-      <p class="item-meta">使用終了日: ${item.endOfUseDate ? escapeHtml(item.endOfUseDate) : "未入力"}</p>
-      <p class="item-meta">使用月数: ${usageMonthsText}</p>
-    `;
-    itemList.appendChild(card);
+    minYear = Math.min(minYear, Math.floor(itemStartMonth(item) / 12));
+    maxYear = Math.max(maxYear, Math.ceil(itemEndMonth(item) / 12));
   }
+
+  return { minYear, maxYear };
 }
 
-function createPcManagementLauncher() {
-  const card = document.createElement("article");
-  card.className = "pc-launch-card";
-
-  const title = document.createElement("h3");
-  title.textContent = "自作PC管理";
-
-  const description = document.createElement("p");
-  description.textContent =
-    "CPU・GPU・メモリ・SSDなどのスペック、追加購入費、総投資額をPC専用画面で管理します。";
-
-  const launchButton = document.createElement("button");
-  launchButton.type = "button";
-  launchButton.className = "primary-button pc-launch-button";
-  launchButton.textContent = "PC管理アプリを起動";
-  launchButton.addEventListener("click", () => {
-    window.location.href = PC_MANAGEMENT_URL;
-  });
-
-  card.append(title, description, launchButton);
-  return card;
+function calculateLifecycleProgress(item) {
+  const now = new Date();
+  const nowMonth = toMonthIndex(now);
+  const startMonth = itemStartMonth(item);
+  const durationMonths = Math.max(itemEndMonth(item) - startMonth, 1);
+  return (nowMonth - startMonth) / durationMonths;
 }
 
-function renderFilteredList() {
-  if (!state.selectedCategory) {
-    renderCategoryPrompt();
+function lifecycleStatus(item) {
+  if (item.endOfUseDate) return "ended";
+
+  const progress = calculateLifecycleProgress(item);
+  if (progress >= 1) return "ended";
+  if (progress >= 0.85) return "danger";
+  if (progress >= 0.5) return "warning";
+  return "normal";
+}
+
+function summarizeItems(items) {
+  const activeItems = items.filter((item) => !item.endOfUseDate && lifecycleStatus(item) !== "ended");
+  const monthlyCostTotal = activeItems.reduce(
+    (total, item) => total + calculateMonthlyCostWithAdditionalCosts(item),
+    0
+  );
+  const purchaseTotal = items.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+
+  summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
+  summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
+  summaryItemCount.textContent = `${items.length} 件`;
+}
+
+function renderEmptyTimeline() {
+  itemList.innerHTML = "";
+  const empty = createElement("div", "timeline-empty");
+  empty.innerHTML = `
+    <strong>登録データがありません</strong>
+    <span>家電を登録すると、購入日から耐用年数までのライフサイクル帯を表示します。</span>
+  `;
+  itemList.appendChild(empty);
+}
+
+function renderAxis(grid, minYear, maxYear, positionClass) {
+  const axis = createElement("div", `timeline-axis ${positionClass}`);
+  const yearCount = maxYear - minYear;
+
+  for (let year = minYear; year <= maxYear; year += 1) {
+    const marker = createElement("span", "timeline-year", String(year));
+    marker.style.left = `${LABEL_WIDTH + (year - minYear) * YEAR_WIDTH}px`;
+    axis.appendChild(marker);
+  }
+
+  for (let index = 0; index <= yearCount * 12; index += 1) {
+    const tick = createElement("span", index % 12 === 0 ? "timeline-tick major" : "timeline-tick");
+    tick.style.left = `${LABEL_WIDTH + (index / 12) * YEAR_WIDTH}px`;
+    axis.appendChild(tick);
+  }
+
+  grid.appendChild(axis);
+}
+
+function renderCurrentLine(grid, minYear, maxYear) {
+  const now = new Date();
+  const minMonth = minYear * 12;
+  const maxMonth = maxYear * 12;
+  const nowPosition = toMonthIndex(now) + now.getDate() / 31;
+
+  if (nowPosition < minMonth || nowPosition > maxMonth) return;
+
+  const currentLine = createElement("div", "timeline-current-line");
+  currentLine.style.left = `${LABEL_WIDTH + ((nowPosition - minMonth) / 12) * YEAR_WIDTH}px`;
+  currentLine.innerHTML = '<span>現在</span>';
+  grid.appendChild(currentLine);
+}
+
+function renderTimeline(items) {
+  itemList.innerHTML = "";
+  if (items.length === 0) {
+    renderEmptyTimeline();
     return;
   }
-  renderList(state.items.filter((item) => item.category === state.selectedCategory));
-  if (state.selectedCategory === "pc") {
-    itemList.prepend(createPcManagementLauncher());
+
+  const { minYear, maxYear } = resolveTimelineRange(items);
+  const timelineWidth = LABEL_WIDTH + (maxYear - minYear) * YEAR_WIDTH;
+  const minMonth = minYear * 12;
+
+  const scroll = createElement("div", "timeline-scroll");
+  scroll.tabIndex = 0;
+  scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
+
+  const grid = createElement("div", "timeline-grid");
+  grid.style.width = `${timelineWidth}px`;
+  grid.style.setProperty("--label-width", `${LABEL_WIDTH}px`);
+
+  renderAxis(grid, minYear, maxYear, "timeline-axis-top");
+  renderCurrentLine(grid, minYear, maxYear);
+
+  const rows = createElement("div", "timeline-rows");
+  for (const item of items) {
+    const startMonth = itemStartMonth(item);
+    const endMonth = itemEndMonth(item);
+    const status = lifecycleStatus(item);
+    const left = LABEL_WIDTH + ((startMonth - minMonth) / 12) * YEAR_WIDTH;
+    const width = Math.max(((endMonth - startMonth) / 12) * YEAR_WIDTH, 84);
+    const isSelected = item.id === state.selectedItemId;
+
+    const row = createElement("div", "timeline-row");
+    const label = createElement("div", "timeline-row-label");
+    label.innerHTML = `<span class="status-swatch status-${status}"></span><strong></strong>`;
+    label.querySelector("strong").textContent = item.name;
+
+    const band = createElement("button", `lifecycle-band status-${status}`);
+    band.type = "button";
+    band.dataset.id = item.id;
+    band.setAttribute("aria-pressed", String(isSelected));
+    band.setAttribute("aria-label", `${item.name}の詳細を表示`);
+    band.style.left = `${left}px`;
+    band.style.width = `${width}px`;
+
+    const purchaseText = createElement("span", "band-purchase", `${formatYearMonthFromIndex(startMonth)} 購入`);
+    const costText = createElement("span", "band-cost", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`);
+    band.append(purchaseText, costText);
+
+    const endLabel = createElement(
+      "span",
+      `timeline-end-label status-${status}`,
+      `${formatYearMonthFromIndex(endMonth)} (${item.yearsOfUse}年)`
+    );
+    endLabel.style.left = `${left + width + 10}px`;
+
+    row.append(label, band, endLabel);
+    rows.appendChild(row);
   }
+
+  grid.appendChild(rows);
+  renderAxis(grid, minYear, maxYear, "timeline-axis-bottom");
+  scroll.appendChild(grid);
+  itemList.appendChild(scroll);
+}
+
+function createDetailMetric(label, value) {
+  const wrapper = createElement("div", "detail-metric");
+  const labelElement = createElement("span", "", label);
+  const valueElement = createElement("strong", "", value);
+  wrapper.append(labelElement, valueElement);
+  return wrapper;
+}
+
+function renderDetail(item) {
+  if (!item) {
+    detailName.textContent = "商品を選択してください";
+    detailContent.innerHTML = '<p class="empty">帯をタップすると詳細を表示します。</p>';
+    detailEditButton.disabled = true;
+    detailDeleteButton.disabled = true;
+    return;
+  }
+
+  const startMonth = itemStartMonth(item);
+  const endMonth = itemEndMonth(item);
+  const additionalCostTotal = calculateAdditionalCostTotal(item);
+
+  detailName.textContent = item.name;
+  detailContent.innerHTML = "";
+  detailContent.append(
+    createDetailMetric("分類", getCategoryLabel(item.category)),
+    createDetailMetric("型番", item.model || "未入力"),
+    createDetailMetric("購入日", item.purchaseDate || "未入力"),
+    createDetailMetric("耐用終了予定", formatYearMonthFromIndex(endMonth)),
+    createDetailMetric("予定耐用年数", `${item.yearsOfUse} 年`),
+    createDetailMetric("購入金額", formatCurrency(item.purchasePrice)),
+    createDetailMetric("追加費用", formatCurrency(additionalCostTotal)),
+    createDetailMetric("月額コスト", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`),
+    createDetailMetric("ライフサイクル", `${formatYearMonthFromIndex(startMonth)} - ${formatYearMonthFromIndex(endMonth)}`)
+  );
+  detailEditButton.disabled = false;
+  detailDeleteButton.disabled = false;
 }
 
 function selectedItem() {
   return state.items.find((item) => item.id === state.selectedItemId) ?? null;
 }
 
-function openDetail(item) {
-  state.selectedItemId = item.id;
-  detailName.textContent = item.name;
-  detailDialog.showModal();
+function selectItem(itemId) {
+  state.selectedItemId = itemId;
+  renderTimeline(state.items);
+  renderDetail(selectedItem());
 }
 
 async function refreshList() {
   state.items = await loadItems(state.uid);
-  renderFilteredList();
+  if (!state.items.some((item) => item.id === state.selectedItemId)) {
+    state.selectedItemId = state.items[0]?.id ?? null;
+  }
+  summarizeItems(state.items);
+  renderTimeline(state.items);
+  renderDetail(selectedItem());
 }
 
-function findCardItem(target) {
-  const card = target.closest(".item-card");
-  if (!card) return null;
-  const id = card.dataset.id;
-  if (!id) return null;
-  return state.items.find((item) => item.id === id) ?? null;
-}
-
-renderCategoryButtons();
-renderCategoryPrompt();
+summarizeItems([]);
+renderEmptyTimeline();
+renderDetail(null);
 
 createButton.addEventListener("click", () => {
   window.location.href = "form.html";
-});
-
-categoryButtons.addEventListener("click", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-
-  const button = target.closest(".category-button");
-  if (!(button instanceof HTMLButtonElement)) return;
-
-  state.selectedCategory = button.dataset.category ?? "";
-  renderCategoryButtons();
-  renderFilteredList();
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -231,18 +299,11 @@ logoutButton.addEventListener("click", async () => {
 itemList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
-  const item = findCardItem(target);
-  if (item) openDetail(item);
-});
 
-itemList.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  const item = findCardItem(target);
-  if (!item) return;
-  event.preventDefault();
-  openDetail(item);
+  const band = target.closest(".lifecycle-band");
+  if (!(band instanceof HTMLButtonElement)) return;
+
+  selectItem(band.dataset.id ?? "");
 });
 
 detailEditButton.addEventListener("click", () => {
@@ -261,7 +322,6 @@ detailDeleteButton.addEventListener("click", async () => {
   try {
     detailDeleteButton.disabled = true;
     await removeItem(state.uid, item.id);
-    detailDialog.close();
     state.selectedItemId = null;
     await refreshList();
   } catch (error) {
@@ -269,14 +329,6 @@ detailDeleteButton.addEventListener("click", async () => {
   } finally {
     detailDeleteButton.disabled = false;
   }
-});
-
-detailCloseButton.addEventListener("click", () => {
-  detailDialog.close();
-});
-
-detailDialog.addEventListener("close", () => {
-  state.selectedItemId = null;
 });
 
 onAuthChanged(async (user) => {
@@ -288,7 +340,6 @@ onAuthChanged(async (user) => {
   authStatus.textContent = `状態: ログイン中 (${user.email ?? "メール未設定"})`;
   try {
     await refreshList();
-    renderCategoryButtons();
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
   }

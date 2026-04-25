@@ -4,47 +4,66 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>一覧 | 耐久消費財管理</title>
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#1f2933" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <main class="app">
-      <header class="app-header">
-        <h1>耐久消費財管理</h1>
-        <p class="subtitle">一覧</p>
-      </header>
-
-      <section class="panel" aria-labelledby="list-title">
-        <h2 id="list-title">登録データ一覧</h2>
-        <p id="auth-status" class="form-mode"></p>
-        <p id="auth-error" class="form-error"></p>
-        <div class="form-actions">
-          <button id="create-button" type="button" class="primary-button">新規登録へ</button>
+  <body class="dashboard-body">
+    <main class="app dashboard-app">
+      <header class="app-header dashboard-header">
+        <div class="dashboard-title">
+          <h1>ライフサイクルコスト</h1>
+          <p class="subtitle">耐久消費財の月割りコスト管理</p>
+        </div>
+        <section class="summary-panel" aria-label="集計">
+          <div class="summary-item summary-item-primary">
+            <span class="summary-label">現在の月額合計</span>
+            <strong id="summary-monthly-cost">¥0 /月</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">総購入額</span>
+            <strong id="summary-purchase-total">¥0</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">登録数</span>
+            <strong id="summary-item-count">0 件</strong>
+          </div>
+        </section>
+        <div class="dashboard-actions">
+          <button id="create-button" type="button" class="primary-button">＋ 家電を登録</button>
           <button id="logout-button" type="button" class="ghost-button">ログアウト</button>
         </div>
-        <div id="category-buttons" class="category-buttons" aria-label="表示する分類">
-          <a class="category-button pc-management-category-link" href="pc-management/index.html" aria-label="パソコン管理を開く">
-            <span class="category-button-label">パソコン管理</span>
-            <span class="category-button-total">開く</span>
-          </a>
+      </header>
+
+      <section class="panel timeline-panel" aria-labelledby="list-title">
+        <h2 id="list-title">ライフサイクル年表</h2>
+        <p id="auth-status" class="form-mode"></p>
+        <p id="auth-error" class="form-error"></p>
+        <div id="item-list" class="timeline-shell"></div>
+      </section>
+
+      <section id="detail-panel" class="panel selected-detail-panel" aria-labelledby="detail-name">
+        <div class="selected-detail-heading">
+          <div>
+            <p class="detail-kicker">選択中</p>
+            <h2 id="detail-name">商品を選択してください</h2>
+          </div>
+          <div class="detail-actions">
+            <button id="detail-edit-button" type="button" class="primary-button" disabled>編集</button>
+            <button id="detail-delete-button" type="button" class="danger-button" disabled>削除</button>
+          </div>
         </div>
-        <div id="item-list" class="card-list"></div>
+        <div id="detail-content" class="detail-grid">
+          <p class="empty">帯をタップすると詳細を表示します。</p>
+        </div>
+      </section>
+
+      <section class="pc-management-launch" aria-label="パソコン管理">
+        <a class="pc-management-button" href="pc-management/index.html">パソコン管理を開く</a>
       </section>
     </main>
-
-    <dialog id="detail-dialog" class="detail-dialog">
-      <article class="detail-card">
-        <h3 id="detail-name"></h3>
-        <div class="detail-actions">
-          <button id="detail-edit-button" type="button" class="primary-button">編集</button>
-          <button id="detail-delete-button" type="button" class="danger-button">削除</button>
-          <button id="detail-close-button" type="button" class="ghost-button">閉じる</button>
-        </div>
-      </article>
-    </dialog>
     <script type="module" src="js/list.js"></script>
   </body>
 </html>
