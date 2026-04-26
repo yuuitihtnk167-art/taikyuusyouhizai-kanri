@@ -205,6 +205,32 @@ select:focus {
   margin-top: 4px;
 }
 
+.calculation-result {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f3f8f6;
+}
+
+.calculation-result div {
+  display: grid;
+  gap: 4px;
+}
+
+.calculation-result span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.calculation-result strong {
+  color: var(--primary-strong);
+  font-size: 1.2rem;
+}
+
 button,
 .file-button {
   min-height: 44px;
@@ -454,6 +480,7 @@ button {
   .summary-grid,
   .form-grid,
   .pc-cost-summary,
+  .calculation-result,
   .spec-grid {
     grid-template-columns: 1fr;
   }

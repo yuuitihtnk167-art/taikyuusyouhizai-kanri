@@ -11,17 +11,16 @@ import {
   decodePcManagementModel,
   decodePcPartMemo,
   firebaseErrorMessage,
+  formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
   registerServiceWorker,
 } from "./common.js";
 
-const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const toListButton = document.getElementById("to-list-button");
 const form = document.getElementById("item-form");
 const formPanel = document.getElementById("form-panel");
-const formMode = document.getElementById("form-mode");
 const formError = document.getElementById("form-error");
 const submitButton = document.getElementById("submit-button");
 const cancelButton = document.getElementById("cancel-button");
@@ -36,6 +35,8 @@ const yearsOfUseInput = document.getElementById("years-of-use");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
+const calculationTotal = document.getElementById("calculation-total");
+const calculationMonthlyCost = document.getElementById("calculation-monthly-cost");
 
 const state = {
   uid: null,
@@ -55,6 +56,35 @@ function populateCategorySelect() {
 
 function updateEndedUseStyle() {
   formPanel.classList.toggle("ended-use", Boolean(endOfUseDateInput.value));
+}
+
+function formatMonthlyCost(value) {
+  return `${formatCurrency(value)} /月`;
+}
+
+function parseCurrencyInputValue(value) {
+  const normalizedValue = String(value ?? "").replaceAll(",", "").trim();
+  const amount = Number(normalizedValue);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function calculateAdditionalCostInputTotal() {
+  const rows = additionalCostList.querySelectorAll(".additional-cost-row");
+  return [...rows].reduce((total, row) => {
+    const amountInput = row.querySelector(".additional-cost-amount");
+    if (!(amountInput instanceof HTMLInputElement)) return total;
+    return total + parseCurrencyInputValue(amountInput.value);
+  }, 0);
+}
+
+function updateCalculationResult() {
+  const purchasePrice = parseCurrencyInputValue(purchasePriceInput.value);
+  const yearsOfUse = Number(yearsOfUseInput.value);
+  const total = purchasePrice + calculateAdditionalCostInputTotal();
+  const monthlyCost = Number.isFinite(yearsOfUse) && yearsOfUse > 0 ? total / (yearsOfUse * 12) : 0;
+
+  calculationTotal.textContent = formatCurrency(total);
+  calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
 }
 
 function createAdditionalCostRow(cost = {}) {
@@ -116,6 +146,7 @@ function renderAdditionalCosts(costs) {
   if (additionalCostList.children.length === 0) {
     additionalCostList.appendChild(createAdditionalCostRow({ createdAt: Date.now() }));
   }
+  updateCalculationResult();
 }
 
 function collectAdditionalCosts() {
@@ -178,6 +209,7 @@ addCostButton.addEventListener("click", () => {
   const row = createAdditionalCostRow({ createdAt: Date.now() });
   additionalCostList.prepend(row);
   row.querySelector(".additional-cost-amount")?.focus();
+  updateCalculationResult();
 });
 
 additionalCostList.addEventListener("click", (event) => {
@@ -188,7 +220,15 @@ additionalCostList.addEventListener("click", (event) => {
   if (additionalCostList.children.length === 0) {
     additionalCostList.appendChild(createAdditionalCostRow({ createdAt: Date.now() }));
   }
+  updateCalculationResult();
 });
+
+form.addEventListener("input", updateCalculationResult);
+form.addEventListener("change", updateCalculationResult);
+purchasePriceInput.addEventListener("input", updateCalculationResult);
+yearsOfUseInput.addEventListener("input", updateCalculationResult);
+additionalCostList.addEventListener("input", updateCalculationResult);
+additionalCostList.addEventListener("change", updateCalculationResult);
 
 endOfUseDateInput.addEventListener("input", () => {
   updateEndedUseStyle();
@@ -232,10 +272,8 @@ onAuthChanged(async (user) => {
     return;
   }
   state.uid = user.uid;
-  authStatus.textContent = `状態: ログイン中 (${user.email ?? "メール未設定"})`;
 
   if (!state.editingId) {
-    formMode.textContent = "現在: 新規登録";
     submitButton.textContent = "登録する";
     cancelButton.hidden = true;
     updateEndedUseStyle();
@@ -243,7 +281,6 @@ onAuthChanged(async (user) => {
     return;
   }
 
-  formMode.textContent = "現在: 編集中";
   submitButton.textContent = "更新する";
   cancelButton.hidden = false;
 

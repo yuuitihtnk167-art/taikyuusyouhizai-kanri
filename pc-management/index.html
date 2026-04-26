@@ -36,9 +36,7 @@
           <h2 id="form-title">PC情報</h2>
           <button id="reset-button" class="ghost-button small-button" type="button">新規入力</button>
         </div>
-        <p id="auth-status" class="form-mode">状態: 確認中</p>
         <p id="auth-error" class="form-error" aria-live="polite"></p>
-        <p id="form-mode" class="form-mode">現在: 新規登録</p>
 
         <form id="pc-form" novalidate>
           <input id="pc-id" type="hidden" />
@@ -71,6 +69,17 @@
               <button id="add-part-button" class="primary-button small-button" type="button">パーツ追加</button>
             </div>
             <div id="part-list" class="part-list"></div>
+          </section>
+
+          <section class="calculation-result" aria-label="計算結果">
+            <div>
+              <span>合計</span>
+              <strong id="calculation-total">¥0</strong>
+            </div>
+            <div>
+              <span>月額コスト</span>
+              <strong id="calculation-monthly-cost">¥0 /月</strong>
+            </div>
           </section>
 
           <p id="form-error" class="form-error" aria-live="polite"></p>

@@ -12,11 +12,13 @@ import {
   registerServiceWorker,
 } from "./common.js";
 
-const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const createButton = document.getElementById("create-button");
 const itemList = document.getElementById("item-list");
+const helpButton = document.getElementById("help-button");
+const helpDialog = document.getElementById("help-dialog");
+const helpCloseButton = document.getElementById("help-close-button");
 
 const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
@@ -115,6 +117,18 @@ function itemEndMonth(item) {
   return Math.max(itemPlannedEndMonth(item), itemActualEndMonth(item));
 }
 
+function itemUnusedPeriodEndMonth(item) {
+  if (!item.endOfUseDate) return itemEndMonth(item);
+  return itemPlannedEndMonth(item);
+}
+
+function itemTimelineEndMonth(item) {
+  if (item.endOfUseDate) {
+    return Math.max(itemEndMonth(item), itemUnusedPeriodEndMonth(item));
+  }
+  return itemEndMonth(item);
+}
+
 function itemEndLabel(item, endMonth) {
   if (item.endOfUseDate) {
     return `${formatYearMonthFromIndex(endMonth)} (使用終了)`;
@@ -137,7 +151,7 @@ function resolveTimelineRange(items) {
 
   for (const item of items) {
     minYear = Math.min(minYear, Math.floor(itemStartMonth(item) / 12));
-    maxYear = Math.max(maxYear, Math.ceil(itemEndMonth(item) / 12));
+    maxYear = Math.max(maxYear, Math.ceil(itemTimelineEndMonth(item) / 12));
   }
 
   return { minYear, maxYear };
@@ -187,7 +201,7 @@ function summarizeItems(items) {
     (total, item) => total + calculateMonthlyCostWithAdditionalCosts(item),
     0
   );
-  const purchaseTotal = items.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+  const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
@@ -289,10 +303,13 @@ function renderTimeline(items) {
   for (const item of sortedItems) {
     const startMonth = itemStartMonth(item);
     const endMonth = itemEndMonth(item);
+    const unusedPeriodEndMonth = itemUnusedPeriodEndMonth(item);
     const plannedEndMonth = itemPlannedEndMonth(item);
     const status = lifecycleStatus(item);
     const left = labelWidth + ((startMonth - minMonth) / 12) * yearWidth;
     const width = Math.max(((endMonth - startMonth) / 12) * yearWidth, timelineLayout().isCompact ? 32 : 84);
+    const unusedPeriodLeft = labelWidth + ((endMonth - minMonth) / 12) * yearWidth;
+    const unusedPeriodWidth = ((unusedPeriodEndMonth - endMonth) / 12) * yearWidth;
     const overuseStartPercent = ((plannedEndMonth - startMonth) / Math.max(endMonth - startMonth, 1)) * 100;
     const isOverused = itemActualEndMonth(item) > plannedEndMonth;
     const isSelected = item.id === state.selectedItemId;
@@ -316,6 +333,17 @@ function renderTimeline(items) {
     const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
     const costText = createElement("span", "band-cost", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`);
     band.append(purchaseText, costText);
+
+    if (item.endOfUseDate && unusedPeriodWidth > 0) {
+      const postEndBand = createElement("button", "post-end-band");
+      postEndBand.type = "button";
+      postEndBand.dataset.id = item.id;
+      postEndBand.setAttribute("aria-pressed", String(isSelected));
+      postEndBand.setAttribute("aria-label", `${item.name}の使えなかった期間`);
+      postEndBand.style.left = `${unusedPeriodLeft}px`;
+      postEndBand.style.width = `${Math.max(unusedPeriodWidth, 2)}px`;
+      row.appendChild(postEndBand);
+    }
 
     const endLabel = createElement(
       "span",
@@ -349,7 +377,7 @@ function selectItem(itemId) {
 function openItemNameDialog(item) {
   if (!item || !itemNameDialog) return;
   dialogItemName.textContent = item.name || "商品名未入力";
-  dialogItemMeta.textContent = `${displayApplianceType(item)} / ${formatCurrency(
+  dialogItemMeta.textContent = `購入金額${formatCurrency(Number(item.purchasePrice || 0))} / ${formatCurrency(
     calculateMonthlyCostWithAdditionalCosts(item)
   )} /月`;
   itemNameDialog.showModal();
@@ -386,7 +414,7 @@ itemList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
-  const band = target.closest(".lifecycle-band");
+  const band = target.closest(".lifecycle-band, .post-end-band");
   if (!(band instanceof HTMLButtonElement)) return;
 
   selectItem(band.dataset.id ?? "");
@@ -426,6 +454,18 @@ itemNameDialog.addEventListener("click", (event) => {
   if (event.target === itemNameDialog) itemNameDialog.close();
 });
 
+helpButton.addEventListener("click", () => {
+  helpDialog.showModal();
+});
+
+helpCloseButton.addEventListener("click", () => {
+  helpDialog.close();
+});
+
+helpDialog.addEventListener("click", (event) => {
+  if (event.target === helpDialog) helpDialog.close();
+});
+
 window.addEventListener("resize", () => {
   window.clearTimeout(state.resizeTimer);
   state.resizeTimer = window.setTimeout(() => {
@@ -439,7 +479,6 @@ onAuthChanged(async (user) => {
     return;
   }
   state.uid = user.uid;
-  authStatus.textContent = `状態: ログイン中 (${user.email ?? "メール未設定"})`;
   try {
     await refreshList();
   } catch (error) {

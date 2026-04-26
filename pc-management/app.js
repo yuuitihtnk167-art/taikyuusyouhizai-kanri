@@ -58,10 +58,8 @@ const elements = {
   summaryCount: document.getElementById("summary-count"),
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
-  authStatus: document.getElementById("auth-status"),
   authError: document.getElementById("auth-error"),
   form: document.getElementById("pc-form"),
-  formMode: document.getElementById("form-mode"),
   formError: document.getElementById("form-error"),
   resetButton: document.getElementById("reset-button"),
   submitButton: document.getElementById("submit-button"),
@@ -76,6 +74,8 @@ const elements = {
   partsDialogClose: document.getElementById("parts-dialog-close"),
   exportButton: document.getElementById("export-button"),
   importFile: document.getElementById("import-file"),
+  calculationTotal: document.getElementById("calculation-total"),
+  calculationMonthlyCost: document.getElementById("calculation-monthly-cost"),
   id: document.getElementById("pc-id"),
   itemName: document.getElementById("item-name"),
   usage: document.getElementById("usage"),
@@ -238,6 +238,16 @@ function calculateMonthlyCost(item) {
   const yearsOfUse = Number(item.yearsOfUse ?? 0);
   if (!Number.isFinite(yearsOfUse) || yearsOfUse <= 0) return 0;
   return calculateTotalInvestment(item) / (yearsOfUse * 12);
+}
+
+function formatMonthlyCost(value) {
+  return `${formatCurrency(value)} /月`;
+}
+
+function parseCurrencyInputValue(value) {
+  const normalizedValue = String(value ?? "").replaceAll(",", "").trim();
+  const amount = Number(normalizedValue);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
 }
 
 function normalizePcItem(value) {
@@ -440,12 +450,22 @@ function collectParts() {
       partType,
       partName,
       purchaseDate,
-      price: rawPrice ? Number(rawPrice) : Number.NaN,
+      price: rawPrice ? parseCurrencyInputValue(rawPrice) : Number.NaN,
       memo,
       createdAt: Number(row.dataset.createdAt) || Date.now(),
     });
   }
   return parts;
+}
+
+function updateCalculationResult() {
+  const parts = collectParts();
+  const totalInvestment = calculatePartsTotal(parts);
+  const yearsOfUse = Number(elements.yearsOfUse.value);
+  const monthlyCost = Number.isFinite(yearsOfUse) && yearsOfUse > 0 ? totalInvestment / (yearsOfUse * 12) : 0;
+
+  elements.calculationTotal.textContent = formatCurrency(totalInvestment);
+  elements.calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
 }
 
 function collectPcItem() {
@@ -470,11 +490,11 @@ function resetForm() {
   elements.id.value = "";
   elements.usage.value = "work";
   elements.yearsOfUse.value = "5";
-  elements.formMode.textContent = "現在: 新規登録";
   elements.submitButton.textContent = "登録する";
   elements.cancelButton.hidden = true;
   elements.formError.textContent = "";
   renderPartRows([]);
+  updateCalculationResult();
 }
 
 function fillForm(item) {
@@ -484,11 +504,11 @@ function fillForm(item) {
   elements.usage.value = item.usage;
   elements.purchaseDate.value = item.purchaseDate;
   elements.yearsOfUse.value = item.yearsOfUse;
-  elements.formMode.textContent = "現在: 編集中";
   elements.submitButton.textContent = "更新する";
   elements.cancelButton.hidden = false;
   elements.formError.textContent = "";
   renderPartRows(item.parts);
+  updateCalculationResult();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -625,6 +645,7 @@ elements.addPartButton.addEventListener("click", () => {
   const row = createPartRow({ createdAt: Date.now() });
   elements.partList.prepend(row);
   row.querySelector(".part-purchase-date").focus();
+  updateCalculationResult();
 });
 
 elements.partList.addEventListener("click", (event) => {
@@ -635,7 +656,14 @@ elements.partList.addEventListener("click", (event) => {
   if (elements.partList.children.length === 0) {
     elements.partList.appendChild(createPartRow({ createdAt: Date.now() }));
   }
+  updateCalculationResult();
 });
+
+elements.form.addEventListener("input", updateCalculationResult);
+elements.form.addEventListener("change", updateCalculationResult);
+elements.yearsOfUse.addEventListener("input", updateCalculationResult);
+elements.partList.addEventListener("input", updateCalculationResult);
+elements.partList.addEventListener("change", updateCalculationResult);
 
 elements.partsDialogClose.addEventListener("click", () => {
   elements.partsDialog.close();
@@ -779,6 +807,7 @@ elements.importFile.addEventListener("change", async () => {
 });
 
 renderPartRows([]);
+updateCalculationResult();
 render();
 
 onAuthChanged(async (user) => {
@@ -788,7 +817,6 @@ onAuthChanged(async (user) => {
   }
 
   state.uid = user.uid;
-  elements.authStatus.textContent = `状態: ログイン中 (${user.email ?? "メール未設定"})`;
   elements.authError.textContent = "";
 
   try {

@@ -303,6 +303,32 @@ button {
   color: var(--primary-strong);
 }
 
+.calculation-result {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7faff;
+}
+
+.calculation-result div {
+  display: grid;
+  gap: 4px;
+}
+
+.calculation-result span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.calculation-result strong {
+  color: var(--primary-strong);
+  font-size: 1.2rem;
+}
+
 .card-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -362,6 +388,10 @@ button {
 }
 
 @media (max-width: 520px) {
+  .calculation-result {
+    grid-template-columns: 1fr;
+  }
+
   .additional-cost-row {
     grid-template-columns: 1fr;
   }
@@ -449,7 +479,7 @@ button {
 
 .dashboard-actions {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) 54px;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
@@ -470,7 +500,7 @@ button {
 
 .dashboard-actions .ghost-button {
   overflow: hidden;
-  color: transparent;
+  color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.28);
   background: rgba(36, 46, 57, 0.58);
   position: relative;
@@ -484,6 +514,10 @@ button {
   place-items: center;
   color: #e5edf5;
   font-size: 1.45rem;
+}
+
+.dashboard-actions #logout-button::before {
+  display: none;
 }
 
 .dashboard-body .panel {
@@ -562,6 +596,11 @@ button {
     rgba(38, 79, 153, 0.96) 48%,
     rgba(54, 99, 179, 0.92) 100%
   );
+}
+
+.legend-unused {
+  background: rgba(255, 255, 255, 0.04);
+  border-style: dashed;
 }
 
 .timeline-shell {
@@ -766,6 +805,29 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
+.post-end-band {
+  position: absolute;
+  top: 12px;
+  z-index: 2;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px dashed rgba(148, 163, 184, 0.42);
+  border-left: 0;
+  border-radius: 0 4px 4px 0;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.post-end-band[aria-pressed="true"] {
+  outline: 2px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 2px;
+}
+
+.post-end-band:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
 .lifecycle-band.overused::after {
   position: absolute;
   top: 0;
@@ -921,6 +983,8 @@ button {
 
 .pc-management-launch {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
   margin-top: 18px;
   padding-bottom: 12px;
@@ -939,10 +1003,85 @@ button {
   background: rgba(36, 46, 57, 0.72);
   font-weight: 800;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .pc-management-button:hover {
   background: rgba(63, 78, 92, 0.86);
+}
+
+.help-button {
+  min-width: 120px;
+}
+
+.help-dialog {
+  width: min(720px, calc(100% - 32px));
+  max-height: min(760px, calc(100% - 32px));
+  padding: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.24);
+  border-radius: 8px;
+  background: rgba(31, 42, 53, 0.97);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.help-dialog::backdrop {
+  background: rgba(6, 10, 14, 0.62);
+}
+
+.help-dialog-card {
+  display: grid;
+  gap: 18px;
+  max-height: inherit;
+  padding: 22px;
+  overflow: auto;
+}
+
+.help-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.help-dialog-header h2,
+.help-section h3,
+.help-section p {
+  margin: 0;
+}
+
+.help-dialog-header h2 {
+  font-size: 1.35rem;
+}
+
+.help-dialog-header .ghost-button {
+  min-height: 38px;
+  padding: 0 16px;
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.26);
+  border-radius: 5px;
+  background: rgba(44, 55, 66, 0.78);
+}
+
+.help-section {
+  display: grid;
+  gap: 10px;
+}
+
+.help-section h3 {
+  color: #e5edf5;
+  font-size: 1rem;
+}
+
+.help-section p {
+  color: #d4dee8;
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+.help-legend {
+  margin: 0;
 }
 
 .item-name-dialog {
@@ -1002,7 +1141,7 @@ button {
   }
 
   .dashboard-actions {
-    grid-template-columns: 1fr 54px;
+    grid-template-columns: 1fr 1fr;
   }
 
   .summary-panel {
@@ -1054,7 +1193,7 @@ button {
   }
 
   .dashboard-actions {
-    grid-template-columns: 1fr 34px;
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
   }
 
@@ -1185,9 +1324,45 @@ button {
     font-size: 0.56rem;
   }
 
+  .post-end-band {
+    top: 7px;
+    height: 24px;
+    min-height: 24px;
+    border-radius: 0 3px 3px 0;
+  }
+
   .band-cost,
   .timeline-end-label {
     display: none;
+  }
+
+  .pc-management-launch {
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .pc-management-button {
+    min-height: 40px;
+    min-width: 0;
+    padding: 0 12px;
+    font-size: 0.78rem;
+  }
+
+  .help-button {
+    min-width: 86px;
+  }
+
+  .help-dialog-card {
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .help-dialog-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .help-section p {
+    font-size: 0.86rem;
   }
 
   .item-name-dialog-card {

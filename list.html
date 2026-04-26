@@ -32,33 +32,54 @@
           </div>
         </section>
         <div class="dashboard-actions">
-          <button id="create-button" type="button" class="primary-button">＋ 家電を登録</button>
+          <button id="create-button" type="button" class="primary-button">新規登録</button>
           <button id="logout-button" type="button" class="ghost-button">ログアウト</button>
         </div>
       </header>
 
       <section class="panel timeline-panel" aria-labelledby="list-title">
         <h2 id="list-title">ライフサイクル年表</h2>
-        <div class="timeline-legend" aria-label="帯の色の凡例">
-          <span class="legend-item"><span class="legend-band category-information_device"></span>情報機器</span>
-          <span class="legend-item"><span class="legend-band category-smartphone"></span>スマホ</span>
-          <span class="legend-item"><span class="legend-band category-audio_visual"></span>映像・音響</span>
-          <span class="legend-item"><span class="legend-band category-air_conditioning"></span>空調家電</span>
-          <span class="legend-item"><span class="legend-band category-living_appliance"></span>生活家電</span>
-          <span class="legend-item"><span class="legend-band category-cooking_appliance"></span>調理家電</span>
-          <span class="legend-item"><span class="legend-band category-beauty_health"></span>美容・健康</span>
-          <span class="legend-item"><span class="legend-band category-other"></span>その他</span>
-          <span class="legend-item"><span class="legend-band legend-overused"></span>濃い部分は使用年数超過</span>
-        </div>
-        <p id="auth-status" class="form-mode"></p>
         <p id="auth-error" class="form-error"></p>
         <div id="item-list" class="timeline-shell"></div>
       </section>
 
       <section class="pc-management-launch" aria-label="パソコン管理">
-        <a class="pc-management-button" href="pc-management/index.html">パソコン管理を開く</a>
+        <a class="pc-management-button" href="pc-management/index.html">パソコン管理</a>
+        <button id="help-button" type="button" class="pc-management-button help-button">ヘルプ</button>
       </section>
     </main>
+
+    <dialog id="help-dialog" class="help-dialog">
+      <article class="help-dialog-card">
+        <div class="help-dialog-header">
+          <h2>ヘルプ</h2>
+          <button id="help-close-button" type="button" class="ghost-button">閉じる</button>
+        </div>
+
+        <section class="help-section" aria-labelledby="help-legend-title">
+          <h3 id="help-legend-title">帯の凡例</h3>
+          <div class="timeline-legend help-legend" aria-label="帯の色の凡例">
+            <span class="legend-item"><span class="legend-band category-information_device"></span>情報機器</span>
+            <span class="legend-item"><span class="legend-band category-smartphone"></span>スマホ</span>
+            <span class="legend-item"><span class="legend-band category-audio_visual"></span>映像・音響</span>
+            <span class="legend-item"><span class="legend-band category-air_conditioning"></span>空調家電</span>
+            <span class="legend-item"><span class="legend-band category-living_appliance"></span>生活家電</span>
+            <span class="legend-item"><span class="legend-band category-cooking_appliance"></span>調理家電</span>
+            <span class="legend-item"><span class="legend-band category-beauty_health"></span>美容・健康</span>
+            <span class="legend-item"><span class="legend-band category-other"></span>その他</span>
+            <span class="legend-item"><span class="legend-band legend-overused"></span>濃い部分は使用年数超過</span>
+            <span class="legend-item"><span class="legend-band legend-unused"></span>無色部分は使用年数に達しなかった期間</span>
+          </div>
+        </section>
+
+        <section class="help-section" aria-labelledby="help-concept-title">
+          <h3 id="help-concept-title">このアプリのコンセプト</h3>
+          <p>このアプリは、家電や消耗品の購入日・購入金額・使用年数を記録し、いつまで使う予定か、どれくらいのコストで使えているかを見える化するための管理ツールです。</p>
+          <p>単に購入履歴を残すだけでなく、使用期間を年表で確認することで、買い替え時期の目安や、予定より早く使えなくなったものを把握しやすくします。</p>
+          <p>月額換算のコストや使用終了後の期間を確認することで、次回購入時の判断材料として活用できます。</p>
+        </section>
+      </article>
+    </dialog>
 
     <dialog id="item-name-dialog" class="item-name-dialog">
       <article class="item-name-dialog-card">
