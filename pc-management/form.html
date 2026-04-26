@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>登録・編集 | パソコン管理</title>
+    <meta name="theme-color" content="#2563eb" />
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <link rel="icon" href="../icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+    <link rel="stylesheet" href="../style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>パソコン管理</h1>
+        <p class="subtitle">登録・編集</p>
+      </header>
+
+      <section id="form-panel" class="panel" aria-labelledby="form-title">
+        <h2 id="form-title">入力フォーム</h2>
+        <p id="auth-error" class="form-error"></p>
+        <form id="pc-form" novalidate>
+          <input id="pc-id" type="hidden" />
+
+          <label for="part-name">商品名（パーツ）</label>
+          <input id="part-name" type="text" autocomplete="off" required />
+          <label for="model-number">型番</label>
+          <input id="model-number" type="text" autocomplete="off" required />
+          <label for="pc-name">分類（パソコン名）</label>
+          <select id="pc-name" required>
+            <option value="main">メインPC</option>
+            <option value="sub">サブPC</option>
+          </select>
+          <label for="spec-detail">スペック（詳細入力欄）</label>
+          <textarea id="spec-detail" rows="4"></textarea>
+          <label for="purchase-date">購入日</label>
+          <input id="purchase-date" type="date" required />
+          <label for="purchase-price">購入価格（円）</label>
+          <input id="purchase-price" type="number" inputmode="numeric" min="0" step="1" required />
+          <label for="years-of-use">使用年数（年）</label>
+          <input id="years-of-use" type="number" inputmode="numeric" min="1" step="1" value="5" required />
+          <label for="end-of-use-date">使用終了日</label>
+          <input id="end-of-use-date" type="date" />
+
+          <section class="calculation-result" aria-label="計算結果">
+            <div>
+              <span>合計</span>
+              <strong id="calculation-total">¥0</strong>
+            </div>
+            <div>
+              <span>月額コスト</span>
+              <strong id="calculation-monthly-cost">¥0 /月</strong>
+            </div>
+          </section>
+
+          <p id="form-error" class="form-error"></p>
+          <label class="checkbox-field" for="hide-from-timeline">
+            <input id="hide-from-timeline" type="checkbox" />
+            <span>帯を表示しない</span>
+          </label>
+          <div class="form-actions">
+            <button id="submit-button" class="primary-button" type="submit">登録する</button>
+            <button id="cancel-button" class="ghost-button" type="button" hidden>編集をキャンセル</button>
+          </div>
+          <button id="to-list-button" class="ghost-button" type="button">一覧に戻る</button>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

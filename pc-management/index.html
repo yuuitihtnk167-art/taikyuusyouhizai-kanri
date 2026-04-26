@@ -3,142 +3,90 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>自作PC管理</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>パソコン管理</title>
+    <meta name="theme-color" content="#1f2933" />
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <link rel="icon" href="../icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+    <link rel="stylesheet" href="../style.css" />
   </head>
-  <body>
-    <main class="app">
-      <header class="app-header">
-        <div>
-          <h1>自作PC管理</h1>
-          <p>部品ごとの購入費と現在スペックを管理します。</p>
+  <body class="dashboard-body" data-timeline-mode="visible">
+    <main class="app dashboard-app">
+      <header class="app-header dashboard-header">
+        <div class="dashboard-title">
+          <h1>パソコン管理</h1>
+          <p class="subtitle">パーツの月割りコスト管理</p>
         </div>
-        <a class="back-link" href="../list.html">一覧に戻る</a>
+        <section class="summary-panel" aria-label="集計">
+          <div class="summary-item summary-item-primary">
+            <span class="summary-label">現在の月額合計</span>
+            <strong id="summary-monthly">¥0 /月</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">総購入額(現在使用中)</span>
+            <strong id="summary-total">¥0</strong>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">登録数</span>
+            <strong id="summary-count">0 件</strong>
+          </div>
+        </section>
+        <div class="dashboard-actions">
+          <button id="create-button" type="button" class="primary-button">新規登録</button>
+          <button id="back-button" type="button" class="ghost-button">一覧に戻る</button>
+          <button id="help-button" type="button" class="ghost-button help-button">ヘルプ</button>
+        </div>
       </header>
 
-      <section class="summary-grid" aria-label="全体サマリー">
-        <article class="summary-card">
-          <span>登録PC</span>
-          <strong id="summary-count">0台</strong>
-        </article>
-        <article class="summary-card">
-          <span>総投資額</span>
-          <strong id="summary-total">¥0</strong>
-        </article>
-        <article class="summary-card">
-          <span>月額換算</span>
-          <strong id="summary-monthly">¥0</strong>
-        </article>
+      <section class="panel timeline-panel" aria-labelledby="list-title">
+        <h2 id="list-title">ライフサイクル年表</h2>
+        <p id="auth-error" class="form-error"></p>
+        <div id="item-list" class="timeline-shell"></div>
       </section>
 
-      <section class="panel" aria-labelledby="form-title">
-        <div class="section-heading">
-          <h2 id="form-title">PC情報</h2>
-          <button id="reset-button" class="ghost-button small-button" type="button">新規入力</button>
-        </div>
-        <p id="auth-error" class="form-error" aria-live="polite"></p>
-
-        <form id="pc-form" novalidate>
-          <input id="pc-id" type="hidden" />
-
-          <label for="item-name">PC名</label>
-          <input id="item-name" type="text" autocomplete="off" placeholder="メインPC" required />
-
-          <label for="usage">用途</label>
-          <select id="usage" required>
-            <option value="work">仕事</option>
-            <option value="game">ゲーム</option>
-            <option value="development">開発</option>
-            <option value="other">その他</option>
-          </select>
-
-          <div class="form-grid">
-            <div>
-              <label for="purchase-date">組立日</label>
-              <input id="purchase-date" type="date" required />
-            </div>
-            <div>
-              <label for="years-of-use">想定使用年数（年）</label>
-              <input id="years-of-use" type="number" inputmode="numeric" min="1" step="1" value="5" required />
-            </div>
-          </div>
-
-          <section class="subsection" aria-labelledby="parts-title">
-            <div class="section-heading">
-              <h3 id="parts-title">パーツ入力</h3>
-              <button id="add-part-button" class="primary-button small-button" type="button">パーツ追加</button>
-            </div>
-            <div id="part-list" class="part-list"></div>
-          </section>
-
-          <section class="calculation-result" aria-label="計算結果">
-            <div>
-              <span>合計</span>
-              <strong id="calculation-total">¥0</strong>
-            </div>
-            <div>
-              <span>月額コスト</span>
-              <strong id="calculation-monthly-cost">¥0 /月</strong>
-            </div>
-          </section>
-
-          <p id="form-error" class="form-error" aria-live="polite"></p>
-          <label class="checkbox-field" for="hide-from-timeline">
-            <input id="hide-from-timeline" type="checkbox" />
-            <span>帯を表示しない</span>
-          </label>
-          <div class="form-actions">
-            <button id="submit-button" class="primary-button" type="submit">登録する</button>
-            <button id="cancel-button" class="ghost-button" type="button" hidden>編集をキャンセル</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="panel" aria-labelledby="list-title">
-        <div class="section-heading">
-          <h2 id="list-title">登録済みPC</h2>
-          <div class="toolbar">
-            <button id="export-button" class="ghost-button small-button" type="button">JSON出力</button>
-            <label class="ghost-button small-button file-button" for="import-file">JSON読込</label>
-            <input id="import-file" type="file" accept="application/json" />
-          </div>
-        </div>
-        <div id="pc-list" class="pc-list"></div>
+      <section class="pc-management-launch" aria-label="非表示パーツ">
+        <a class="pc-management-button" href="hidden.html">非表示パーツ</a>
       </section>
     </main>
 
-    <dialog id="parts-dialog" class="parts-dialog" aria-labelledby="parts-dialog-title">
-      <div class="dialog-header">
-        <div>
-          <p class="dialog-subtitle">パーツ一覧</p>
-          <h2 id="parts-dialog-title">パーツ一覧</h2>
+    <dialog id="help-dialog" class="help-dialog">
+      <article class="help-dialog-card">
+        <div class="help-dialog-header">
+          <h2>ヘルプ</h2>
+          <button id="help-close-button" type="button" class="ghost-button">閉じる</button>
         </div>
-        <button id="parts-dialog-close" class="ghost-button small-button" type="button">閉じる</button>
-      </div>
-      <div id="parts-dialog-body" class="dialog-body"></div>
+
+        <section class="help-section" aria-labelledby="help-legend-title">
+          <h3 id="help-legend-title">帯の凡例</h3>
+          <div class="timeline-legend help-legend" aria-label="帯の色の凡例">
+            <span class="legend-item"><span class="legend-band category-pc-main"></span>メインPC</span>
+            <span class="legend-item"><span class="legend-band category-pc-sub"></span>サブPC</span>
+            <span class="legend-item"><span class="legend-band legend-overused"></span>濃い部分は使用年数超過</span>
+            <span class="legend-item"><span class="legend-band legend-unused"></span>無色部分は使用年数に達しなかった期間</span>
+          </div>
+        </section>
+
+        <section class="help-section" aria-labelledby="help-concept-title">
+          <h3 id="help-concept-title">このアプリのコンセプト</h3>
+          <p>このアプリは、パソコンを本体単位ではなく、CPU、GPU、メモリ、ストレージ、電源、モニターなどのパーツ単位で管理するためのツールです。</p>
+          <p>パーツごとに購入日、購入価格、使用年数、使用終了日を記録し、それぞれをライフサイクル年表の帯として表示します。これにより、どのパーツをいつ購入し、いつ頃まで使う予定なのかをひと目で確認できます。</p>
+          <p>パソコンは一度に丸ごと買い替えるだけでなく、パーツ単位で交換・増設することが多いため、パーツごとの月額コストや使用期間を分けて見ることで、次に交換すべき部品や、長く使えている部品を判断しやすくします。</p>
+          <p>メインPCとサブPCで帯の色を分けることで、複数のパソコンに使っているパーツを混同せずに管理できます。</p>
+        </section>
+      </article>
     </dialog>
 
-    <template id="part-row-template">
-      <div class="part-row">
-        <select class="part-type" aria-label="パーツ種別">
-          <option value="cpu">CPU</option>
-          <option value="gpu">GPU</option>
-          <option value="motherboard">マザーボード</option>
-          <option value="memory">メモリ</option>
-          <option value="storage">ストレージ</option>
-          <option value="power_supply">電源</option>
-          <option value="monitor">モニター</option>
-          <option value="os">OS</option>
-          <option value="other">その他</option>
-        </select>
-        <input class="part-purchase-date" type="date" aria-label="購入日" />
-        <input class="part-name" type="text" autocomplete="off" placeholder="パーツ名" aria-label="パーツ名" />
-        <input class="part-price" type="number" inputmode="numeric" min="0" step="1" placeholder="費用" aria-label="費用" />
-        <input class="part-memo" type="text" autocomplete="off" placeholder="メモ" aria-label="メモ" />
-        <button class="danger-button small-button part-delete" type="button">削除</button>
-      </div>
-    </template>
-
+    <dialog id="item-dialog" class="item-name-dialog">
+      <article class="item-name-dialog-card">
+        <h2 id="dialog-item-name"></h2>
+        <p id="dialog-item-meta" class="dialog-item-meta"></p>
+        <div class="dialog-actions">
+          <button id="dialog-edit-button" type="button" class="primary-button">編集</button>
+          <button id="dialog-delete-button" type="button" class="danger-button">削除</button>
+          <button id="dialog-close-button" type="button" class="ghost-button">閉じる</button>
+        </div>
+      </article>
+    </dialog>
     <script type="module" src="app.js"></script>
   </body>
 </html>

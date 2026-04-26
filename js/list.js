@@ -400,7 +400,7 @@ async function refreshList() {
   const loadedItems = await loadItems(state.uid);
   state.items =
     TIMELINE_MODE === "hidden"
-      ? loadedItems.filter((item) => item.hideFromTimeline)
+      ? loadedItems.filter((item) => !isPcManagementItem(item) && item.hideFromTimeline)
       : loadedItems.filter((item) => !isPcManagementItem(item) && !item.hideFromTimeline);
   if (!state.items.some((item) => item.id === state.selectedItemId)) {
     state.selectedItemId = state.items[0]?.id ?? null;

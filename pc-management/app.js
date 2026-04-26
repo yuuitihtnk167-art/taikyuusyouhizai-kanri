@@ -9,85 +9,72 @@ import {
 import {
   db,
   onAuthChanged,
-  decodePcManagementModel,
-  decodePcPartMemo,
   firebaseErrorMessage,
-  pcPartMemoDisplayText,
   registerServiceWorker,
 } from "../js/common.js";
 
-const LOCAL_STORAGE_KEY = "pcManagementItems.v1";
 const PC_ITEMS_COLLECTION = "durableGoodsItems";
 const SOURCE_TYPE = "pcManagement";
-const DATA_VERSION = 6;
-const PC_MODEL_PREFIX = "[pcManagement]";
-const PART_MEMO_PREFIX = "[pcPart]";
+const DATA_VERSION = 7;
+const SCHEMA_TYPE = "pcPartLifecycle";
+const TIMELINE_MIN_YEAR = 2015;
+const TIMELINE_MAX_YEAR = 2055;
+const DESKTOP_YEAR_WIDTH = 168;
+const DESKTOP_LABEL_WIDTH = 230;
+const MOBILE_YEAR_WIDTH = 28;
+const MOBILE_LABEL_WIDTH = 72;
+const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 
-const usageLabels = {
-  work: "仕事",
-  game: "ゲーム",
-  development: "開発",
-  other: "その他",
+const pcNameLabels = {
+  main: "メインPC",
+  sub: "サブPC",
 };
-
-const partTypeLabels = {
-  cpu: "CPU",
-  gpu: "GPU",
-  motherboard: "マザーボード",
-  memory: "メモリ",
-  storage: "ストレージ",
-  power_supply: "電源",
-  monitor: "モニター",
-  os: "OS",
-  other: "その他",
-};
-
-const currentSpecTypes = [
-  "cpu",
-  "gpu",
-  "motherboard",
-  "memory",
-  "storage",
-  "power_supply",
-  "monitor",
-  "os",
-];
-const requiredSpecTypes = currentSpecTypes.filter((specType) => specType !== "gpu");
 
 const elements = {
   summaryCount: document.getElementById("summary-count"),
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
+  createButton: document.getElementById("create-button"),
+  hiddenButton: document.getElementById("hidden-button"),
+  backButton: document.getElementById("back-button"),
+  helpButton: document.getElementById("help-button"),
+  helpDialog: document.getElementById("help-dialog"),
+  helpCloseButton: document.getElementById("help-close-button"),
+  toListButton: document.getElementById("to-list-button"),
+  formPanel: document.getElementById("form-panel"),
   form: document.getElementById("pc-form"),
   formError: document.getElementById("form-error"),
   resetButton: document.getElementById("reset-button"),
   submitButton: document.getElementById("submit-button"),
   cancelButton: document.getElementById("cancel-button"),
-  pcList: document.getElementById("pc-list"),
-  addPartButton: document.getElementById("add-part-button"),
-  partList: document.getElementById("part-list"),
-  partRowTemplate: document.getElementById("part-row-template"),
-  partsDialog: document.getElementById("parts-dialog"),
-  partsDialogTitle: document.getElementById("parts-dialog-title"),
-  partsDialogBody: document.getElementById("parts-dialog-body"),
-  partsDialogClose: document.getElementById("parts-dialog-close"),
-  exportButton: document.getElementById("export-button"),
-  importFile: document.getElementById("import-file"),
+  itemList: document.getElementById("item-list"),
   calculationTotal: document.getElementById("calculation-total"),
   calculationMonthlyCost: document.getElementById("calculation-monthly-cost"),
   id: document.getElementById("pc-id"),
-  itemName: document.getElementById("item-name"),
-  usage: document.getElementById("usage"),
+  partName: document.getElementById("part-name"),
+  modelNumber: document.getElementById("model-number"),
+  pcName: document.getElementById("pc-name"),
+  specDetail: document.getElementById("spec-detail"),
   purchaseDate: document.getElementById("purchase-date"),
+  purchasePrice: document.getElementById("purchase-price"),
   yearsOfUse: document.getElementById("years-of-use"),
+  endOfUseDate: document.getElementById("end-of-use-date"),
   hideFromTimeline: document.getElementById("hide-from-timeline"),
+  itemDialog: document.getElementById("item-dialog"),
+  dialogItemName: document.getElementById("dialog-item-name"),
+  dialogItemMeta: document.getElementById("dialog-item-meta"),
+  dialogEditButton: document.getElementById("dialog-edit-button"),
+  dialogDeleteButton: document.getElementById("dialog-delete-button"),
+  dialogCloseButton: document.getElementById("dialog-close-button"),
 };
 
 const state = {
   uid: null,
   items: [],
+  selectedItemId: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
+  resizeTimer: null,
 };
 
 function createId() {
@@ -95,6 +82,13 @@ function createId() {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function createElement(tagName, className, textContent = "") {
+  const element = document.createElement(tagName);
+  if (className) element.className = className;
+  if (textContent) element.textContent = textContent;
+  return element;
 }
 
 function formatCurrency(value) {
@@ -105,21 +99,10 @@ function formatCurrency(value) {
   }).format(Number(value) || 0);
 }
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function normalizeUsage(value) {
-  return usageLabels[value] ? value : "other";
-}
-
-function normalizePartType(value) {
-  return partTypeLabels[value] ? value : "other";
+function parseCurrencyInputValue(value) {
+  const normalizedValue = String(value ?? "").replaceAll(",", "").trim();
+  const amount = Number(normalizedValue);
+  return Number.isFinite(amount) && amount >= 0 ? amount : Number.NaN;
 }
 
 function toMillis(value, fallback = Date.now()) {
@@ -133,146 +116,68 @@ function toMillis(value, fallback = Date.now()) {
   return Number.isFinite(numericValue) ? numericValue : fallback;
 }
 
-function normalizeLegacySpecs(value) {
-  const specs = value && typeof value === "object" ? value : {};
-  return {
-    cpu: String(specs.cpu ?? ""),
-    gpu: String(specs.gpu ?? ""),
-    motherboard: String(specs.motherboard ?? ""),
-    memory: String(specs.memory ?? ""),
-    storage: String(specs.storage ?? ""),
-    power_supply: String(specs.powerSupply ?? specs.power_supply ?? ""),
-    monitor: String(specs.monitor ?? ""),
-    os: String(specs.os ?? ""),
-  };
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function normalizeParts(value) {
-  if (!Array.isArray(value)) return [];
-  return value.map((part) => {
-    const decodedMemo = decodePcPartMemo(part?.memo);
-    return {
-      id: part?.id || createId(),
-      partType: normalizePartType(decodedMemo?.partType ?? part?.partType),
-      partName: String(decodedMemo?.partName ?? part?.partName ?? ""),
-      purchaseDate: String(decodedMemo?.purchaseDate ?? part?.purchaseDate ?? ""),
-      price: Number(part?.price ?? 0),
-      memo: String(decodedMemo?.memo ?? part?.memo ?? ""),
-      createdAt: Number.isFinite(Number(part?.createdAt)) ? Number(part.createdAt) : Date.now(),
-    };
-  });
+function toMonthIndex(date) {
+  return date.getFullYear() * 12 + date.getMonth();
 }
 
-function encodePcModel(item) {
-  return `${PC_MODEL_PREFIX}${JSON.stringify({
-    dataVersion: DATA_VERSION,
-    itemName: item.itemName,
-    usage: item.usage,
-    specs: item.specs,
-    parts: item.parts,
-  })}`;
+function daysInMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
 }
 
-function decodePcModel(value) {
-  return decodePcManagementModel(value);
+function toMonthPosition(date) {
+  return toMonthIndex(date) + (date.getDate() - 1) / daysInMonth(date);
 }
 
-function encodePartMemo(part) {
-  return `${PART_MEMO_PREFIX}${JSON.stringify({
-    partType: part.partType,
-    partName: part.partName,
-    purchaseDate: part.purchaseDate,
-    memo: part.memo,
-  })}`;
+function addYearsClamped(date, years) {
+  const targetYear = date.getFullYear() + years;
+  const targetMonth = date.getMonth();
+  const targetDay = Math.min(date.getDate(), new Date(targetYear, targetMonth + 1, 0).getDate());
+  return new Date(targetYear, targetMonth, targetDay);
 }
 
-function decodePartsFromAdditionalCosts(value) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((cost) => {
-      const decoded = decodePcPartMemo(cost?.memo);
-      if (!decoded) return null;
-      return {
-        id: cost?.id || createId(),
-        partType: normalizePartType(decoded.partType),
-        partName: String(decoded.partName ?? ""),
-        purchaseDate: String(decoded.purchaseDate ?? ""),
-        price: Number(cost?.amount ?? 0),
-        memo: String(decoded.memo ?? ""),
-        createdAt: Number.isFinite(Number(cost?.createdAt)) ? Number(cost.createdAt) : Date.now(),
-      };
-    })
-    .filter(Boolean);
-}
-
-function sortParts(parts) {
-  return normalizeParts(parts).sort((a, b) => {
-    const dateCompare = String(b.purchaseDate).localeCompare(String(a.purchaseDate));
-    if (dateCompare !== 0) return dateCompare;
-    return Number(b.createdAt ?? 0) - Number(a.createdAt ?? 0);
-  });
-}
-
-function deriveCurrentSpecs(parts, legacySpecs = {}) {
-  const specs = normalizeLegacySpecs(legacySpecs);
-  for (const part of sortParts(parts).reverse()) {
-    if (!currentSpecTypes.includes(part.partType)) continue;
-    if (!part.partName.trim()) continue;
-    specs[part.partType] = part.partName;
-  }
-  return specs;
-}
-
-function calculatePartsTotal(parts) {
-  return normalizeParts(parts).reduce((total, part) => {
-    if (!Number.isFinite(part.price)) return total;
-    return total + part.price;
-  }, 0);
-}
-
-function calculateTotalInvestment(item) {
-  const partsTotal = calculatePartsTotal(item.parts);
-  return item.parts.length > 0 ? partsTotal : Number(item.price ?? 0);
-}
-
-function calculateMonthlyCost(item) {
-  const yearsOfUse = Number(item.yearsOfUse ?? 0);
-  if (!Number.isFinite(yearsOfUse) || yearsOfUse <= 0) return 0;
-  return calculateTotalInvestment(item) / (yearsOfUse * 12);
+function formatYearMonthFromIndex(monthIndex) {
+  const normalizedMonthIndex = Math.floor(monthIndex);
+  const year = Math.floor(normalizedMonthIndex / 12);
+  const month = (normalizedMonthIndex % 12) + 1;
+  return `${year}/${String(month).padStart(2, "0")}`;
 }
 
 function formatMonthlyCost(value) {
   return `${formatCurrency(value)} /月`;
 }
 
-function parseCurrencyInputValue(value) {
-  const normalizedValue = String(value ?? "").replaceAll(",", "").trim();
-  const amount = Number(normalizedValue);
-  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+function calculateMonthlyCost(item) {
+  const purchasePrice = Number(item.purchasePrice ?? 0);
+  const yearsOfUse = Number(item.yearsOfUse ?? 0);
+  if (!Number.isFinite(purchasePrice) || !Number.isFinite(yearsOfUse) || yearsOfUse <= 0) return 0;
+  return purchasePrice / (yearsOfUse * 12);
 }
 
-function normalizePcItem(value) {
+function normalizePcName(value) {
+  return pcNameLabels[value] ? value : "main";
+}
+
+function normalizePcPartItem(value) {
   const item = value && typeof value === "object" ? value : {};
-  const decodedModel = decodePcModel(item.model);
-  const parts = normalizeParts(
-    item.parts ??
-      item.upgradeHistory ??
-      decodedModel?.parts ??
-      decodePartsFromAdditionalCosts(item.additionalCosts)
-  );
-  const legacySpecs = normalizeLegacySpecs(item.specs ?? decodedModel?.specs);
-  const fallbackPrice = Number(item.price ?? item.purchasePrice ?? item.initialPurchaseCost ?? 0);
+  const purchasePrice = Number(item.purchasePrice ?? item.price ?? 0);
   const normalized = {
     id: item.id || createId(),
-    category: "pc",
-    itemName: String(item.itemName ?? decodedModel?.itemName ?? item.name ?? ""),
-    usage: normalizeUsage(item.usage ?? decodedModel?.usage),
+    sourceType: SOURCE_TYPE,
+    partName: String(item.partName ?? item.name ?? item.itemName ?? ""),
+    modelNumber: String(item.modelNumber ?? item.model ?? ""),
+    pcName: normalizePcName(item.pcName),
+    specDetail: String(item.specDetail ?? ""),
     purchaseDate: String(item.purchaseDate ?? ""),
-    price: parts.length > 0 ? calculatePartsTotal(parts) : fallbackPrice,
+    purchasePrice: Number.isFinite(purchasePrice) ? purchasePrice : 0,
     yearsOfUse: Number(item.yearsOfUse ?? 5),
+    endOfUseDate: String(item.endOfUseDate ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
-    specs: deriveCurrentSpecs(parts, legacySpecs),
-    parts,
     createdAt: toMillis(item.createdAt),
     updatedAt: toMillis(item.updatedAt),
   };
@@ -291,30 +196,27 @@ function pcItemDocRef(uid, itemId) {
 }
 
 function toFirestorePayload(item) {
-  const normalized = normalizePcItem(item);
-  const totalInvestment = calculateTotalInvestment(normalized);
+  const normalized = normalizePcPartItem(item);
   return {
+    dataVersion: DATA_VERSION,
+    schemaType: SCHEMA_TYPE,
     sourceType: SOURCE_TYPE,
-    name: normalized.itemName,
-    model: encodePcModel(normalized),
     category: "pc",
-    itemName: normalized.itemName,
-    usage: normalized.usage,
+    name: normalized.partName,
+    itemName: normalized.partName,
+    partName: normalized.partName,
+    model: normalized.modelNumber,
+    modelNumber: normalized.modelNumber,
+    pcName: normalized.pcName,
+    specDetail: normalized.specDetail,
     purchaseDate: normalized.purchaseDate,
-    price: totalInvestment,
-    purchasePrice: totalInvestment,
+    price: normalized.purchasePrice,
+    purchasePrice: normalized.purchasePrice,
     yearsOfUse: normalized.yearsOfUse,
-    hideFromTimeline: Boolean(normalized.hideFromTimeline),
+    endOfUseDate: normalized.endOfUseDate,
+    hideFromTimeline: normalized.hideFromTimeline,
     monthlyCost: calculateMonthlyCost(normalized),
-    specs: normalized.specs,
-    parts: normalized.parts,
-    endOfUseDate: "",
-    additionalCosts: normalized.parts.map((part) => ({
-      id: part.id,
-      amount: Number(part.price ?? 0),
-      memo: encodePartMemo(part),
-      createdAt: Number.isFinite(Number(part.createdAt)) ? Number(part.createdAt) : Date.now(),
-    })),
+    additionalCosts: [],
     createdAt: normalized.createdAt,
     updatedAt: serverTimestamp(),
   };
@@ -325,8 +227,10 @@ async function loadFirestoreItems(uid) {
   const items = [];
   snapshot.forEach((documentSnapshot) => {
     const data = documentSnapshot.data();
-    if (data.sourceType !== SOURCE_TYPE && !decodePcModel(data.model)) return;
-    items.push(normalizePcItem({
+    if (data.sourceType !== SOURCE_TYPE) return;
+    if (Number(data.dataVersion ?? 0) !== DATA_VERSION) return;
+    if (data.schemaType !== SCHEMA_TYPE) return;
+    items.push(normalizePcPartItem({
       id: documentSnapshot.id,
       ...data,
     }));
@@ -335,7 +239,7 @@ async function loadFirestoreItems(uid) {
 }
 
 async function saveFirestoreItem(uid, item) {
-  const normalized = normalizePcItem(item);
+  const normalized = normalizePcPartItem(item);
   await setDoc(pcItemDocRef(uid, normalized.id), toFirestorePayload(normalized));
 }
 
@@ -343,481 +247,525 @@ async function removeFirestoreItem(uid, itemId) {
   await deleteDoc(pcItemDocRef(uid, itemId));
 }
 
-async function replaceFirestoreItems(uid, items) {
-  await Promise.all(state.items.map((item) => removeFirestoreItem(uid, item.id)));
-  await Promise.all(items.map((item) => saveFirestoreItem(uid, item)));
-}
-
-function loadLocalItemsForMigration() {
-  try {
-    const rawValue = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!rawValue) return [];
-    const parsed = JSON.parse(rawValue);
-    const items = Array.isArray(parsed) ? parsed : parsed.pcItems;
-    return Array.isArray(items) ? items.map(normalizePcItem) : [];
-  } catch (_error) {
-    return [];
-  }
-}
-
-function saveLocalBackupItems(items) {
-  const payload = {
-    dataVersion: DATA_VERSION,
-    pcItems: items.map(normalizePcItem),
-  };
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
-}
-
-async function migrateLocalItemsIfNeeded(uid) {
-  if (state.items.length > 0) return;
-  const localItems = loadLocalItemsForMigration();
-  if (localItems.length === 0) return;
-  const shouldMigrate = confirm("このブラウザに保存済みのPCデータがあります。Firestoreへ移行しますか？");
-  if (!shouldMigrate) return;
-  await Promise.all(localItems.map((item) => saveFirestoreItem(uid, item)));
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
-  state.items = await loadFirestoreItems(uid);
-  render();
-}
-
 function sortItems(items) {
   return [...items].sort((a, b) => {
+    const pcCompare = String(a.pcName).localeCompare(String(b.pcName));
+    if (pcCompare !== 0) return pcCompare;
     const dateCompare = String(b.purchaseDate).localeCompare(String(a.purchaseDate));
     if (dateCompare !== 0) return dateCompare;
-    return Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0);
+    return String(a.partName).localeCompare(String(b.partName), "ja");
   });
 }
 
+function visibleItems() {
+  return state.items.filter((item) =>
+    TIMELINE_MODE === "hidden" ? item.hideFromTimeline : !item.hideFromTimeline
+  );
+}
+
+function itemStartMonth(item) {
+  const purchaseDate = parseDate(item.purchaseDate);
+  return purchaseDate ? toMonthPosition(purchaseDate) : TIMELINE_MIN_YEAR * 12;
+}
+
+function currentMonthIndex() {
+  return toMonthPosition(new Date());
+}
+
+function itemPlannedEndMonth(item) {
+  const purchaseDate = parseDate(item.purchaseDate);
+  const yearsOfUse = Math.max(Number(item.yearsOfUse) || 1, 1);
+  if (!purchaseDate) return itemStartMonth(item) + yearsOfUse * 12;
+  return toMonthPosition(addYearsClamped(purchaseDate, yearsOfUse));
+}
+
+function itemActualEndMonth(item) {
+  const endOfUseDate = parseDate(item.endOfUseDate);
+  if (endOfUseDate) return Math.max(itemStartMonth(item), toMonthPosition(endOfUseDate));
+  return currentMonthIndex();
+}
+
+function itemEndMonth(item) {
+  if (item.endOfUseDate) return itemActualEndMonth(item);
+  return Math.max(itemPlannedEndMonth(item), itemActualEndMonth(item));
+}
+
+function itemUnusedPeriodEndMonth(item) {
+  if (!item.endOfUseDate) return itemEndMonth(item);
+  return itemPlannedEndMonth(item);
+}
+
+function itemTimelineEndMonth(item) {
+  if (item.endOfUseDate) return Math.max(itemEndMonth(item), itemUnusedPeriodEndMonth(item));
+  return itemEndMonth(item);
+}
+
+function itemEndLabel(item, endMonth) {
+  if (item.endOfUseDate) return `${formatYearMonthFromIndex(endMonth)} (使用終了)`;
+  return `${formatYearMonthFromIndex(endMonth)} (${item.yearsOfUse}年)`;
+}
+
+function calculateLifecycleProgress(item) {
+  const startMonth = itemStartMonth(item);
+  const durationMonths = Math.max(itemPlannedEndMonth(item) - startMonth, 1);
+  return (currentMonthIndex() - startMonth) / durationMonths;
+}
+
+function lifecycleStatus(item) {
+  if (item.endOfUseDate) return "ended";
+  const progress = calculateLifecycleProgress(item);
+  if (progress >= 1) return "ended";
+  if (progress >= 0.85) return "danger";
+  if (progress >= 0.5) return "warning";
+  return "normal";
+}
+
+function pcNameClass(item) {
+  return item.pcName === "sub" ? "category-pc-sub" : "category-pc-main";
+}
+
+function timelineLayout() {
+  const isCompact = window.matchMedia("(max-width: 640px)").matches;
+  return {
+    isCompact,
+    labelWidth: isCompact ? MOBILE_LABEL_WIDTH : DESKTOP_LABEL_WIDTH,
+    yearWidth: isCompact ? MOBILE_YEAR_WIDTH : DESKTOP_YEAR_WIDTH,
+  };
+}
+
+function resolveTimelineRange(items) {
+  let minYear = TIMELINE_MIN_YEAR;
+  let maxYear = TIMELINE_MAX_YEAR;
+  for (const item of items) {
+    minYear = Math.min(minYear, Math.floor(itemStartMonth(item) / 12));
+    maxYear = Math.max(maxYear, Math.ceil(itemTimelineEndMonth(item) / 12));
+  }
+  return { minYear, maxYear };
+}
+
+function currentLinePosition(minYear, maxYear) {
+  const { labelWidth, yearWidth } = timelineLayout();
+  const minMonth = minYear * 12;
+  const maxMonth = maxYear * 12;
+  const nowPosition = currentMonthIndex();
+  if (nowPosition < minMonth || nowPosition > maxMonth) return null;
+  return labelWidth + ((nowPosition - minMonth) / 12) * yearWidth;
+}
+
+function renderAxis(grid, minYear, maxYear, positionClass) {
+  const { isCompact, labelWidth, yearWidth } = timelineLayout();
+  const axis = createElement("div", `timeline-axis ${positionClass}`);
+  const yearCount = maxYear - minYear;
+
+  for (let year = minYear; year <= maxYear; year += 1) {
+    if (isCompact && year % 5 !== 0) continue;
+    const marker = createElement("span", "timeline-year", String(year));
+    marker.style.left = `${labelWidth + (year - minYear) * yearWidth}px`;
+    axis.appendChild(marker);
+  }
+
+  for (let index = 0; index <= yearCount * 12; index += 1) {
+    const tick = createElement("span", index % 12 === 0 ? "timeline-tick major" : "timeline-tick");
+    tick.style.left = `${labelWidth + (index / 12) * yearWidth}px`;
+    axis.appendChild(tick);
+  }
+
+  grid.appendChild(axis);
+}
+
+function renderCurrentLine(grid, minYear, maxYear) {
+  const currentPosition = currentLinePosition(minYear, maxYear);
+  if (currentPosition === null) return;
+  const currentLine = createElement("div", "timeline-current-line");
+  currentLine.style.left = `${currentPosition}px`;
+  currentLine.innerHTML = "<span>現在</span>";
+  grid.appendChild(currentLine);
+}
+
+function centerCurrentLine(scroll, minYear, maxYear) {
+  const currentPosition = currentLinePosition(minYear, maxYear);
+  if (currentPosition === null) return;
+  const { labelWidth } = timelineLayout();
+  requestAnimationFrame(() => {
+    const maxScrollLeft = Math.max(scroll.scrollWidth - scroll.clientWidth, 0);
+    const visibleTimelineWidth = Math.max(scroll.clientWidth - labelWidth, 1);
+    const targetScrollLeft = currentPosition - labelWidth - visibleTimelineWidth / 2;
+    scroll.scrollLeft = Math.min(Math.max(targetScrollLeft, 0), maxScrollLeft);
+  });
+}
+
+function renderEmptyTimeline() {
+  if (!elements.itemList) return;
+  elements.itemList.innerHTML = "";
+  const empty = createElement("div", "timeline-empty");
+  const message =
+    TIMELINE_MODE === "hidden"
+      ? "帯を表示しないパーツはありません。"
+      : "パーツを登録すると、購入日から使用年数までのライフサイクル帯を表示します。";
+  empty.innerHTML = `
+    <strong>登録データがありません</strong>
+    <span></span>
+  `;
+  empty.querySelector("span").textContent = message;
+  elements.itemList.appendChild(empty);
+}
+
+function renderTimeline() {
+  if (!elements.itemList) return;
+  const items = sortItems(visibleItems());
+  elements.itemList.innerHTML = "";
+  if (items.length === 0) {
+    renderEmptyTimeline();
+    return;
+  }
+
+  const { minYear, maxYear } = resolveTimelineRange(items);
+  const { labelWidth, yearWidth } = timelineLayout();
+  const timelineWidth = labelWidth + (maxYear - minYear) * yearWidth;
+  const minMonth = minYear * 12;
+
+  const scroll = createElement("div", "timeline-scroll");
+  scroll.tabIndex = 0;
+  scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
+
+  const grid = createElement("div", "timeline-grid");
+  grid.style.width = `${timelineWidth}px`;
+  grid.style.setProperty("--label-width", `${labelWidth}px`);
+  grid.style.setProperty("--year-width", `${yearWidth}px`);
+
+  renderAxis(grid, minYear, maxYear, "timeline-axis-top");
+  renderCurrentLine(grid, minYear, maxYear);
+
+  const rows = createElement("div", "timeline-rows");
+  for (const item of items) {
+    const startMonth = itemStartMonth(item);
+    const endMonth = itemEndMonth(item);
+    const unusedPeriodEndMonth = itemUnusedPeriodEndMonth(item);
+    const plannedEndMonth = itemPlannedEndMonth(item);
+    const status = lifecycleStatus(item);
+    const left = labelWidth + ((startMonth - minMonth) / 12) * yearWidth;
+    const width = Math.max(((endMonth - startMonth) / 12) * yearWidth, timelineLayout().isCompact ? 32 : 84);
+    const unusedPeriodLeft = labelWidth + ((endMonth - minMonth) / 12) * yearWidth;
+    const unusedPeriodWidth = ((unusedPeriodEndMonth - endMonth) / 12) * yearWidth;
+    const overuseStartPercent = ((plannedEndMonth - startMonth) / Math.max(endMonth - startMonth, 1)) * 100;
+    const isOverused = itemActualEndMonth(item) > plannedEndMonth;
+    const isSelected = item.id === state.selectedItemId;
+    const colorClass = pcNameClass(item);
+
+    const row = createElement("div", "timeline-row");
+    const label = createElement("div", "timeline-row-label");
+    label.innerHTML = `<span class="category-swatch ${colorClass}"></span><strong></strong>`;
+    label.querySelector("strong").textContent = pcNameLabels[item.pcName] || "メインPC";
+
+    const band = createElement("button", `lifecycle-band ${colorClass}${isOverused ? " overused" : ""}`);
+    band.type = "button";
+    band.dataset.id = item.id;
+    band.setAttribute("aria-pressed", String(isSelected));
+    band.setAttribute("aria-label", `${item.partName || "パーツ"}の詳細を表示`);
+    band.style.left = `${left}px`;
+    band.style.width = `${width}px`;
+    if (isOverused) {
+      band.style.setProperty("--overuse-start", `${Math.min(Math.max(overuseStartPercent, 0), 100)}%`);
+    }
+
+    band.append(
+      createElement("span", "band-name", item.partName || "商品名未入力"),
+      createElement("span", "band-cost", formatMonthlyCost(calculateMonthlyCost(item)))
+    );
+
+    if (item.endOfUseDate && unusedPeriodWidth > 0) {
+      const postEndBand = createElement("button", "post-end-band");
+      postEndBand.type = "button";
+      postEndBand.dataset.id = item.id;
+      postEndBand.setAttribute("aria-pressed", String(isSelected));
+      postEndBand.setAttribute("aria-label", `${item.partName || "パーツ"}の使わなかった期間`);
+      postEndBand.style.left = `${unusedPeriodLeft}px`;
+      postEndBand.style.width = `${Math.max(unusedPeriodWidth, 2)}px`;
+      row.appendChild(postEndBand);
+    }
+
+    const endLabel = createElement("span", `timeline-end-label status-${status}`, itemEndLabel(item, endMonth));
+    endLabel.style.left = `${left + width + 10}px`;
+
+    row.append(label, band, endLabel);
+    rows.appendChild(row);
+  }
+
+  grid.appendChild(rows);
+  renderAxis(grid, minYear, maxYear, "timeline-axis-bottom");
+  scroll.appendChild(grid);
+  elements.itemList.appendChild(scroll);
+  centerCurrentLine(scroll, minYear, maxYear);
+}
+
+function renderSummary() {
+  if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
+  const items = visibleItems();
+  const activeItems = items.filter((item) => !item.endOfUseDate);
+  const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+  const monthlyCostTotal = activeItems.reduce((total, item) => total + calculateMonthlyCost(item), 0);
+  elements.summaryCount.textContent = `${items.length} 件`;
+  elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
+  elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
+}
+
+function render() {
+  renderSummary();
+  renderTimeline();
+}
+
 function validatePcItem(item) {
-  if (!item.itemName.trim()) return "PC名を入力してください。";
-  if (!item.purchaseDate) return "組立日を入力してください。";
-  if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) {
-    return "想定使用年数は1年以上で入力してください。";
-  }
-  if (item.parts.length === 0) return "パーツを1件以上入力してください。";
-
-  for (const part of item.parts) {
-    if (!part.partName.trim()) return "パーツ名を入力してください。";
-    if (!part.purchaseDate) return "パーツの購入日を入力してください。";
-    if (!Number.isFinite(part.price) || part.price < 0) {
-      return "パーツ費用は0以上で入力してください。";
-    }
-  }
-
-  for (const specType of requiredSpecTypes) {
-    if (!item.specs[specType].trim()) {
-      return `${partTypeLabels[specType]}をパーツ入力に追加してください。`;
-    }
+  if (!item.partName.trim()) return "商品名（パーツ）を入力してください。";
+  if (!item.modelNumber.trim()) return "型番を入力してください。";
+  if (!pcNameLabels[item.pcName]) return "分類（パソコン名）を選択してください。";
+  if (!item.purchaseDate) return "購入日を入力してください。";
+  if (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0) return "購入価格は0以上で入力してください。";
+  if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用年数は1以上で入力してください。";
+  if (item.endOfUseDate && item.endOfUseDate < item.purchaseDate) {
+    return "使用終了日は購入日以降の日付を入力してください。";
   }
   return null;
 }
 
-function createPartRow(part = {}) {
-  const decodedMemo = decodePcPartMemo(part.memo);
-  const fragment = elements.partRowTemplate.content.cloneNode(true);
-  const row = fragment.querySelector(".part-row");
-  row.dataset.id = part.id || createId();
-  row.dataset.createdAt = Number.isFinite(Number(part.createdAt)) ? String(part.createdAt) : String(Date.now());
-  row.querySelector(".part-type").value = normalizePartType(decodedMemo?.partType ?? part.partType);
-  row.querySelector(".part-purchase-date").value = decodedMemo?.purchaseDate ?? part.purchaseDate ?? "";
-  row.querySelector(".part-name").value = decodedMemo?.partName ?? part.partName ?? "";
-  row.querySelector(".part-price").value =
-    Number.isFinite(Number(part.price)) && Number(part.price) >= 0 ? part.price : "";
-  row.querySelector(".part-memo").value = decodedMemo?.memo ?? pcPartMemoDisplayText(part.memo);
-  return row;
-}
-
-function renderPartRows(parts) {
-  elements.partList.innerHTML = "";
-  for (const part of sortParts(parts)) {
-    elements.partList.appendChild(createPartRow(part));
-  }
-  if (elements.partList.children.length === 0) {
-    elements.partList.appendChild(createPartRow({ createdAt: Date.now() }));
-  }
-}
-
-function collectParts() {
-  const rows = elements.partList.querySelectorAll(".part-row");
-  const parts = [];
-  for (const row of rows) {
-    const partType = row.querySelector(".part-type").value;
-    const purchaseDate = row.querySelector(".part-purchase-date").value;
-    const partName = row.querySelector(".part-name").value.trim();
-    const rawPrice = row.querySelector(".part-price").value.trim();
-    const memo = row.querySelector(".part-memo").value.trim();
-    if (!partName && !purchaseDate && !rawPrice && !memo) continue;
-
-    parts.push({
-      id: row.dataset.id || createId(),
-      partType,
-      partName,
-      purchaseDate,
-      price: rawPrice ? parseCurrencyInputValue(rawPrice) : Number.NaN,
-      memo,
-      createdAt: Number(row.dataset.createdAt) || Date.now(),
-    });
-  }
-  return parts;
-}
-
-function updateCalculationResult() {
-  const parts = collectParts();
-  const totalInvestment = calculatePartsTotal(parts);
-  const yearsOfUse = Number(elements.yearsOfUse.value);
-  const monthlyCost = Number.isFinite(yearsOfUse) && yearsOfUse > 0 ? totalInvestment / (yearsOfUse * 12) : 0;
-
-  elements.calculationTotal.textContent = formatCurrency(totalInvestment);
-  elements.calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
-}
-
 function collectPcItem() {
   const existingItem = state.items.find((item) => item.id === state.editingId);
-  const parts = collectParts();
-  return normalizePcItem({
+  return normalizePcPartItem({
     id: elements.id.value || createId(),
-    category: "pc",
-    itemName: elements.itemName.value.trim(),
-    usage: elements.usage.value,
+    partName: elements.partName.value.trim(),
+    modelNumber: elements.modelNumber.value.trim(),
+    pcName: elements.pcName.value,
+    specDetail: elements.specDetail.value.trim(),
     purchaseDate: elements.purchaseDate.value,
+    purchasePrice: parseCurrencyInputValue(elements.purchasePrice.value),
     yearsOfUse: Number(elements.yearsOfUse.value),
+    endOfUseDate: elements.endOfUseDate.value,
     hideFromTimeline: elements.hideFromTimeline.checked,
-    parts,
     createdAt: existingItem?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   });
 }
 
 function resetForm() {
+  if (!elements.form) return;
   state.editingId = null;
   elements.form.reset();
   elements.id.value = "";
-  elements.usage.value = "work";
+  elements.pcName.value = "main";
   elements.yearsOfUse.value = "5";
   elements.hideFromTimeline.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.cancelButton.hidden = true;
   elements.formError.textContent = "";
-  renderPartRows([]);
   updateCalculationResult();
 }
 
+function updateEndedUseStyle() {
+  if (!elements.formPanel || !elements.endOfUseDate) return;
+  elements.formPanel.classList.toggle("ended-use", Boolean(elements.endOfUseDate.value));
+}
+
 function fillForm(item) {
+  if (!elements.form) return;
   state.editingId = item.id;
   elements.id.value = item.id;
-  elements.itemName.value = item.itemName;
-  elements.usage.value = item.usage;
+  elements.partName.value = item.partName;
+  elements.modelNumber.value = item.modelNumber;
+  elements.pcName.value = item.pcName;
+  elements.specDetail.value = item.specDetail;
   elements.purchaseDate.value = item.purchaseDate;
+  elements.purchasePrice.value = item.purchasePrice;
   elements.yearsOfUse.value = item.yearsOfUse;
+  elements.endOfUseDate.value = item.endOfUseDate;
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
   elements.cancelButton.hidden = false;
   elements.formError.textContent = "";
-  renderPartRows(item.parts);
+  updateEndedUseStyle();
   updateCalculationResult();
-  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function renderSummary() {
-  const totalInvestment = state.items.reduce((total, item) => total + calculateTotalInvestment(item), 0);
-  const monthlyCost = state.items.reduce((total, item) => total + calculateMonthlyCost(item), 0);
-  elements.summaryCount.textContent = `${state.items.length}台`;
-  elements.summaryTotal.textContent = formatCurrency(totalInvestment);
-  elements.summaryMonthly.textContent = formatCurrency(monthlyCost);
-}
-
-function renderParts(parts) {
-  const sortedParts = sortParts(parts);
-  if (sortedParts.length === 0) {
-    return '<p class="pc-card-meta">パーツはまだ入力されていません。</p>';
+function updateCalculationResult() {
+  if (!elements.calculationMonthlyCost) return;
+  const purchasePrice = parseCurrencyInputValue(elements.purchasePrice.value);
+  const monthlyCost = calculateMonthlyCost({
+    purchasePrice,
+    yearsOfUse: Number(elements.yearsOfUse.value),
+  });
+  if (elements.calculationTotal) {
+    elements.calculationTotal.textContent = formatCurrency(purchasePrice);
   }
-  return `
-    <div class="history-list">
-      ${sortedParts
-        .map(
-          (part) => `
-            <div class="history-row">
-              <span data-label="購入日">${escapeHtml(part.purchaseDate)}</span>
-              <span data-label="種別">${escapeHtml(partTypeLabels[part.partType] ?? "その他")}</span>
-              <strong data-label="パーツ名">${escapeHtml(part.partName)}</strong>
-              <span data-label="費用">${formatCurrency(part.price)}</span>
-              <span data-label="メモ">${escapeHtml(part.memo)}</span>
-            </div>
-          `
-        )
-        .join("")}
-    </div>
-  `;
-}
-
-function renderSpecGrid(specs) {
-  return currentSpecTypes
-    .map((specType) => {
-      const emptyText = specType === "gpu" ? "未搭載" : "未入力";
-      return `
-        <div>
-          <dt>${escapeHtml(partTypeLabels[specType])}</dt>
-          <dd>${escapeHtml(specs[specType] || emptyText)}</dd>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function showPartsDialog(item) {
-  elements.partsDialogTitle.textContent = `${item.itemName}のパーツ一覧`;
-  elements.partsDialogBody.innerHTML = renderParts(item.parts);
-
-  if (typeof elements.partsDialog.showModal === "function") {
-    elements.partsDialog.showModal();
-    return;
-  }
-
-  elements.partsDialog.setAttribute("open", "");
-}
-
-function renderList() {
-  elements.pcList.innerHTML = "";
-  if (state.items.length === 0) {
-    elements.pcList.innerHTML = '<div class="empty">PCはまだ登録されていません。</div>';
-    return;
-  }
-
-  for (const item of sortItems(state.items)) {
-    const totalInvestment = calculateTotalInvestment(item);
-    const monthlyCost = calculateMonthlyCost(item);
-
-    const card = document.createElement("article");
-    card.className = "pc-card";
-    card.innerHTML = `
-      <div class="pc-card-header">
-        <div>
-          <h3 class="pc-card-title">${escapeHtml(item.itemName)}</h3>
-          <p class="pc-card-meta">
-            用途: ${escapeHtml(usageLabels[item.usage] ?? "その他")} / 組立日: ${escapeHtml(item.purchaseDate)}
-          </p>
-        </div>
-        <div class="card-actions">
-          <button class="primary-button small-button edit-button" type="button" data-id="${escapeHtml(item.id)}">編集</button>
-          <button class="danger-button small-button delete-button" type="button" data-id="${escapeHtml(item.id)}">削除</button>
-        </div>
-      </div>
-
-      <div class="pc-cost-summary">
-        <div>
-          <span class="cost-label">総投資額</span>
-          <strong>${formatCurrency(totalInvestment)}</strong>
-        </div>
-        <div>
-          <span class="cost-label">月額換算</span>
-          <strong>${formatCurrency(monthlyCost)}</strong>
-        </div>
-      </div>
-
-      <dl class="spec-grid">
-        ${renderSpecGrid(item.specs)}
-      </dl>
-
-      <button
-        class="part-summary-card parts-dialog-button"
-        type="button"
-        data-id="${escapeHtml(item.id)}"
-        aria-label="${escapeHtml(item.itemName)}のパーツ一覧を表示"
-      >
-        <span>パーツ一覧</span>
-        <strong>${item.parts.length}件</strong>
-      </button>
-    `;
-    elements.pcList.appendChild(card);
-  }
-}
-
-function render() {
-  renderSummary();
-  renderList();
+  elements.calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
 }
 
 async function refreshItems() {
   if (!state.uid) return;
   state.items = await loadFirestoreItems(state.uid);
+  if (!state.items.some((item) => item.id === state.selectedItemId)) {
+    state.selectedItemId = visibleItems()[0]?.id ?? null;
+  }
   render();
-  if (state.editingId) {
+  if (state.editingId && elements.form) {
     const item = state.items.find((currentItem) => currentItem.id === state.editingId);
     if (item) fillForm(item);
   }
 }
 
-function showError(error, fallback) {
-  elements.authError.textContent = firebaseErrorMessage(error, fallback);
+function selectedItem() {
+  return state.items.find((item) => item.id === state.selectedItemId) ?? null;
 }
 
-elements.addPartButton.addEventListener("click", () => {
-  const row = createPartRow({ createdAt: Date.now() });
-  elements.partList.prepend(row);
-  row.querySelector(".part-purchase-date").focus();
-  updateCalculationResult();
-});
+function openItemDialog(item) {
+  if (!item || !elements.itemDialog) return;
+  elements.dialogItemName.textContent = item.partName || "商品名未入力";
+  elements.dialogItemMeta.textContent =
+    `${pcNameLabels[item.pcName] || "メインPC"} / 型番: ${item.modelNumber || "未入力"} / ${formatMonthlyCost(calculateMonthlyCost(item))}`;
+  elements.itemDialog.showModal();
+}
 
-elements.partList.addEventListener("click", (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-  if (!target.classList.contains("part-delete")) return;
-  target.closest(".part-row")?.remove();
-  if (elements.partList.children.length === 0) {
-    elements.partList.appendChild(createPartRow({ createdAt: Date.now() }));
+function selectItem(itemId) {
+  state.selectedItemId = itemId;
+  renderTimeline();
+  openItemDialog(selectedItem());
+}
+
+function showError(error, fallback) {
+  if (elements.authError) {
+    elements.authError.textContent = firebaseErrorMessage(error, fallback);
   }
-  updateCalculationResult();
-});
+}
 
-elements.form.addEventListener("input", updateCalculationResult);
-elements.form.addEventListener("change", updateCalculationResult);
-elements.yearsOfUse.addEventListener("input", updateCalculationResult);
-elements.partList.addEventListener("input", updateCalculationResult);
-elements.partList.addEventListener("change", updateCalculationResult);
+if (elements.form) {
+  elements.form.addEventListener("input", updateCalculationResult);
+  elements.form.addEventListener("change", updateCalculationResult);
+  elements.endOfUseDate.addEventListener("input", updateEndedUseStyle);
 
-elements.partsDialogClose.addEventListener("click", () => {
-  elements.partsDialog.close();
-});
+  elements.form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    elements.formError.textContent = "";
+    elements.authError.textContent = "";
 
-elements.partsDialog.addEventListener("click", (event) => {
-  if (event.target === elements.partsDialog) {
-    elements.partsDialog.close();
-  }
-});
-
-elements.form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  elements.formError.textContent = "";
-  elements.authError.textContent = "";
-
-  if (!state.uid) {
-    elements.formError.textContent = "ログイン状態を確認できません。もう一度ログインしてください。";
-    return;
-  }
-
-  const item = collectPcItem();
-  const validation = validatePcItem(item);
-  if (validation) {
-    elements.formError.textContent = validation;
-    return;
-  }
-
-  try {
-    elements.submitButton.disabled = true;
-    await saveFirestoreItem(state.uid, item);
-    await refreshItems();
-    resetForm();
-  } catch (error) {
-    elements.formError.textContent = firebaseErrorMessage(error, "PC情報の保存に失敗しました。");
-  } finally {
-    elements.submitButton.disabled = false;
-  }
-});
-
-elements.cancelButton.addEventListener("click", () => {
-  resetForm();
-});
-
-elements.resetButton.addEventListener("click", () => {
-  resetForm();
-});
-
-elements.pcList.addEventListener("click", async (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement)) return;
-
-  const editButton = target.closest(".edit-button");
-  if (editButton instanceof HTMLButtonElement) {
-    const item = state.items.find((currentItem) => currentItem.id === editButton.dataset.id);
-    if (item) fillForm(item);
-    return;
-  }
-
-  const partsDialogButton = target.closest(".parts-dialog-button");
-  if (partsDialogButton instanceof HTMLButtonElement) {
-    const item = state.items.find((currentItem) => currentItem.id === partsDialogButton.dataset.id);
-    if (item) showPartsDialog(item);
-    return;
-  }
-
-  const deleteButton = target.closest(".delete-button");
-  if (!(deleteButton instanceof HTMLButtonElement)) return;
-  if (!state.uid) return;
-
-  const item = state.items.find((currentItem) => currentItem.id === deleteButton.dataset.id);
-  if (!item) return;
-
-  const shouldDelete = confirm(`「${item.itemName}」を削除しますか？`);
-  if (!shouldDelete) return;
-
-  try {
-    deleteButton.disabled = true;
-    await removeFirestoreItem(state.uid, item.id);
-    await refreshItems();
-    if (state.editingId === item.id) resetForm();
-  } catch (error) {
-    showError(error, "PC情報の削除に失敗しました。");
-  } finally {
-    deleteButton.disabled = false;
-  }
-});
-
-elements.exportButton.addEventListener("click", () => {
-  const payload = {
-    dataVersion: DATA_VERSION,
-    exportedAt: new Date().toISOString(),
-    pcItems: sortItems(state.items).map(normalizePcItem),
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "pc-management-data.json";
-  link.click();
-  URL.revokeObjectURL(url);
-});
-
-elements.importFile.addEventListener("change", async () => {
-  const file = elements.importFile.files?.[0];
-  if (!file || !state.uid) return;
-  elements.formError.textContent = "";
-  elements.authError.textContent = "";
-
-  try {
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    const items = Array.isArray(parsed) ? parsed : parsed.pcItems;
-    if (!Array.isArray(items)) {
-      throw new Error("PC一覧データが見つかりません。");
-    }
-    const shouldReplace = confirm("読み込んだJSONでFirestore上のPC一覧を置き換えますか？");
-    if (!shouldReplace) return;
-    const importedItems = items.map(normalizePcItem);
-    state.items = sortItems(importedItems);
-    saveLocalBackupItems(state.items);
-    render();
-    resetForm();
-    try {
-      await replaceFirestoreItems(state.uid, state.items);
-      await refreshItems();
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    } catch (error) {
-      elements.formError.textContent = firebaseErrorMessage(
-        error,
-        "JSONは画面に反映しましたが、Firestoreへの保存に失敗しました。"
-      );
+    if (!state.uid) {
+      elements.formError.textContent = "ログイン状態を確認できません。もう一度ログインしてください。";
       return;
     }
-    resetForm();
-  } catch (error) {
-    elements.formError.textContent = firebaseErrorMessage(error, "JSONの読み込みに失敗しました。");
-  } finally {
-    elements.importFile.value = "";
-  }
+
+    const item = collectPcItem();
+    const validation = validatePcItem(item);
+    if (validation) {
+      elements.formError.textContent = validation;
+      return;
+    }
+
+    try {
+      elements.submitButton.disabled = true;
+      await saveFirestoreItem(state.uid, item);
+      window.location.href = "index.html";
+    } catch (error) {
+      elements.formError.textContent = firebaseErrorMessage(error, "パーツ情報の保存に失敗しました。");
+    } finally {
+      elements.submitButton.disabled = false;
+    }
+  });
+
+  elements.cancelButton.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+  elements.toListButton.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+}
+
+if (elements.createButton) {
+  elements.createButton.addEventListener("click", () => {
+    window.location.href = "form.html";
+  });
+}
+
+if (elements.hiddenButton) {
+  elements.hiddenButton.addEventListener("click", () => {
+    window.location.href = "hidden.html";
+  });
+}
+
+if (elements.backButton) {
+  elements.backButton.addEventListener("click", () => {
+    window.location.href = TIMELINE_MODE === "hidden" ? "index.html" : "../list.html";
+  });
+}
+
+if (elements.helpButton && elements.helpDialog && elements.helpCloseButton) {
+  elements.helpButton.addEventListener("click", () => {
+    elements.helpDialog.showModal();
+  });
+
+  elements.helpCloseButton.addEventListener("click", () => {
+    elements.helpDialog.close();
+  });
+
+  elements.helpDialog.addEventListener("click", (event) => {
+    if (event.target === elements.helpDialog) elements.helpDialog.close();
+  });
+}
+
+if (elements.itemList) {
+  elements.itemList.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const band = target.closest(".lifecycle-band, .post-end-band");
+    if (!(band instanceof HTMLButtonElement)) return;
+    selectItem(band.dataset.id ?? "");
+  });
+}
+
+if (elements.dialogEditButton) {
+  elements.dialogEditButton.addEventListener("click", () => {
+    const item = selectedItem();
+    if (!item) return;
+    window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
+  });
+}
+
+if (elements.dialogDeleteButton) {
+  elements.dialogDeleteButton.addEventListener("click", async () => {
+    const item = selectedItem();
+    if (!item || !state.uid) return;
+    const shouldDelete = confirm(`「${item.partName}」を削除しますか？`);
+    if (!shouldDelete) return;
+
+    try {
+      elements.dialogDeleteButton.disabled = true;
+      await removeFirestoreItem(state.uid, item.id);
+      elements.itemDialog.close();
+      state.selectedItemId = null;
+      await refreshItems();
+      if (state.editingId === item.id) resetForm();
+    } catch (error) {
+      showError(error, "パーツ情報の削除に失敗しました。");
+    } finally {
+      elements.dialogDeleteButton.disabled = false;
+    }
+  });
+}
+
+if (elements.dialogCloseButton) {
+  elements.dialogCloseButton.addEventListener("click", () => {
+    elements.itemDialog.close();
+  });
+}
+
+if (elements.itemDialog) {
+  elements.itemDialog.addEventListener("click", (event) => {
+    if (event.target === elements.itemDialog) elements.itemDialog.close();
+  });
+}
+
+window.addEventListener("resize", () => {
+  window.clearTimeout(state.resizeTimer);
+  state.resizeTimer = window.setTimeout(renderTimeline, 120);
 });
 
-renderPartRows([]);
 updateCalculationResult();
+updateEndedUseStyle();
 render();
 
 onAuthChanged(async (user) => {
@@ -827,13 +775,33 @@ onAuthChanged(async (user) => {
   }
 
   state.uid = user.uid;
-  elements.authError.textContent = "";
+  if (elements.authError) elements.authError.textContent = "";
 
   try {
-    await refreshItems();
-    await migrateLocalItemsIfNeeded(user.uid);
+    if (!elements.form) {
+      await refreshItems();
+      return;
+    }
+
+    if (!state.editingId) {
+      elements.submitButton.textContent = "登録する";
+      elements.cancelButton.hidden = true;
+      elements.pcName.value = "main";
+      elements.yearsOfUse.value = elements.yearsOfUse.value || "5";
+      updateEndedUseStyle();
+      updateCalculationResult();
+      return;
+    }
+
+    state.items = await loadFirestoreItems(state.uid);
+    const item = state.items.find((currentItem) => currentItem.id === state.editingId);
+    if (!item) {
+      elements.authError.textContent = "編集対象が見つかりません。";
+      return;
+    }
+    fillForm(item);
   } catch (error) {
-    showError(error, "PC情報の取得に失敗しました。");
+    showError(error, "パーツ情報の取得に失敗しました。");
   }
 });
 
