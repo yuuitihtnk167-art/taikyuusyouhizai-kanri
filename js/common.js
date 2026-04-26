@@ -228,6 +228,7 @@ export async function loadItems(uid) {
       purchasePrice: Number(data.purchasePrice ?? 0),
       yearsOfUse: Number(data.yearsOfUse ?? 0),
       endOfUseDate: data.endOfUseDate ?? "",
+      hideFromTimeline: Boolean(data.hideFromTimeline),
       additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
       createdAt: data.createdAt ?? null,
       updatedAt: data.updatedAt ?? null,
@@ -255,6 +256,7 @@ export async function loadItem(uid, itemId) {
     purchasePrice: Number(data.purchasePrice ?? 0),
     yearsOfUse: Number(data.yearsOfUse ?? 0),
     endOfUseDate: data.endOfUseDate ?? "",
+    hideFromTimeline: Boolean(data.hideFromTimeline),
     additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
   };
 }
@@ -268,6 +270,7 @@ export async function saveItem(uid, item) {
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
+    hideFromTimeline: Boolean(item.hideFromTimeline),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     updatedAt: serverTimestamp(),
   };

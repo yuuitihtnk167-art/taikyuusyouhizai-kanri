@@ -81,12 +81,13 @@ const elements = {
   usage: document.getElementById("usage"),
   purchaseDate: document.getElementById("purchase-date"),
   yearsOfUse: document.getElementById("years-of-use"),
+  hideFromTimeline: document.getElementById("hide-from-timeline"),
 };
 
 const state = {
   uid: null,
   items: [],
-  editingId: null,
+  editingId: new URLSearchParams(window.location.search).get("id"),
 };
 
 function createId() {
@@ -269,6 +270,7 @@ function normalizePcItem(value) {
     purchaseDate: String(item.purchaseDate ?? ""),
     price: parts.length > 0 ? calculatePartsTotal(parts) : fallbackPrice,
     yearsOfUse: Number(item.yearsOfUse ?? 5),
+    hideFromTimeline: Boolean(item.hideFromTimeline),
     specs: deriveCurrentSpecs(parts, legacySpecs),
     parts,
     createdAt: toMillis(item.createdAt),
@@ -302,6 +304,7 @@ function toFirestorePayload(item) {
     price: totalInvestment,
     purchasePrice: totalInvestment,
     yearsOfUse: normalized.yearsOfUse,
+    hideFromTimeline: Boolean(normalized.hideFromTimeline),
     monthlyCost: calculateMonthlyCost(normalized),
     specs: normalized.specs,
     parts: normalized.parts,
@@ -478,6 +481,7 @@ function collectPcItem() {
     usage: elements.usage.value,
     purchaseDate: elements.purchaseDate.value,
     yearsOfUse: Number(elements.yearsOfUse.value),
+    hideFromTimeline: elements.hideFromTimeline.checked,
     parts,
     createdAt: existingItem?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
@@ -490,6 +494,7 @@ function resetForm() {
   elements.id.value = "";
   elements.usage.value = "work";
   elements.yearsOfUse.value = "5";
+  elements.hideFromTimeline.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.cancelButton.hidden = true;
   elements.formError.textContent = "";
@@ -504,6 +509,7 @@ function fillForm(item) {
   elements.usage.value = item.usage;
   elements.purchaseDate.value = item.purchaseDate;
   elements.yearsOfUse.value = item.yearsOfUse;
+  elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
   elements.cancelButton.hidden = false;
   elements.formError.textContent = "";
@@ -635,6 +641,10 @@ async function refreshItems() {
   if (!state.uid) return;
   state.items = await loadFirestoreItems(state.uid);
   render();
+  if (state.editingId) {
+    const item = state.items.find((currentItem) => currentItem.id === state.editingId);
+    if (item) fillForm(item);
+  }
 }
 
 function showError(error, fallback) {

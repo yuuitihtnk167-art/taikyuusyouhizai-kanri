@@ -1,10 +1,11 @@
-const CACHE_NAME = "durable-goods-pwa-v37";
+const CACHE_NAME = "durable-goods-pwa-v38";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
   "index.html",
   "login.html",
   "list.html",
+  "hidden.html",
   "form.html",
   "style.css",
   "js/common.js",

@@ -33,6 +33,7 @@ const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
+const hideFromTimelineInput = document.getElementById("hide-from-timeline");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
 const calculationTotal = document.getElementById("calculation-total");
@@ -191,6 +192,7 @@ function fillForm(item) {
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
+  hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
 }
@@ -248,6 +250,7 @@ form.addEventListener("submit", async (event) => {
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
+    hideFromTimeline: hideFromTimelineInput.checked,
     additionalCosts: collectAdditionalCosts(),
   };
   const validation = validateItem(item);

@@ -3,6 +3,7 @@ import {
   logout,
   loadItems,
   removeItem,
+  calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
   CATEGORY_OPTIONS,
@@ -37,6 +38,7 @@ const DESKTOP_YEAR_WIDTH = 168;
 const DESKTOP_LABEL_WIDTH = 230;
 const MOBILE_YEAR_WIDTH = 28;
 const MOBILE_LABEL_WIDTH = 72;
+const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 
 const state = {
   uid: null,
@@ -195,10 +197,16 @@ function lifecycleStatus(item) {
   return "normal";
 }
 
+function timelineMonthlyCost(item) {
+  return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
+}
+
 function summarizeItems(items) {
+  if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
+
   const activeItems = items.filter((item) => !item.endOfUseDate);
   const monthlyCostTotal = activeItems.reduce(
-    (total, item) => total + calculateMonthlyCostWithAdditionalCosts(item),
+    (total, item) => total + timelineMonthlyCost(item),
     0
   );
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
@@ -211,10 +219,15 @@ function summarizeItems(items) {
 function renderEmptyTimeline() {
   itemList.innerHTML = "";
   const empty = createElement("div", "timeline-empty");
+  const message =
+    TIMELINE_MODE === "hidden"
+      ? "帯を表示しない商品はありません。"
+      : "家電を登録すると、購入日から耐用年数までのライフサイクル帯を表示します。";
   empty.innerHTML = `
     <strong>登録データがありません</strong>
-    <span>家電を登録すると、購入日から耐用年数までのライフサイクル帯を表示します。</span>
+    <span></span>
   `;
+  empty.querySelector("span").textContent = message;
   itemList.appendChild(empty);
 }
 
@@ -331,7 +344,7 @@ function renderTimeline(items) {
     }
 
     const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
-    const costText = createElement("span", "band-cost", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`);
+    const costText = createElement("span", "band-cost", `${formatCurrency(timelineMonthlyCost(item))} /月`);
     band.append(purchaseText, costText);
 
     if (item.endOfUseDate && unusedPeriodWidth > 0) {
@@ -378,14 +391,17 @@ function openItemNameDialog(item) {
   if (!item || !itemNameDialog) return;
   dialogItemName.textContent = item.name || "商品名未入力";
   dialogItemMeta.textContent = `購入金額${formatCurrency(Number(item.purchasePrice || 0))} / ${formatCurrency(
-    calculateMonthlyCostWithAdditionalCosts(item)
+    timelineMonthlyCost(item)
   )} /月`;
   itemNameDialog.showModal();
 }
 
 async function refreshList() {
   const loadedItems = await loadItems(state.uid);
-  state.items = loadedItems.filter((item) => !isPcManagementItem(item));
+  state.items =
+    TIMELINE_MODE === "hidden"
+      ? loadedItems.filter((item) => item.hideFromTimeline)
+      : loadedItems.filter((item) => !isPcManagementItem(item) && !item.hideFromTimeline);
   if (!state.items.some((item) => item.id === state.selectedItemId)) {
     state.selectedItemId = state.items[0]?.id ?? null;
   }
@@ -396,19 +412,23 @@ async function refreshList() {
 summarizeItems([]);
 renderEmptyTimeline();
 
-createButton.addEventListener("click", () => {
-  window.location.href = "form.html";
-});
+if (createButton) {
+  createButton.addEventListener("click", () => {
+    window.location.href = "form.html";
+  });
+}
 
-logoutButton.addEventListener("click", async () => {
-  authError.textContent = "";
-  try {
-    await logout();
-    window.location.href = "login.html";
-  } catch (error) {
-    authError.textContent = firebaseErrorMessage(error, "ログアウトに失敗しました。");
-  }
-});
+if (logoutButton) {
+  logoutButton.addEventListener("click", async () => {
+    authError.textContent = "";
+    try {
+      await logout();
+      window.location.href = "login.html";
+    } catch (error) {
+      authError.textContent = firebaseErrorMessage(error, "ログアウトに失敗しました。");
+    }
+  });
+}
 
 itemList.addEventListener("click", (event) => {
   const target = event.target;
@@ -423,6 +443,10 @@ itemList.addEventListener("click", (event) => {
 dialogEditButton.addEventListener("click", () => {
   const item = selectedItem();
   if (!item) return;
+  if (isPcManagementItem(item)) {
+    window.location.href = `pc-management/index.html?id=${encodeURIComponent(item.id)}`;
+    return;
+  }
   window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
 });
 
@@ -454,17 +478,19 @@ itemNameDialog.addEventListener("click", (event) => {
   if (event.target === itemNameDialog) itemNameDialog.close();
 });
 
-helpButton.addEventListener("click", () => {
-  helpDialog.showModal();
-});
+if (helpButton && helpDialog && helpCloseButton) {
+  helpButton.addEventListener("click", () => {
+    helpDialog.showModal();
+  });
 
-helpCloseButton.addEventListener("click", () => {
-  helpDialog.close();
-});
+  helpCloseButton.addEventListener("click", () => {
+    helpDialog.close();
+  });
 
-helpDialog.addEventListener("click", (event) => {
-  if (event.target === helpDialog) helpDialog.close();
-});
+  helpDialog.addEventListener("click", (event) => {
+    if (event.target === helpDialog) helpDialog.close();
+  });
+}
 
 window.addEventListener("resize", () => {
   window.clearTimeout(state.resizeTimer);
