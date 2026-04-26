@@ -36,15 +36,23 @@ export const DEFAULT_CATEGORY = "other";
 export const PC_MODEL_PREFIX = "[pcManagement]";
 export const PC_PART_MEMO_PREFIX = "[pcPart]";
 export const CATEGORY_OPTIONS = [
-  { value: "home_appliance", label: "家電" },
-  { value: "tv", label: "テレビ" },
-  { value: "cooking_appliance", label: "調理家電" },
-  { value: "washing_machine", label: "洗濯機" },
-  { value: "car", label: "自動車" },
+  { value: "information_device", label: "情報機器" },
   { value: "smartphone", label: "スマホ" },
-  { value: "pc", label: "パソコン" },
+  { value: "audio_visual", label: "映像・音響" },
+  { value: "air_conditioning", label: "空調家電" },
+  { value: "living_appliance", label: "生活家電" },
+  { value: "cooking_appliance", label: "調理家電" },
+  { value: "beauty_health", label: "美容・健康" },
   { value: "other", label: "その他" },
 ];
+
+const LEGACY_CATEGORY_MAP = {
+  home_appliance: "living_appliance",
+  tv: "audio_visual",
+  washing_machine: "living_appliance",
+  car: "other",
+  pc: "information_device",
+};
 
 export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
@@ -93,9 +101,8 @@ export function formatCurrency(value) {
 
 export function normalizeCategory(value) {
   const normalizedValue = String(value ?? "");
-  return CATEGORY_OPTIONS.some((category) => category.value === normalizedValue)
-    ? normalizedValue
-    : DEFAULT_CATEGORY;
+  const mappedValue = LEGACY_CATEGORY_MAP[normalizedValue] ?? normalizedValue;
+  return CATEGORY_OPTIONS.some((category) => category.value === mappedValue) ? mappedValue : DEFAULT_CATEGORY;
 }
 
 export function getCategoryLabel(value) {
@@ -109,6 +116,10 @@ export function decodePcPartMemo(value) {
 
 export function decodePcManagementModel(value) {
   return parsePrefixedJson(value, PC_MODEL_PREFIX);
+}
+
+export function isPcManagementItem(item) {
+  return item?.sourceType === "pcManagement" || Boolean(decodePcManagementModel(item?.model));
 }
 
 function parsePrefixedJson(value, prefix) {
@@ -212,6 +223,7 @@ export async function loadItems(uid) {
       name: data.name ?? "",
       model: data.model ?? "",
       category: normalizeCategory(data.category),
+      sourceType: data.sourceType ?? "",
       purchaseDate: data.purchaseDate ?? "",
       purchasePrice: Number(data.purchasePrice ?? 0),
       yearsOfUse: Number(data.yearsOfUse ?? 0),
@@ -238,6 +250,7 @@ export async function loadItem(uid, itemId) {
     name: data.name ?? "",
     model: data.model ?? "",
     category: normalizeCategory(data.category),
+    sourceType: data.sourceType ?? "",
     purchaseDate: data.purchaseDate ?? "",
     purchasePrice: Number(data.purchasePrice ?? 0),
     yearsOfUse: Number(data.yearsOfUse ?? 0),

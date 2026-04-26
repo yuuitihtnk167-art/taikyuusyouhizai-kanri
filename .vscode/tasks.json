@@ -12,11 +12,11 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "local-server",
-        "pattern": [
-          {
-            "regexp": ".+"
-          }
-        ],
+        "pattern": {
+          "regexp": "^(LOCAL_SERVER_NEVER_MATCHES)$",
+          "file": 1,
+          "message": 1
+        },
         "background": {
           "activeOnStart": true,
           "beginsPattern": ".*",

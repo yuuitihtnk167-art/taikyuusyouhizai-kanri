@@ -5,7 +5,9 @@ import {
   removeItem,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
+  CATEGORY_OPTIONS,
   getCategoryLabel,
+  isPcManagementItem,
   firebaseErrorMessage,
   registerServiceWorker,
 } from "./common.js";
@@ -58,23 +60,59 @@ function toMonthIndex(date) {
   return date.getFullYear() * 12 + date.getMonth();
 }
 
+function daysInMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function toMonthPosition(date) {
+  return toMonthIndex(date) + (date.getDate() - 1) / daysInMonth(date);
+}
+
+function addYearsClamped(date, years) {
+  const targetYear = date.getFullYear() + years;
+  const targetMonth = date.getMonth();
+  const targetDay = Math.min(date.getDate(), new Date(targetYear, targetMonth + 1, 0).getDate());
+  return new Date(targetYear, targetMonth, targetDay);
+}
+
 function formatYearMonthFromIndex(monthIndex) {
-  const year = Math.floor(monthIndex / 12);
-  const month = (monthIndex % 12) + 1;
+  const normalizedMonthIndex = Math.floor(monthIndex);
+  const year = Math.floor(normalizedMonthIndex / 12);
+  const month = (normalizedMonthIndex % 12) + 1;
   return `${year}/${String(month).padStart(2, "0")}`;
 }
 
 function itemStartMonth(item) {
   const purchaseDate = parseDate(item.purchaseDate);
-  return purchaseDate ? toMonthIndex(purchaseDate) : TIMELINE_MIN_YEAR * 12;
+  return purchaseDate ? toMonthPosition(purchaseDate) : TIMELINE_MIN_YEAR * 12;
+}
+
+function currentMonthIndex() {
+  return toMonthPosition(new Date());
+}
+
+function itemPlannedEndMonth(item) {
+  const purchaseDate = parseDate(item.purchaseDate);
+  const yearsOfUse = Math.max(Number(item.yearsOfUse) || 1, 1);
+  if (!purchaseDate) {
+    return itemStartMonth(item) + yearsOfUse * 12;
+  }
+  return toMonthPosition(addYearsClamped(purchaseDate, yearsOfUse));
+}
+
+function itemActualEndMonth(item) {
+  const endOfUseDate = parseDate(item.endOfUseDate);
+  if (endOfUseDate) {
+    return Math.max(itemStartMonth(item), toMonthPosition(endOfUseDate));
+  }
+  return currentMonthIndex();
 }
 
 function itemEndMonth(item) {
-  const endOfUseDate = parseDate(item.endOfUseDate);
-  if (endOfUseDate) {
-    return Math.max(itemStartMonth(item), toMonthIndex(endOfUseDate));
+  if (item.endOfUseDate) {
+    return itemActualEndMonth(item);
   }
-  return itemStartMonth(item) + Math.max(Number(item.yearsOfUse) || 1, 1) * 12;
+  return Math.max(itemPlannedEndMonth(item), itemActualEndMonth(item));
 }
 
 function itemEndLabel(item, endMonth) {
@@ -109,11 +147,27 @@ function displayApplianceType(item) {
   return getCategoryLabel(item.category);
 }
 
+function categoryOrderIndex(categoryValue) {
+  const index = CATEGORY_OPTIONS.findIndex((category) => category.value === categoryValue);
+  return index === -1 ? CATEGORY_OPTIONS.length : index;
+}
+
+function sortItemsByCategory(items) {
+  return [...items].sort((a, b) => {
+    const categoryCompare = categoryOrderIndex(a.category) - categoryOrderIndex(b.category);
+    if (categoryCompare !== 0) return categoryCompare;
+
+    const dateCompare = String(b.purchaseDate).localeCompare(String(a.purchaseDate));
+    if (dateCompare !== 0) return dateCompare;
+    return String(a.name).localeCompare(String(b.name), "ja");
+  });
+}
+
 function calculateLifecycleProgress(item) {
   const now = new Date();
-  const nowMonth = toMonthIndex(now);
+  const nowMonth = toMonthPosition(now);
   const startMonth = itemStartMonth(item);
-  const durationMonths = Math.max(itemEndMonth(item) - startMonth, 1);
+  const durationMonths = Math.max(itemPlannedEndMonth(item) - startMonth, 1);
   return (nowMonth - startMonth) / durationMonths;
 }
 
@@ -128,7 +182,7 @@ function lifecycleStatus(item) {
 }
 
 function summarizeItems(items) {
-  const activeItems = items.filter((item) => !item.endOfUseDate && lifecycleStatus(item) !== "ended");
+  const activeItems = items.filter((item) => !item.endOfUseDate);
   const monthlyCostTotal = activeItems.reduce(
     (total, item) => total + calculateMonthlyCostWithAdditionalCosts(item),
     0
@@ -187,7 +241,7 @@ function currentLinePosition(minYear, maxYear) {
   const now = new Date();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const nowPosition = toMonthIndex(now) + now.getDate() / 31;
+  const nowPosition = toMonthPosition(now);
 
   if (nowPosition < minMonth || nowPosition > maxMonth) return null;
   return labelWidth + ((nowPosition - minMonth) / 12) * yearWidth;
@@ -213,7 +267,8 @@ function renderTimeline(items) {
     return;
   }
 
-  const { minYear, maxYear } = resolveTimelineRange(items);
+  const sortedItems = sortItemsByCategory(items);
+  const { minYear, maxYear } = resolveTimelineRange(sortedItems);
   const { labelWidth, yearWidth } = timelineLayout();
   const timelineWidth = labelWidth + (maxYear - minYear) * yearWidth;
   const minMonth = minYear * 12;
@@ -231,28 +286,34 @@ function renderTimeline(items) {
   renderCurrentLine(grid, minYear, maxYear);
 
   const rows = createElement("div", "timeline-rows");
-  for (const item of items) {
+  for (const item of sortedItems) {
     const startMonth = itemStartMonth(item);
     const endMonth = itemEndMonth(item);
+    const plannedEndMonth = itemPlannedEndMonth(item);
     const status = lifecycleStatus(item);
     const left = labelWidth + ((startMonth - minMonth) / 12) * yearWidth;
     const width = Math.max(((endMonth - startMonth) / 12) * yearWidth, timelineLayout().isCompact ? 32 : 84);
+    const overuseStartPercent = ((plannedEndMonth - startMonth) / Math.max(endMonth - startMonth, 1)) * 100;
+    const isOverused = itemActualEndMonth(item) > plannedEndMonth;
     const isSelected = item.id === state.selectedItemId;
 
     const row = createElement("div", "timeline-row");
     const label = createElement("div", "timeline-row-label");
-    label.innerHTML = `<span class="status-swatch status-${status}"></span><strong></strong>`;
+    label.innerHTML = `<span class="category-swatch category-${item.category}"></span><strong></strong>`;
     label.querySelector("strong").textContent = displayApplianceType(item);
 
-    const band = createElement("button", `lifecycle-band status-${status}`);
+    const band = createElement("button", `lifecycle-band category-${item.category}${isOverused ? " overused" : ""}`);
     band.type = "button";
     band.dataset.id = item.id;
     band.setAttribute("aria-pressed", String(isSelected));
     band.setAttribute("aria-label", `${item.name}の詳細を表示`);
     band.style.left = `${left}px`;
     band.style.width = `${width}px`;
+    if (isOverused) {
+      band.style.setProperty("--overuse-start", `${Math.min(Math.max(overuseStartPercent, 0), 100)}%`);
+    }
 
-    const purchaseText = createElement("span", "band-purchase", `${formatYearMonthFromIndex(startMonth)} 購入`);
+    const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
     const costText = createElement("span", "band-cost", `${formatCurrency(calculateMonthlyCostWithAdditionalCosts(item))} /月`);
     band.append(purchaseText, costText);
 
@@ -295,7 +356,8 @@ function openItemNameDialog(item) {
 }
 
 async function refreshList() {
-  state.items = await loadItems(state.uid);
+  const loadedItems = await loadItems(state.uid);
+  state.items = loadedItems.filter((item) => !isPcManagementItem(item));
   if (!state.items.some((item) => item.id === state.selectedItemId)) {
     state.selectedItemId = state.items[0]?.id ?? null;
   }
