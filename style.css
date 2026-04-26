@@ -988,6 +988,13 @@ button {
   --band-overuse-end: rgba(178, 82, 120, 0.92);
 }
 
+.category-car {
+  --band-start: rgba(176, 88, 38, 0.95);
+  --band-end: rgba(210, 122, 64, 0.88);
+  --band-overuse-start: rgba(136, 66, 28, 0.96);
+  --band-overuse-end: rgba(166, 88, 44, 0.92);
+}
+
 .category-other {
   --band-start: rgba(107, 117, 127, 0.9);
   --band-end: rgba(132, 142, 151, 0.82);

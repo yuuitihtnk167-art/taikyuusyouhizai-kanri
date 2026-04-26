@@ -43,6 +43,7 @@ export const CATEGORY_OPTIONS = [
   { value: "living_appliance", label: "生活家電" },
   { value: "cooking_appliance", label: "調理家電" },
   { value: "beauty_health", label: "美容・健康" },
+  { value: "car", label: "自動車" },
   { value: "other", label: "その他" },
 ];
 
@@ -50,7 +51,7 @@ const LEGACY_CATEGORY_MAP = {
   home_appliance: "living_appliance",
   tv: "audio_visual",
   washing_machine: "living_appliance",
-  car: "other",
+  car: "car",
   pc: "information_device",
 };
 
