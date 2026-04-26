@@ -478,15 +478,24 @@ button {
 }
 
 .dashboard-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 .dashboard-actions button {
+  width: 132px;
   min-height: 58px;
+  min-width: 132px;
+  padding: 0 18px;
   border-radius: 6px;
   white-space: nowrap;
+}
+
+.dashboard-actions #logout-button {
+  width: 132px;
+  margin-top: 0;
 }
 
 .dashboard-actions .primary-button {
@@ -1141,7 +1150,7 @@ button {
   }
 
   .dashboard-actions {
-    grid-template-columns: 1fr 1fr;
+    justify-content: flex-start;
   }
 
   .summary-panel {
@@ -1193,14 +1202,20 @@ button {
   }
 
   .dashboard-actions {
-    grid-template-columns: 1fr 1fr;
     gap: 6px;
   }
 
   .dashboard-actions button {
+    width: 82px;
     min-height: 30px;
+    min-width: 82px;
+    padding: 0 10px;
     border-radius: 4px;
     font-size: 0.72rem;
+  }
+
+  .dashboard-actions #logout-button {
+    width: 82px;
   }
 
   .dashboard-actions .ghost-button::before {
