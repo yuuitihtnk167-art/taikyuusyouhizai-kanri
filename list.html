@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>一覧 | 耐久消費財管理</title>
+    <title>一覧 | 月額家電簿</title>
     <meta name="theme-color" content="#1f2933" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
@@ -14,7 +14,10 @@
     <main class="app dashboard-app">
       <header class="app-header dashboard-header">
         <div class="dashboard-title">
-          <h1>ライフサイクルコスト</h1>
+          <div class="dashboard-title-row">
+            <h1>月額家電簿</h1>
+            <button id="logout-button" type="button" class="ghost-button">ログアウト</button>
+          </div>
           <p class="subtitle">耐久消費財の月割りコスト管理</p>
         </div>
         <section class="summary-panel" aria-label="集計">
@@ -33,7 +36,7 @@
         </section>
         <div class="dashboard-actions">
           <button id="create-button" type="button" class="primary-button">新規登録</button>
-          <button id="logout-button" type="button" class="ghost-button">ログアウト</button>
+          <div id="category-filter" class="category-filter" aria-label="分類フィルター"></div>
         </div>
       </header>
 
