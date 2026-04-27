@@ -530,6 +530,10 @@ function downloadBackupFile(backup) {
 if (backupButton) {
   backupButton.addEventListener("click", async () => {
     authError.textContent = "";
+    if (!isLocalMode()) {
+      authError.textContent = "保存はローカル保存モードでのみ使用できます。";
+      return;
+    }
     try {
       backupButton.disabled = true;
       downloadBackupFile(await createLocalBackupData());
@@ -563,6 +567,10 @@ function selectBackupFile() {
 if (restoreButton) {
   restoreButton.addEventListener("click", async () => {
     authError.textContent = "";
+    if (!isLocalMode()) {
+      authError.textContent = "復元はローカル保存モードでのみ使用できます。";
+      return;
+    }
     try {
       const file = await selectBackupFile();
       if (!file) return;

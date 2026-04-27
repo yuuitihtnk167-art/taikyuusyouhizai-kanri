@@ -523,16 +523,29 @@ button {
   display: none;
 }
 
+.dashboard-title-row #logout-button[hidden],
+.dashboard-title-row #back-button[hidden],
+.dashboard-title-row #backup-button[hidden],
+.dashboard-title-row #restore-button[hidden] {
+  display: none;
+}
+
 .dashboard-title-row #logout-button,
 .dashboard-title-row #back-button,
 .dashboard-title-row #backup-button,
 .dashboard-title-row #restore-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  width: 88px;
-  min-width: 88px;
+  width: 96px;
+  min-width: 96px;
   min-height: 44px;
   margin-top: 0;
   padding: 0 12px;
+  line-height: 1;
+  white-space: nowrap;
   color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.28);
   border-radius: 6px;
@@ -1355,10 +1368,13 @@ button {
   }
 
   .dashboard-title-row {
+    flex-wrap: wrap;
     gap: 8px;
   }
 
   .dashboard-title-actions {
+    width: 100%;
+    justify-content: flex-end;
     gap: 5px;
   }
 
@@ -1366,12 +1382,12 @@ button {
   .dashboard-title-row #back-button,
   .dashboard-title-row #backup-button,
   .dashboard-title-row #restore-button {
-    width: 58px;
-    min-width: 58px;
-    min-height: 30px;
-    padding: 0 7px;
+    width: 96px;
+    min-width: 96px;
+    min-height: 38px;
+    padding: 0 10px;
     border-radius: 4px;
-    font-size: 0.66rem;
+    font-size: 0.72rem;
   }
 
   .dashboard-body .subtitle {
