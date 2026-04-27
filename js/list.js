@@ -275,6 +275,7 @@ function syncLocalModeUi() {
   }
   if (backupButton) backupButton.hidden = !localMode;
   if (restoreButton) restoreButton.hidden = !localMode;
+  if (firebaseLocalBackupButton) firebaseLocalBackupButton.hidden = localMode;
 }
 
 function renderEmptyTimeline() {
