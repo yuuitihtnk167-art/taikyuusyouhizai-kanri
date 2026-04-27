@@ -182,6 +182,10 @@ textarea:focus {
   margin-top: 8px;
 }
 
+.auth-actions {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
 button {
   min-height: 46px;
   border: none;
@@ -388,6 +392,39 @@ button {
   background: rgba(0, 0, 0, 0.35);
 }
 
+.local-mode-dialog {
+  width: min(520px, calc(100% - 24px));
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+}
+
+.local-mode-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.local-mode-dialog-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.local-mode-dialog-card h2,
+.local-mode-dialog-card p {
+  margin: 0;
+}
+
+.local-mode-dialog-card p {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.local-mode-dialog-check {
+  margin-top: 2px;
+}
+
 .detail-card {
   padding: 16px;
 }
@@ -413,6 +450,10 @@ button {
 
   .form-actions {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .auth-actions {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -471,14 +512,40 @@ button {
   gap: 14px;
 }
 
-.dashboard-title-row #logout-button,
-.dashboard-title-row #back-button {
+.dashboard-title-actions {
+  display: flex;
   flex: 0 0 auto;
-  width: 132px;
-  min-width: 132px;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-title-actions .ghost-button[hidden] {
+  display: none;
+}
+
+.dashboard-title-row #logout-button[hidden],
+.dashboard-title-row #back-button[hidden],
+.dashboard-title-row #backup-button[hidden],
+.dashboard-title-row #restore-button[hidden] {
+  display: none;
+}
+
+.dashboard-title-row #logout-button,
+.dashboard-title-row #back-button,
+.dashboard-title-row #backup-button,
+.dashboard-title-row #restore-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 96px;
+  min-width: 96px;
   min-height: 44px;
   margin-top: 0;
-  padding: 0 18px;
+  padding: 0 12px;
+  line-height: 1;
+  white-space: nowrap;
   color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.28);
   border-radius: 6px;
@@ -486,7 +553,9 @@ button {
 }
 
 .dashboard-title-row #logout-button:hover,
-.dashboard-title-row #back-button:hover {
+.dashboard-title-row #back-button:hover,
+.dashboard-title-row #backup-button:hover,
+.dashboard-title-row #restore-button:hover {
   background: rgba(54, 68, 82, 0.72);
 }
 
@@ -1299,14 +1368,23 @@ button {
   }
 
   .dashboard-title-row {
+    flex-wrap: wrap;
     gap: 8px;
   }
 
+  .dashboard-title-actions {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+
   .dashboard-title-row #logout-button,
-  .dashboard-title-row #back-button {
-    width: 82px;
-    min-width: 82px;
-    min-height: 30px;
+  .dashboard-title-row #back-button,
+  .dashboard-title-row #backup-button,
+  .dashboard-title-row #restore-button {
+    width: 96px;
+    min-width: 96px;
+    min-height: 38px;
     padding: 0 10px;
     border-radius: 4px;
     font-size: 0.72rem;

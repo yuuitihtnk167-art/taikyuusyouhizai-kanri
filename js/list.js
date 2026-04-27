@@ -3,18 +3,24 @@ import {
   logout,
   loadItems,
   removeItem,
+  createLocalBackupData,
+  parseLocalBackupText,
+  restoreLocalBackupData,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
   CATEGORY_OPTIONS,
   getCategoryLabel,
   isPcManagementItem,
+  isLocalMode,
   firebaseErrorMessage,
   registerServiceWorker,
 } from "./common.js";
 
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
+const backupButton = document.getElementById("backup-button");
+const restoreButton = document.getElementById("restore-button");
 const createButton = document.getElementById("create-button");
 const categoryFilter = document.getElementById("category-filter");
 const itemList = document.getElementById("item-list");
@@ -40,7 +46,6 @@ const DESKTOP_LABEL_WIDTH = 230;
 const MOBILE_YEAR_WIDTH = 28;
 const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
-
 const state = {
   uid: null,
   items: [],
@@ -261,6 +266,16 @@ function renderLoadingTimeline() {
   itemList.appendChild(loading);
 }
 
+function syncLocalModeUi() {
+  const localMode = isLocalMode();
+  if (logoutButton) {
+    logoutButton.textContent = "ログアウト";
+    logoutButton.setAttribute("aria-label", localMode ? "ローカル保存を終了" : "ログアウト");
+  }
+  if (backupButton) backupButton.hidden = !localMode;
+  if (restoreButton) restoreButton.hidden = !localMode;
+}
+
 function renderEmptyTimeline() {
   itemList.innerHTML = "";
   const empty = createElement("div", "timeline-empty");
@@ -453,6 +468,7 @@ async function refreshList() {
 summarizeItems([]);
 renderLoadingTimeline();
 renderCategoryFilter();
+syncLocalModeUi();
 
 if (createButton) {
   createButton.addEventListener("click", () => {
@@ -490,6 +506,86 @@ if (logoutButton) {
       window.location.href = "login.html";
     } catch (error) {
       authError.textContent = firebaseErrorMessage(error, "ログアウトに失敗しました。");
+    }
+  });
+}
+
+function backupFileName() {
+  const dateText = new Date().toISOString().slice(0, 10);
+  return `月額家電簿-backup-${dateText}.json`;
+}
+
+function downloadBackupFile(backup) {
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = backupFileName();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+if (backupButton) {
+  backupButton.addEventListener("click", async () => {
+    authError.textContent = "";
+    if (!isLocalMode()) {
+      authError.textContent = "保存はローカル保存モードでのみ使用できます。";
+      return;
+    }
+    try {
+      backupButton.disabled = true;
+      downloadBackupFile(await createLocalBackupData());
+    } catch (error) {
+      authError.textContent = error?.message || "バックアップの保存に失敗しました。";
+    } finally {
+      backupButton.disabled = false;
+    }
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result ?? "")));
+    reader.addEventListener("error", () => reject(reader.error ?? new Error("ファイルを読み込めません。")));
+    reader.readAsText(file);
+  });
+}
+
+function selectBackupFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
+    input.click();
+  });
+}
+
+if (restoreButton) {
+  restoreButton.addEventListener("click", async () => {
+    authError.textContent = "";
+    if (!isLocalMode()) {
+      authError.textContent = "復元はローカル保存モードでのみ使用できます。";
+      return;
+    }
+    try {
+      const file = await selectBackupFile();
+      if (!file) return;
+      const backup = parseLocalBackupText(await readFileAsText(file));
+      const shouldRestore = confirm("現在のローカル保存データをバックアップ内容で上書きします。よろしいですか？");
+      if (!shouldRestore) return;
+
+      restoreButton.disabled = true;
+      await restoreLocalBackupData(backup);
+      state.selectedItemId = null;
+      await refreshList();
+    } catch (error) {
+      authError.textContent = error?.message || "バックアップの復元に失敗しました。";
+    } finally {
+      restoreButton.disabled = false;
     }
   });
 }
@@ -564,6 +660,17 @@ window.addEventListener("resize", () => {
 });
 
 onAuthChanged(async (user) => {
+  syncLocalModeUi();
+  if (isLocalMode()) {
+    state.uid = "local";
+    try {
+      await refreshList();
+    } catch (error) {
+      authError.textContent = error?.message || "ローカルデータの取得に失敗しました。";
+    }
+    return;
+  }
+
   if (!user) {
     window.location.href = "login.html";
     return;

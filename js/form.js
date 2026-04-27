@@ -14,6 +14,7 @@ import {
   formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
+  isLocalMode,
   registerServiceWorker,
 } from "./common.js";
 
@@ -43,7 +44,6 @@ const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
 };
-
 function populateCategorySelect() {
   categoryInput.innerHTML = "";
   for (const category of CATEGORY_OPTIONS) {
@@ -270,11 +270,14 @@ form.addEventListener("submit", async (event) => {
 });
 
 onAuthChanged(async (user) => {
-  if (!user) {
+  if (isLocalMode()) {
+    state.uid = "local";
+  } else if (!user) {
     window.location.href = "login.html";
     return;
+  } else {
+    state.uid = user.uid;
   }
-  state.uid = user.uid;
 
   if (!state.editingId) {
     submitButton.textContent = "登録する";

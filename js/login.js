@@ -1,14 +1,31 @@
-import { login, signup, onAuthChanged, firebaseErrorMessage, registerServiceWorker } from "./common.js";
+import {
+  login,
+  signup,
+  onAuthChanged,
+  enterLocalMode,
+  isLocalMode,
+  LOCAL_WARNING_DISMISSED_KEY,
+  storageGetItem,
+  storageSetItem,
+  firebaseErrorMessage,
+  registerServiceWorker,
+} from "./common.js";
 
 const authError = document.getElementById("auth-error");
 const emailInput = document.getElementById("auth-email");
 const passwordInput = document.getElementById("auth-password");
 const loginButton = document.getElementById("login-button");
 const signupButton = document.getElementById("signup-button");
+const localModeButton = document.getElementById("local-mode-button");
+const localModeDialog = document.getElementById("local-mode-dialog");
+const localModeStartButton = document.getElementById("local-mode-start-button");
+const localModeCancelButton = document.getElementById("local-mode-cancel-button");
+const hideLocalModeWarningInput = document.getElementById("hide-local-mode-warning");
 
 function setButtonsDisabled(disabled) {
   loginButton.disabled = disabled;
   signupButton.disabled = disabled;
+  localModeButton.disabled = disabled;
 }
 
 function getCredentials() {
@@ -58,8 +75,47 @@ signupButton.addEventListener("click", async () => {
   }
 });
 
+function shouldShowLocalModeWarning() {
+  return storageGetItem(LOCAL_WARNING_DISMISSED_KEY) !== "true";
+}
+
+async function startLocalMode() {
+  authError.textContent = "";
+  try {
+    setButtonsDisabled(true);
+    if (hideLocalModeWarningInput?.checked) {
+      storageSetItem(LOCAL_WARNING_DISMISSED_KEY, "true");
+    }
+    await enterLocalMode();
+    window.location.href = "list.html";
+  } catch (error) {
+    authError.textContent = error?.message || "ローカル保存を開始できません。";
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+localModeButton.addEventListener("click", async () => {
+  if (!shouldShowLocalModeWarning() || !localModeDialog) {
+    await startLocalMode();
+    return;
+  }
+
+  hideLocalModeWarningInput.checked = false;
+  localModeDialog.showModal();
+});
+
+localModeStartButton.addEventListener("click", async () => {
+  localModeDialog.close();
+  await startLocalMode();
+});
+
+localModeCancelButton.addEventListener("click", () => {
+  localModeDialog.close();
+});
+
 onAuthChanged((user) => {
-  if (user) {
+  if (user && !isLocalMode()) {
     window.location.href = "list.html";
   }
 });
