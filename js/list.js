@@ -22,6 +22,7 @@ const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const backupButton = document.getElementById("backup-button");
 const restoreButton = document.getElementById("restore-button");
+const createButton = document.getElementById("create-button");
 const categoryFilter = document.getElementById("category-filter");
 const itemList = document.getElementById("item-list");
 const helpButton = document.getElementById("help-button");
@@ -471,6 +472,12 @@ summarizeItems([]);
 renderLoadingTimeline();
 renderCategoryFilter();
 syncLocalModeUi();
+
+if (createButton) {
+  createButton.addEventListener("click", () => {
+    window.location.href = "form.html";
+  });
+}
 
 if (categoryFilter) {
   categoryFilter.addEventListener("click", (event) => {

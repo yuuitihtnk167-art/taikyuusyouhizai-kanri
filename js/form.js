@@ -240,13 +240,8 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   formError.textContent = "";
 
-  if (!state.editingId || !idInput.value) {
-    formError.textContent = "新規登録は無効です。一覧から既存データを選択して編集してください。";
-    return;
-  }
-
   const item = {
-    id: idInput.value,
+    id: idInput.value || createId(),
     isUpdate: Boolean(state.editingId),
     name: nameInput.value.trim(),
     model: modelInput.dataset.encodedModel || modelInput.value.trim(),
@@ -285,7 +280,10 @@ onAuthChanged(async (user) => {
   }
 
   if (!state.editingId) {
-    window.location.href = "list.html";
+    submitButton.textContent = "登録する";
+    cancelButton.hidden = true;
+    updateEndedUseStyle();
+    renderAdditionalCosts([]);
     return;
   }
 
