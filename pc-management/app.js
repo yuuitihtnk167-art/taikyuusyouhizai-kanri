@@ -43,7 +43,6 @@ const elements = {
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
-  createButton: document.getElementById("create-button"),
   categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
   backButton: document.getElementById("back-button"),
@@ -611,7 +610,7 @@ function validatePcItem(item) {
 function collectPcItem() {
   const existingItem = state.items.find((item) => item.id === state.editingId);
   return normalizePcPartItem({
-    id: elements.id.value || createId(),
+    id: elements.id.value,
     partName: elements.partName.value.trim(),
     modelNumber: elements.modelNumber.value.trim(),
     pcName: elements.pcName.value,
@@ -727,6 +726,11 @@ if (elements.form) {
       return;
     }
 
+    if (!state.editingId || !elements.id.value) {
+      elements.formError.textContent = "新規登録は無効です。一覧から既存データを選択して編集してください。";
+      return;
+    }
+
     const item = collectPcItem();
     const validation = validatePcItem(item);
     if (validation) {
@@ -750,12 +754,6 @@ if (elements.form) {
   });
   elements.toListButton.addEventListener("click", () => {
     window.location.href = "index.html";
-  });
-}
-
-if (elements.createButton) {
-  elements.createButton.addEventListener("click", () => {
-    window.location.href = "form.html";
   });
 }
 
@@ -887,12 +885,7 @@ onAuthChanged(async (user) => {
     }
 
     if (!state.editingId) {
-      elements.submitButton.textContent = "登録する";
-      elements.cancelButton.hidden = true;
-      elements.pcName.value = "main";
-      elements.yearsOfUse.value = elements.yearsOfUse.value || "5";
-      updateEndedUseStyle();
-      updateCalculationResult();
+      window.location.href = "index.html";
       return;
     }
 

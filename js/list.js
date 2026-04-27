@@ -4,6 +4,7 @@ import {
   loadItems,
   removeItem,
   createLocalBackupData,
+  createFirebaseLocalBackupData,
   parseLocalBackupText,
   restoreLocalBackupData,
   calculateMonthlyCost,
@@ -21,12 +22,12 @@ const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const backupButton = document.getElementById("backup-button");
 const restoreButton = document.getElementById("restore-button");
-const createButton = document.getElementById("create-button");
 const categoryFilter = document.getElementById("category-filter");
 const itemList = document.getElementById("item-list");
 const helpButton = document.getElementById("help-button");
 const helpDialog = document.getElementById("help-dialog");
 const helpCloseButton = document.getElementById("help-close-button");
+const firebaseLocalBackupButton = document.getElementById("firebase-local-backup-button");
 
 const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
@@ -470,12 +471,6 @@ renderLoadingTimeline();
 renderCategoryFilter();
 syncLocalModeUi();
 
-if (createButton) {
-  createButton.addEventListener("click", () => {
-    window.location.href = "form.html";
-  });
-}
-
 if (categoryFilter) {
   categoryFilter.addEventListener("click", (event) => {
     const target = event.target;
@@ -515,12 +510,17 @@ function backupFileName() {
   return `月額家電簿-backup-${dateText}.json`;
 }
 
-function downloadBackupFile(backup) {
+function localRestoreFileName() {
+  const dateText = new Date().toISOString().slice(0, 10);
+  return `月額家電簿-local-restore-${dateText}.json`;
+}
+
+function downloadBackupFile(backup, fileName = backupFileName()) {
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = backupFileName();
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -541,6 +541,29 @@ if (backupButton) {
       authError.textContent = error?.message || "バックアップの保存に失敗しました。";
     } finally {
       backupButton.disabled = false;
+    }
+  });
+}
+
+if (firebaseLocalBackupButton) {
+  firebaseLocalBackupButton.addEventListener("click", async () => {
+    authError.textContent = "";
+    if (isLocalMode()) {
+      authError.textContent = "Firebase保存データのファイル作成は、通常ログイン時のみ使用できます。";
+      return;
+    }
+    if (!state.uid) {
+      authError.textContent = "Firebaseデータの取得に必要なログイン情報がありません。";
+      return;
+    }
+
+    try {
+      firebaseLocalBackupButton.disabled = true;
+      downloadBackupFile(await createFirebaseLocalBackupData(state.uid), localRestoreFileName());
+    } catch (error) {
+      authError.textContent = firebaseErrorMessage(error, "ローカル保存用ファイルの作成に失敗しました。");
+    } finally {
+      firebaseLocalBackupButton.disabled = false;
     }
   });
 }
