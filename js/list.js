@@ -27,7 +27,6 @@ const itemList = document.getElementById("item-list");
 const helpButton = document.getElementById("help-button");
 const helpDialog = document.getElementById("help-dialog");
 const helpCloseButton = document.getElementById("help-close-button");
-const localModeNotice = document.getElementById("local-mode-notice");
 
 const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
@@ -47,9 +46,6 @@ const DESKTOP_LABEL_WIDTH = 230;
 const MOBILE_YEAR_WIDTH = 28;
 const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
-const LOCAL_MODE_NOTICE_TEXT =
-  "ローカル保存中です。このスマホのブラウザ内に保存されます。機種変更、ブラウザのデータ削除、プライベートブラウズではデータが失われる場合があります。";
-
 const state = {
   uid: null,
   items: [],
@@ -272,10 +268,6 @@ function renderLoadingTimeline() {
 
 function syncLocalModeUi() {
   const localMode = isLocalMode();
-  if (localModeNotice) {
-    localModeNotice.hidden = !localMode;
-    localModeNotice.textContent = localMode ? LOCAL_MODE_NOTICE_TEXT : "";
-  }
   if (logoutButton) {
     logoutButton.textContent = "ログアウト";
     logoutButton.setAttribute("aria-label", localMode ? "ローカル保存を終了" : "ログアウト");

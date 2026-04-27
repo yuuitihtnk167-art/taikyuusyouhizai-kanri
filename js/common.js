@@ -38,6 +38,7 @@ export const DEFAULT_CATEGORY = "other";
 export const PC_MODEL_PREFIX = "[pcManagement]";
 export const PC_PART_MEMO_PREFIX = "[pcPart]";
 const LOCAL_STORAGE_MODE_KEY = "monthlyApplianceBook.storageMode";
+export const LOCAL_WARNING_DISMISSED_KEY = "monthlyApplianceBook.localWarningDismissed";
 const STORAGE_MODE_LOCAL = "local";
 const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
 const LOCAL_DB_VERSION = 1;
@@ -84,7 +85,7 @@ export function registerServiceWorker() {
   });
 }
 
-function storageGetItem(key) {
+export function storageGetItem(key) {
   try {
     return localStorage.getItem(key);
   } catch (_error) {
@@ -92,7 +93,7 @@ function storageGetItem(key) {
   }
 }
 
-function storageSetItem(key, value) {
+export function storageSetItem(key, value) {
   localStorage.setItem(key, value);
 }
 

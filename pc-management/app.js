@@ -43,7 +43,6 @@ const elements = {
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
-  localModeNotice: document.getElementById("local-mode-notice"),
   createButton: document.getElementById("create-button"),
   categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
@@ -87,16 +86,6 @@ const state = {
   editingId: new URLSearchParams(window.location.search).get("id"),
   resizeTimer: null,
 };
-const LOCAL_MODE_NOTICE_TEXT =
-  "ローカル保存中です。このスマホのブラウザ内に保存されます。機種変更、ブラウザのデータ削除、プライベートブラウズではデータが失われる場合があります。";
-
-function syncLocalModeUi() {
-  const localMode = isLocalMode();
-  if (!elements.localModeNotice) return;
-  elements.localModeNotice.hidden = !localMode;
-  elements.localModeNotice.textContent = localMode ? LOCAL_MODE_NOTICE_TEXT : "";
-}
-
 function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -878,10 +867,8 @@ updateCalculationResult();
 updateEndedUseStyle();
 renderCategoryFilter();
 renderLoadingTimeline();
-syncLocalModeUi();
 
 onAuthChanged(async (user) => {
-  syncLocalModeUi();
   if (isLocalMode()) {
     state.uid = "local";
   } else if (!user) {

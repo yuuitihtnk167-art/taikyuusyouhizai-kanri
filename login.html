@@ -29,6 +29,23 @@
           <button id="local-mode-button" class="ghost-button" type="button">ローカル保存</button>
         </div>
       </section>
+
+      <dialog id="local-mode-dialog" class="local-mode-dialog">
+        <article class="local-mode-dialog-card">
+          <h2>ローカル保存について</h2>
+          <p>
+            ローカル保存中です。このスマホのブラウザ内に保存されます。機種変更、ブラウザのデータ削除、プライベートブラウズではデータが失われる場合があります。必ずバックアップで保存をタップしてください。
+          </p>
+          <label class="checkbox-field local-mode-dialog-check" for="hide-local-mode-warning">
+            <input id="hide-local-mode-warning" type="checkbox" />
+            <span>今後表示しない</span>
+          </label>
+          <div class="form-actions auth-actions">
+            <button id="local-mode-start-button" class="primary-button" type="button">開始する</button>
+            <button id="local-mode-cancel-button" class="ghost-button" type="button">キャンセル</button>
+          </div>
+        </article>
+      </dialog>
     </main>
     <script type="module" src="js/login.js"></script>
   </body>
