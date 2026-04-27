@@ -505,14 +505,16 @@ if (logoutButton) {
   });
 }
 
+function fileTimestamp() {
+  return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+}
+
 function backupFileName() {
-  const dateText = new Date().toISOString().slice(0, 10);
-  return `月額家電簿-backup-${dateText}.json`;
+  return `月額家電簿-backup-${fileTimestamp()}.json`;
 }
 
 function localRestoreFileName() {
-  const dateText = new Date().toISOString().slice(0, 10);
-  return `月額家電簿-local-restore-${dateText}.json`;
+  return `月額家電簿-local-restore-${fileTimestamp()}.json`;
 }
 
 function downloadBackupFile(backup, fileName = backupFileName()) {
