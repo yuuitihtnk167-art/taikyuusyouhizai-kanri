@@ -30,12 +30,15 @@ const pcNameLabels = {
   sub: "サブPC",
 };
 
+const pcNameOptions = Object.entries(pcNameLabels).map(([value, label]) => ({ value, label }));
+
 const elements = {
   summaryCount: document.getElementById("summary-count"),
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
   createButton: document.getElementById("create-button"),
+  categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
   backButton: document.getElementById("back-button"),
   helpButton: document.getElementById("help-button"),
@@ -72,6 +75,7 @@ const elements = {
 const state = {
   uid: null,
   items: [],
+  selectedPcNames: new Set(pcNameOptions.map((option) => option.value)),
   selectedItemId: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
   resizeTimer: null,
@@ -259,8 +263,15 @@ function sortItems(items) {
 
 function visibleItems() {
   return state.items.filter((item) =>
-    TIMELINE_MODE === "hidden" ? item.hideFromTimeline : !item.hideFromTimeline
+    (TIMELINE_MODE === "hidden" ? item.hideFromTimeline : !item.hideFromTimeline) &&
+    state.selectedPcNames.has(item.pcName)
   );
+}
+
+function syncSelectedItem(items) {
+  if (!items.some((item) => item.id === state.selectedItemId)) {
+    state.selectedItemId = items[0]?.id ?? null;
+  }
 }
 
 function itemStartMonth(item) {
@@ -322,6 +333,10 @@ function lifecycleStatus(item) {
 
 function pcNameClass(item) {
   return item.pcName === "sub" ? "category-pc-sub" : "category-pc-main";
+}
+
+function pcNameClassFromValue(value) {
+  return value === "sub" ? "category-pc-sub" : "category-pc-main";
 }
 
 function timelineLayout() {
@@ -509,7 +524,25 @@ function renderSummary() {
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
 }
 
+function renderCategoryFilter() {
+  if (!elements.categoryFilter) return;
+
+  elements.categoryFilter.innerHTML = "";
+  for (const option of pcNameOptions) {
+    const isSelected = state.selectedPcNames.has(option.value);
+    const button = createElement("button", `category-filter-button ${pcNameClassFromValue(option.value)}`);
+    button.type = "button";
+    button.dataset.pcName = option.value;
+    button.setAttribute("aria-label", `${option.label}を${isSelected ? "非表示" : "表示"}`);
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.title = option.label;
+    elements.categoryFilter.appendChild(button);
+  }
+}
+
 function render() {
+  syncSelectedItem(visibleItems());
+  renderCategoryFilter();
   renderSummary();
   renderTimeline();
 }
@@ -600,9 +633,6 @@ function updateCalculationResult() {
 async function refreshItems() {
   if (!state.uid) return;
   state.items = await loadFirestoreItems(state.uid);
-  if (!state.items.some((item) => item.id === state.selectedItemId)) {
-    state.selectedItemId = visibleItems()[0]?.id ?? null;
-  }
   render();
   if (state.editingId && elements.form) {
     const item = state.items.find((currentItem) => currentItem.id === state.editingId);
@@ -611,7 +641,7 @@ async function refreshItems() {
 }
 
 function selectedItem() {
-  return state.items.find((item) => item.id === state.selectedItemId) ?? null;
+  return visibleItems().find((item) => item.id === state.selectedItemId) ?? null;
 }
 
 function openItemDialog(item) {
@@ -678,6 +708,27 @@ if (elements.form) {
 if (elements.createButton) {
   elements.createButton.addEventListener("click", () => {
     window.location.href = "form.html";
+  });
+}
+
+if (elements.categoryFilter) {
+  elements.categoryFilter.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const button = target.closest(".category-filter-button");
+    if (!(button instanceof HTMLButtonElement)) return;
+
+    const pcName = button.dataset.pcName;
+    if (!pcName) return;
+
+    if (state.selectedPcNames.has(pcName)) {
+      state.selectedPcNames.delete(pcName);
+    } else {
+      state.selectedPcNames.add(pcName);
+    }
+
+    render();
   });
 }
 

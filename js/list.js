@@ -16,6 +16,7 @@ import {
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const createButton = document.getElementById("create-button");
+const categoryFilter = document.getElementById("category-filter");
 const itemList = document.getElementById("item-list");
 const helpButton = document.getElementById("help-button");
 const helpDialog = document.getElementById("help-dialog");
@@ -43,6 +44,7 @@ const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 const state = {
   uid: null,
   items: [],
+  selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
   selectedItemId: null,
   resizeTimer: null,
 };
@@ -201,6 +203,16 @@ function timelineMonthlyCost(item) {
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
+function visibleItems() {
+  return state.items.filter((item) => state.selectedCategories.has(item.category));
+}
+
+function syncSelectedItem(items) {
+  if (!items.some((item) => item.id === state.selectedItemId)) {
+    state.selectedItemId = items[0]?.id ?? null;
+  }
+}
+
 function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
@@ -214,6 +226,29 @@ function summarizeItems(items) {
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
   summaryItemCount.textContent = `${items.length} 件`;
+}
+
+function renderCategoryFilter() {
+  if (!categoryFilter) return;
+
+  categoryFilter.innerHTML = "";
+  for (const category of CATEGORY_OPTIONS) {
+    const isSelected = state.selectedCategories.has(category.value);
+    const button = createElement("button", `category-filter-button category-${category.value}`);
+    button.type = "button";
+    button.dataset.category = category.value;
+    button.setAttribute("aria-label", `${category.label}を${isSelected ? "非表示" : "表示"}`);
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.title = category.label;
+    categoryFilter.appendChild(button);
+  }
+}
+
+function renderCurrentView() {
+  const items = visibleItems();
+  syncSelectedItem(items);
+  summarizeItems(items);
+  renderTimeline(items);
 }
 
 function renderEmptyTimeline() {
@@ -377,12 +412,12 @@ function renderTimeline(items) {
 }
 
 function selectedItem() {
-  return state.items.find((item) => item.id === state.selectedItemId) ?? null;
+  return visibleItems().find((item) => item.id === state.selectedItemId) ?? null;
 }
 
 function selectItem(itemId) {
   state.selectedItemId = itemId;
-  renderTimeline(state.items);
+  renderTimeline(visibleItems());
   const item = selectedItem();
   openItemNameDialog(item);
 }
@@ -402,19 +437,38 @@ async function refreshList() {
     TIMELINE_MODE === "hidden"
       ? loadedItems.filter((item) => !isPcManagementItem(item) && item.hideFromTimeline)
       : loadedItems.filter((item) => !isPcManagementItem(item) && !item.hideFromTimeline);
-  if (!state.items.some((item) => item.id === state.selectedItemId)) {
-    state.selectedItemId = state.items[0]?.id ?? null;
-  }
-  summarizeItems(state.items);
-  renderTimeline(state.items);
+  renderCurrentView();
 }
 
 summarizeItems([]);
 renderEmptyTimeline();
+renderCategoryFilter();
 
 if (createButton) {
   createButton.addEventListener("click", () => {
     window.location.href = "form.html";
+  });
+}
+
+if (categoryFilter) {
+  categoryFilter.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const button = target.closest(".category-filter-button");
+    if (!(button instanceof HTMLButtonElement)) return;
+
+    const category = button.dataset.category;
+    if (!category) return;
+
+    if (state.selectedCategories.has(category)) {
+      state.selectedCategories.delete(category);
+    } else {
+      state.selectedCategories.add(category);
+    }
+
+    renderCategoryFilter();
+    renderCurrentView();
   });
 }
 
@@ -495,7 +549,7 @@ if (helpButton && helpDialog && helpCloseButton) {
 window.addEventListener("resize", () => {
   window.clearTimeout(state.resizeTimer);
   state.resizeTimer = window.setTimeout(() => {
-    renderTimeline(state.items);
+    renderTimeline(visibleItems());
   }, 120);
 });
 
