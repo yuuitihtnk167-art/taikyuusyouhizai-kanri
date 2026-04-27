@@ -1,14 +1,16 @@
-import { login, signup, onAuthChanged, firebaseErrorMessage, registerServiceWorker } from "./common.js";
+import { login, signup, onAuthChanged, enterLocalMode, isLocalMode, firebaseErrorMessage, registerServiceWorker } from "./common.js";
 
 const authError = document.getElementById("auth-error");
 const emailInput = document.getElementById("auth-email");
 const passwordInput = document.getElementById("auth-password");
 const loginButton = document.getElementById("login-button");
 const signupButton = document.getElementById("signup-button");
+const localModeButton = document.getElementById("local-mode-button");
 
 function setButtonsDisabled(disabled) {
   loginButton.disabled = disabled;
   signupButton.disabled = disabled;
+  localModeButton.disabled = disabled;
 }
 
 function getCredentials() {
@@ -58,8 +60,21 @@ signupButton.addEventListener("click", async () => {
   }
 });
 
+localModeButton.addEventListener("click", async () => {
+  authError.textContent = "";
+  try {
+    setButtonsDisabled(true);
+    await enterLocalMode();
+    window.location.href = "list.html";
+  } catch (error) {
+    authError.textContent = error?.message || "ローカル保存を開始できません。";
+  } finally {
+    setButtonsDisabled(false);
+  }
+});
+
 onAuthChanged((user) => {
-  if (user) {
+  if (user && !isLocalMode()) {
     window.location.href = "list.html";
   }
 });

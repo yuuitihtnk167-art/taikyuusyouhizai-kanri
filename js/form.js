@@ -14,10 +14,12 @@ import {
   formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
+  isLocalMode,
   registerServiceWorker,
 } from "./common.js";
 
 const authError = document.getElementById("auth-error");
+const localModeNotice = document.getElementById("local-mode-notice");
 const toListButton = document.getElementById("to-list-button");
 const form = document.getElementById("item-form");
 const formPanel = document.getElementById("form-panel");
@@ -43,6 +45,15 @@ const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
 };
+const LOCAL_MODE_NOTICE_TEXT =
+  "ローカル保存中です。このスマホのブラウザ内に保存されます。機種変更、ブラウザのデータ削除、プライベートブラウズではデータが失われる場合があります。";
+
+function syncLocalModeUi() {
+  const localMode = isLocalMode();
+  if (!localModeNotice) return;
+  localModeNotice.hidden = !localMode;
+  localModeNotice.textContent = localMode ? LOCAL_MODE_NOTICE_TEXT : "";
+}
 
 function populateCategorySelect() {
   categoryInput.innerHTML = "";
@@ -198,6 +209,7 @@ function fillForm(item) {
 }
 
 populateCategorySelect();
+syncLocalModeUi();
 
 toListButton.addEventListener("click", () => {
   window.location.href = "list.html";
@@ -270,11 +282,15 @@ form.addEventListener("submit", async (event) => {
 });
 
 onAuthChanged(async (user) => {
-  if (!user) {
+  syncLocalModeUi();
+  if (isLocalMode()) {
+    state.uid = "local";
+  } else if (!user) {
     window.location.href = "login.html";
     return;
+  } else {
+    state.uid = user.uid;
   }
-  state.uid = user.uid;
 
   if (!state.editingId) {
     submitButton.textContent = "登録する";

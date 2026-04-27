@@ -32,9 +32,15 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const ITEMS_COLLECTION = "durableGoodsItems";
+export const LOCAL_DURABLE_ITEMS_STORE = "durableGoodsItems";
+export const LOCAL_PC_ITEMS_STORE = "pcItems";
 export const DEFAULT_CATEGORY = "other";
 export const PC_MODEL_PREFIX = "[pcManagement]";
 export const PC_PART_MEMO_PREFIX = "[pcPart]";
+const LOCAL_STORAGE_MODE_KEY = "monthlyApplianceBook.storageMode";
+const STORAGE_MODE_LOCAL = "local";
+const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
+const LOCAL_DB_VERSION = 1;
 export const CATEGORY_OPTIONS = [
   { value: "information_device", label: "情報機器" },
   { value: "smartphone", label: "スマホ" },
@@ -76,19 +82,155 @@ export function registerServiceWorker() {
   });
 }
 
+function storageGetItem(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function storageSetItem(key, value) {
+  localStorage.setItem(key, value);
+}
+
+function storageRemoveItem(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (_error) {
+    // Removing the mode flag is best-effort only.
+  }
+}
+
+export function isLocalMode() {
+  return storageGetItem(LOCAL_STORAGE_MODE_KEY) === STORAGE_MODE_LOCAL;
+}
+
+export function exitLocalMode() {
+  storageRemoveItem(LOCAL_STORAGE_MODE_KEY);
+}
+
+export function isIndexedDbSupported() {
+  return typeof indexedDB !== "undefined";
+}
+
+function indexedDbUnavailableError() {
+  return new Error("このブラウザではローカル保存を利用できません。通常ログインを使用してください。");
+}
+
+function requestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error ?? indexedDbUnavailableError()));
+  });
+}
+
+function createLocalStores(database) {
+  for (const storeName of [LOCAL_DURABLE_ITEMS_STORE, LOCAL_PC_ITEMS_STORE]) {
+    if (!database.objectStoreNames.contains(storeName)) {
+      database.createObjectStore(storeName, { keyPath: "id" });
+    }
+  }
+}
+
+function openLocalDatabase() {
+  if (!isIndexedDbSupported()) {
+    return Promise.reject(indexedDbUnavailableError());
+  }
+
+  return new Promise((resolve, reject) => {
+    let request;
+    try {
+      request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    request.addEventListener("upgradeneeded", () => createLocalStores(request.result));
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error ?? indexedDbUnavailableError()));
+  });
+}
+
+export async function ensureLocalStorageReady() {
+  const database = await openLocalDatabase();
+  database.close();
+}
+
+export async function enterLocalMode() {
+  await ensureLocalStorageReady();
+  if (auth.currentUser) {
+    await signOut(auth);
+  }
+  storageSetItem(LOCAL_STORAGE_MODE_KEY, STORAGE_MODE_LOCAL);
+}
+
+async function withLocalStore(storeName, mode, callback) {
+  const database = await openLocalDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(storeName, mode);
+      const store = transaction.objectStore(storeName);
+      let callbackResult;
+
+      transaction.addEventListener("complete", () => resolve(callbackResult));
+      transaction.addEventListener("error", () => reject(transaction.error ?? indexedDbUnavailableError()));
+      transaction.addEventListener("abort", () => reject(transaction.error ?? indexedDbUnavailableError()));
+
+      try {
+        callbackResult = callback(store);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
+    });
+  } finally {
+    database.close();
+  }
+}
+
+export async function loadLocalRecords(storeName) {
+  return withLocalStore(storeName, "readonly", (store) => requestToPromise(store.getAll()));
+}
+
+export async function loadLocalRecord(storeName, recordId) {
+  return withLocalStore(storeName, "readonly", (store) => requestToPromise(store.get(recordId)));
+}
+
+export async function saveLocalRecord(storeName, record) {
+  if (!record?.id) {
+    throw new Error("ローカル保存するデータのIDがありません。");
+  }
+  await withLocalStore(storeName, "readwrite", (store) => {
+    store.put(record);
+  });
+}
+
+export async function removeLocalRecord(storeName, recordId) {
+  await withLocalStore(storeName, "readwrite", (store) => {
+    store.delete(recordId);
+  });
+}
+
 export function onAuthChanged(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
 export async function login(email, password) {
+  exitLocalMode();
   return signInWithEmailAndPassword(auth, email, password);
 }
 
 export async function signup(email, password) {
+  exitLocalMode();
   return createUserWithEmailAndPassword(auth, email, password);
 }
 
 export async function logout() {
+  if (isLocalMode()) {
+    exitLocalMode();
+    return null;
+  }
   return signOut(auth);
 }
 
@@ -214,55 +356,89 @@ function userItemDocRef(uid, itemId) {
   return doc(db, "users", uid, ITEMS_COLLECTION, itemId);
 }
 
-export async function loadItems(uid) {
-  const snapshot = await getDocs(userItemsCollectionRef(uid));
-  const items = [];
-  snapshot.forEach((documentSnapshot) => {
-    const data = documentSnapshot.data();
-    items.push({
-      id: documentSnapshot.id,
-      name: data.name ?? "",
-      model: data.model ?? "",
-      category: normalizeCategory(data.category),
-      sourceType: data.sourceType ?? "",
-      purchaseDate: data.purchaseDate ?? "",
-      purchasePrice: Number(data.purchasePrice ?? 0),
-      yearsOfUse: Number(data.yearsOfUse ?? 0),
-      endOfUseDate: data.endOfUseDate ?? "",
-      hideFromTimeline: Boolean(data.hideFromTimeline),
-      additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
-      createdAt: data.createdAt ?? null,
-      updatedAt: data.updatedAt ?? null,
-    });
-  });
+function normalizeStoredItem(item) {
+  return {
+    id: item.id,
+    name: item.name ?? "",
+    model: item.model ?? "",
+    category: normalizeCategory(item.category),
+    sourceType: item.sourceType ?? "",
+    purchaseDate: item.purchaseDate ?? "",
+    purchasePrice: Number(item.purchasePrice ?? 0),
+    yearsOfUse: Number(item.yearsOfUse ?? 0),
+    endOfUseDate: item.endOfUseDate ?? "",
+    hideFromTimeline: Boolean(item.hideFromTimeline),
+    additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
+    createdAt: item.createdAt ?? null,
+    updatedAt: item.updatedAt ?? null,
+  };
+}
+
+function sortStoredItems(items) {
   items.sort((a, b) => {
     const dateCompare = String(b.purchaseDate).localeCompare(String(a.purchaseDate));
     if (dateCompare !== 0) return dateCompare;
-    return Number(b.updatedAt?.seconds ?? 0) - Number(a.updatedAt?.seconds ?? 0);
+    const bUpdatedAt = Number(b.updatedAt?.seconds ?? b.updatedAt ?? 0);
+    const aUpdatedAt = Number(a.updatedAt?.seconds ?? a.updatedAt ?? 0);
+    return bUpdatedAt - aUpdatedAt;
   });
   return items;
 }
 
+export async function loadItems(uid) {
+  if (isLocalMode()) {
+    return sortStoredItems((await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE)).map(normalizeStoredItem));
+  }
+
+  const snapshot = await getDocs(userItemsCollectionRef(uid));
+  const items = [];
+  snapshot.forEach((documentSnapshot) => {
+    const data = documentSnapshot.data();
+    items.push(normalizeStoredItem({
+      id: documentSnapshot.id,
+      ...data,
+    }));
+  });
+  return sortStoredItems(items);
+}
+
 export async function loadItem(uid, itemId) {
+  if (isLocalMode()) {
+    const item = await loadLocalRecord(LOCAL_DURABLE_ITEMS_STORE, itemId);
+    return item ? normalizeStoredItem(item) : null;
+  }
+
   const snapshot = await getDoc(userItemDocRef(uid, itemId));
   if (!snapshot.exists()) return null;
   const data = snapshot.data();
-  return {
+  return normalizeStoredItem({
     id: snapshot.id,
-    name: data.name ?? "",
-    model: data.model ?? "",
-    category: normalizeCategory(data.category),
-    sourceType: data.sourceType ?? "",
-    purchaseDate: data.purchaseDate ?? "",
-    purchasePrice: Number(data.purchasePrice ?? 0),
-    yearsOfUse: Number(data.yearsOfUse ?? 0),
-    endOfUseDate: data.endOfUseDate ?? "",
-    hideFromTimeline: Boolean(data.hideFromTimeline),
-    additionalCosts: normalizeAdditionalCosts(data.additionalCosts),
-  };
+    ...data,
+  });
 }
 
 export async function saveItem(uid, item) {
+  if (isLocalMode()) {
+    if (!item.id) item.id = createId();
+    const existing = await loadLocalRecord(LOCAL_DURABLE_ITEMS_STORE, item.id);
+    await saveLocalRecord(LOCAL_DURABLE_ITEMS_STORE, normalizeStoredItem({
+      ...existing,
+      id: item.id,
+      name: item.name,
+      model: item.model,
+      category: item.category,
+      purchaseDate: item.purchaseDate,
+      purchasePrice: item.purchasePrice,
+      yearsOfUse: item.yearsOfUse,
+      endOfUseDate: item.endOfUseDate,
+      hideFromTimeline: Boolean(item.hideFromTimeline),
+      additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
+      createdAt: existing?.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+    }));
+    return;
+  }
+
   const payload = {
     name: item.name,
     model: item.model,
@@ -282,6 +458,11 @@ export async function saveItem(uid, item) {
 }
 
 export async function removeItem(uid, itemId) {
+  if (isLocalMode()) {
+    await removeLocalRecord(LOCAL_DURABLE_ITEMS_STORE, itemId);
+    return;
+  }
+
   await deleteDoc(userItemDocRef(uid, itemId));
 }
 

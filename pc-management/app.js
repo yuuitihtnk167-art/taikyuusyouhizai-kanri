@@ -10,6 +10,12 @@ import {
   db,
   onAuthChanged,
   firebaseErrorMessage,
+  isLocalMode,
+  LOCAL_PC_ITEMS_STORE,
+  loadLocalRecords,
+  loadLocalRecord,
+  saveLocalRecord,
+  removeLocalRecord,
   registerServiceWorker,
 } from "../js/common.js";
 
@@ -37,6 +43,7 @@ const elements = {
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
+  localModeNotice: document.getElementById("local-mode-notice"),
   createButton: document.getElementById("create-button"),
   categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
@@ -80,6 +87,15 @@ const state = {
   editingId: new URLSearchParams(window.location.search).get("id"),
   resizeTimer: null,
 };
+const LOCAL_MODE_NOTICE_TEXT =
+  "ローカル保存中です。このスマホのブラウザ内に保存されます。機種変更、ブラウザのデータ削除、プライベートブラウズではデータが失われる場合があります。";
+
+function syncLocalModeUi() {
+  const localMode = isLocalMode();
+  if (!elements.localModeNotice) return;
+  elements.localModeNotice.hidden = !localMode;
+  elements.localModeNotice.textContent = localMode ? LOCAL_MODE_NOTICE_TEXT : "";
+}
 
 function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -249,6 +265,38 @@ async function saveFirestoreItem(uid, item) {
 
 async function removeFirestoreItem(uid, itemId) {
   await deleteDoc(pcItemDocRef(uid, itemId));
+}
+
+async function loadStorageItems(uid) {
+  if (isLocalMode()) {
+    return sortItems((await loadLocalRecords(LOCAL_PC_ITEMS_STORE)).map(normalizePcPartItem));
+  }
+  return loadFirestoreItems(uid);
+}
+
+async function saveStorageItem(uid, item) {
+  if (!isLocalMode()) {
+    await saveFirestoreItem(uid, item);
+    return;
+  }
+
+  const normalized = normalizePcPartItem(item);
+  const existing = await loadLocalRecord(LOCAL_PC_ITEMS_STORE, normalized.id);
+  await saveLocalRecord(LOCAL_PC_ITEMS_STORE, {
+    ...existing,
+    ...normalized,
+    createdAt: existing?.createdAt ?? normalized.createdAt ?? Date.now(),
+    updatedAt: Date.now(),
+  });
+}
+
+async function removeStorageItem(uid, itemId) {
+  if (!isLocalMode()) {
+    await removeFirestoreItem(uid, itemId);
+    return;
+  }
+
+  await removeLocalRecord(LOCAL_PC_ITEMS_STORE, itemId);
 }
 
 function sortItems(items) {
@@ -643,7 +691,7 @@ function updateCalculationResult() {
 
 async function refreshItems() {
   if (!state.uid) return;
-  state.items = await loadFirestoreItems(state.uid);
+  state.items = await loadStorageItems(state.uid);
   render();
   if (state.editingId && elements.form) {
     const item = state.items.find((currentItem) => currentItem.id === state.editingId);
@@ -699,7 +747,7 @@ if (elements.form) {
 
     try {
       elements.submitButton.disabled = true;
-      await saveFirestoreItem(state.uid, item);
+      await saveStorageItem(state.uid, item);
       window.location.href = "index.html";
     } catch (error) {
       elements.formError.textContent = firebaseErrorMessage(error, "パーツ情報の保存に失敗しました。");
@@ -796,7 +844,7 @@ if (elements.dialogDeleteButton) {
 
     try {
       elements.dialogDeleteButton.disabled = true;
-      await removeFirestoreItem(state.uid, item.id);
+      await removeStorageItem(state.uid, item.id);
       elements.itemDialog.close();
       state.selectedItemId = null;
       await refreshItems();
@@ -830,14 +878,19 @@ updateCalculationResult();
 updateEndedUseStyle();
 renderCategoryFilter();
 renderLoadingTimeline();
+syncLocalModeUi();
 
 onAuthChanged(async (user) => {
-  if (!user) {
+  syncLocalModeUi();
+  if (isLocalMode()) {
+    state.uid = "local";
+  } else if (!user) {
     window.location.href = "../login.html";
     return;
+  } else {
+    state.uid = user.uid;
   }
 
-  state.uid = user.uid;
   if (elements.authError) elements.authError.textContent = "";
 
   try {
@@ -856,7 +909,7 @@ onAuthChanged(async (user) => {
       return;
     }
 
-    state.items = await loadFirestoreItems(state.uid);
+    state.items = await loadStorageItems(state.uid);
     const item = state.items.find((currentItem) => currentItem.id === state.editingId);
     if (!item) {
       elements.authError.textContent = "編集対象が見つかりません。";
