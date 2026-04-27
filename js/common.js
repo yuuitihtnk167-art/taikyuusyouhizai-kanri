@@ -12,7 +12,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
   getAuth,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
@@ -234,6 +233,49 @@ export async function createLocalBackupData() {
   };
 }
 
+function toBackupValue(value) {
+  if (!value) return value;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (Array.isArray(value)) return value.map(toBackupValue);
+  if (typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entryValue]) => [key, toBackupValue(entryValue)])
+  );
+}
+
+export async function createFirebaseLocalBackupData(uid) {
+  if (!uid) {
+    throw new Error("Firebaseデータの取得に必要なユーザー情報がありません。");
+  }
+
+  const snapshot = await getDocs(userItemsCollectionRef(uid));
+  const durableGoodsItems = [];
+  const pcItems = [];
+
+  snapshot.forEach((documentSnapshot) => {
+    const record = toBackupValue({
+      id: documentSnapshot.id,
+      ...documentSnapshot.data(),
+    });
+
+    if (isPcManagementItem(record)) {
+      pcItems.push(record);
+      return;
+    }
+
+    durableGoodsItems.push(normalizeStoredItem(record));
+  });
+
+  return {
+    app: LOCAL_BACKUP_APP_NAME,
+    version: LOCAL_BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    durableGoodsItems: sortStoredItems(durableGoodsItems),
+    pcItems,
+  };
+}
+
 function validateBackupRecordIds(records, label) {
   for (const record of records) {
     if (!record || typeof record !== "object" || !record.id) {
@@ -277,11 +319,6 @@ export function onAuthChanged(callback) {
 export async function login(email, password) {
   exitLocalMode();
   return signInWithEmailAndPassword(auth, email, password);
-}
-
-export async function signup(email, password) {
-  exitLocalMode();
-  return createUserWithEmailAndPassword(auth, email, password);
 }
 
 export async function logout() {
