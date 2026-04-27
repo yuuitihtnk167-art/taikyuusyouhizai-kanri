@@ -41,6 +41,8 @@ const LOCAL_STORAGE_MODE_KEY = "monthlyApplianceBook.storageMode";
 const STORAGE_MODE_LOCAL = "local";
 const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
 const LOCAL_DB_VERSION = 1;
+const LOCAL_BACKUP_APP_NAME = "月額家電簿";
+const LOCAL_BACKUP_VERSION = 1;
 export const CATEGORY_OPTIONS = [
   { value: "information_device", label: "情報機器" },
   { value: "smartphone", label: "スマホ" },
@@ -210,6 +212,61 @@ export async function removeLocalRecord(storeName, recordId) {
   await withLocalStore(storeName, "readwrite", (store) => {
     store.delete(recordId);
   });
+}
+
+export async function replaceLocalRecords(storeName, records) {
+  await withLocalStore(storeName, "readwrite", (store) => {
+    store.clear();
+    for (const record of records) {
+      store.put(record);
+    }
+  });
+}
+
+export async function createLocalBackupData() {
+  return {
+    app: LOCAL_BACKUP_APP_NAME,
+    version: LOCAL_BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    durableGoodsItems: await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE),
+    pcItems: await loadLocalRecords(LOCAL_PC_ITEMS_STORE),
+  };
+}
+
+function validateBackupRecordIds(records, label) {
+  for (const record of records) {
+    if (!record || typeof record !== "object" || !record.id) {
+      throw new Error(`${label}のバックアップ形式が正しくありません。`);
+    }
+  }
+}
+
+export function parseLocalBackupText(text) {
+  let backup;
+  try {
+    backup = JSON.parse(text);
+  } catch (_error) {
+    throw new Error("バックアップファイルを読み込めません。JSON形式を確認してください。");
+  }
+
+  if (!backup || typeof backup !== "object") {
+    throw new Error("バックアップファイルの形式が正しくありません。");
+  }
+  if (backup.app !== LOCAL_BACKUP_APP_NAME || Number(backup.version) !== LOCAL_BACKUP_VERSION) {
+    throw new Error("このアプリのバックアップファイルではないか、対応していないバージョンです。");
+  }
+  if (!Array.isArray(backup.durableGoodsItems) || !Array.isArray(backup.pcItems)) {
+    throw new Error("バックアップファイルに必要なデータが含まれていません。");
+  }
+
+  validateBackupRecordIds(backup.durableGoodsItems, "通常家電");
+  validateBackupRecordIds(backup.pcItems, "パソコン管理");
+  return backup;
+}
+
+export async function restoreLocalBackupData(backup) {
+  await replaceLocalRecords(LOCAL_DURABLE_ITEMS_STORE, backup.durableGoodsItems);
+  await replaceLocalRecords(LOCAL_PC_ITEMS_STORE, backup.pcItems);
 }
 
 export function onAuthChanged(callback) {

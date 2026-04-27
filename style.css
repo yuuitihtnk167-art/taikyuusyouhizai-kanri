@@ -494,14 +494,27 @@ button {
   gap: 14px;
 }
 
-.dashboard-title-row #logout-button,
-.dashboard-title-row #back-button {
+.dashboard-title-actions {
+  display: flex;
   flex: 0 0 auto;
-  width: 132px;
-  min-width: 132px;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-title-actions .ghost-button[hidden] {
+  display: none;
+}
+
+.dashboard-title-row #logout-button,
+.dashboard-title-row #back-button,
+.dashboard-title-row #backup-button,
+.dashboard-title-row #restore-button {
+  flex: 0 0 auto;
+  width: 88px;
+  min-width: 88px;
   min-height: 44px;
   margin-top: 0;
-  padding: 0 18px;
+  padding: 0 12px;
   color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.28);
   border-radius: 6px;
@@ -509,7 +522,9 @@ button {
 }
 
 .dashboard-title-row #logout-button:hover,
-.dashboard-title-row #back-button:hover {
+.dashboard-title-row #back-button:hover,
+.dashboard-title-row #backup-button:hover,
+.dashboard-title-row #restore-button:hover {
   background: rgba(54, 68, 82, 0.72);
 }
 
@@ -1331,14 +1346,20 @@ button {
     gap: 8px;
   }
 
+  .dashboard-title-actions {
+    gap: 5px;
+  }
+
   .dashboard-title-row #logout-button,
-  .dashboard-title-row #back-button {
-    width: 82px;
-    min-width: 82px;
+  .dashboard-title-row #back-button,
+  .dashboard-title-row #backup-button,
+  .dashboard-title-row #restore-button {
+    width: 58px;
+    min-width: 58px;
     min-height: 30px;
-    padding: 0 10px;
+    padding: 0 7px;
     border-radius: 4px;
-    font-size: 0.72rem;
+    font-size: 0.66rem;
   }
 
   .dashboard-body .subtitle {
