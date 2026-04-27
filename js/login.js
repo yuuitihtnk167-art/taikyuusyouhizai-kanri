@@ -1,6 +1,5 @@
 import { login, signup, onAuthChanged, firebaseErrorMessage, registerServiceWorker } from "./common.js";
 
-const authStatus = document.getElementById("auth-status");
 const authError = document.getElementById("auth-error");
 const emailInput = document.getElementById("auth-email");
 const passwordInput = document.getElementById("auth-password");
@@ -62,9 +61,7 @@ signupButton.addEventListener("click", async () => {
 onAuthChanged((user) => {
   if (user) {
     window.location.href = "list.html";
-    return;
   }
-  authStatus.textContent = "状態: 未ログイン";
 });
 
 registerServiceWorker();

@@ -425,6 +425,17 @@ function renderEmptyTimeline() {
   elements.itemList.appendChild(empty);
 }
 
+function renderLoadingTimeline() {
+  if (!elements.itemList) return;
+  elements.itemList.innerHTML = "";
+  const loading = createElement("div", "timeline-empty timeline-loading");
+  loading.innerHTML = `
+    <strong>読込中です</strong>
+    <span>データを準備しています。</span>
+  `;
+  elements.itemList.appendChild(loading);
+}
+
 function renderTimeline() {
   if (!elements.itemList) return;
   const items = sortItems(visibleItems());
@@ -817,7 +828,8 @@ window.addEventListener("resize", () => {
 
 updateCalculationResult();
 updateEndedUseStyle();
-render();
+renderCategoryFilter();
+renderLoadingTimeline();
 
 onAuthChanged(async (user) => {
   if (!user) {

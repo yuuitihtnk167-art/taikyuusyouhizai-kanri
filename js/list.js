@@ -251,6 +251,16 @@ function renderCurrentView() {
   renderTimeline(items);
 }
 
+function renderLoadingTimeline() {
+  itemList.innerHTML = "";
+  const loading = createElement("div", "timeline-empty timeline-loading");
+  loading.innerHTML = `
+    <strong>読込中です</strong>
+    <span>データを準備しています。</span>
+  `;
+  itemList.appendChild(loading);
+}
+
 function renderEmptyTimeline() {
   itemList.innerHTML = "";
   const empty = createElement("div", "timeline-empty");
@@ -441,7 +451,7 @@ async function refreshList() {
 }
 
 summarizeItems([]);
-renderEmptyTimeline();
+renderLoadingTimeline();
 renderCategoryFilter();
 
 if (createButton) {
