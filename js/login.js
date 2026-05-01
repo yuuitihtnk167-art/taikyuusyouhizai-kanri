@@ -1,14 +1,11 @@
 import {
-  login,
-  onAuthChanged,
-  enterLocalMode,
-  isLocalMode,
   LOCAL_WARNING_DISMISSED_KEY,
   storageGetItem,
   storageSetItem,
   firebaseErrorMessage,
-  registerServiceWorker,
 } from "./common.js";
+import { isLocalMode } from "./platform/local-db.js";
+import { enterLocalMode, login, onAuthChanged, registerServiceWorker } from "./services/auth.js";
 
 const authError = document.getElementById("auth-error");
 const emailInput = document.getElementById("auth-email");

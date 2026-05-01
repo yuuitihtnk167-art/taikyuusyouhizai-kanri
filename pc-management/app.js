@@ -1,28 +1,21 @@
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  serverTimestamp,
-  setDoc,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import {
-  db,
-  onAuthChanged,
+  calculateUsageMonths,
   firebaseErrorMessage,
-  isLocalMode,
-  LOCAL_PC_ITEMS_STORE,
-  loadLocalRecords,
-  loadLocalRecord,
-  saveLocalRecord,
-  removeLocalRecord,
-  registerServiceWorker,
 } from "../js/common.js";
+import { isLocalMode } from "../js/platform/local-db.js";
+import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
+import { shouldIncludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
+import {
+  deleteItem as deletePcItem,
+  getItems as getPcItems,
+  saveItem as savePcItem,
+} from "../js/storage/pc-items/index.js";
 
 const PC_ITEMS_COLLECTION = "durableGoodsItems";
 const SOURCE_TYPE = "pcManagement";
 const DATA_VERSION = 7;
 const SCHEMA_TYPE = "pcPartLifecycle";
+const HIDDEN_TIMELINE_NOTICE_MESSAGE = "非表示でも使用年数が未達の場合は加算されます。";
 const TIMELINE_MIN_YEAR = 2015;
 const TIMELINE_MAX_YEAR = 2055;
 const DESKTOP_YEAR_WIDTH = 168;
@@ -56,7 +49,6 @@ const elements = {
   formError: document.getElementById("form-error"),
   resetButton: document.getElementById("reset-button"),
   submitButton: document.getElementById("submit-button"),
-  cancelButton: document.getElementById("cancel-button"),
   itemList: document.getElementById("item-list"),
   calculationTotal: document.getElementById("calculation-total"),
   calculationMonthlyCost: document.getElementById("calculation-monthly-cost"),
@@ -168,6 +160,62 @@ function calculateMonthlyCost(item) {
   return purchasePrice / (yearsOfUse * 12);
 }
 
+function isUnderusedItem(item) {
+  if (!item.endOfUseDate) return false;
+  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+  const plannedMonths = Number(item.yearsOfUse) * 12;
+  return Boolean(usageMonths && Number.isFinite(plannedMonths) && plannedMonths > 0 && usageMonths < plannedMonths);
+}
+
+function shouldShowHiddenTimelineNotice(item) {
+  return Boolean(item.hideFromTimeline);
+}
+
+function showHiddenTimelineNoticeDialog() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "item-name-dialog";
+    dialog.innerHTML = `
+      <article class="item-name-dialog-card">
+        <p class="dialog-item-meta">${HIDDEN_TIMELINE_NOTICE_MESSAGE}</p>
+        <div class="dialog-actions">
+          <button type="button" class="primary-button">OK</button>
+        </div>
+      </article>
+    `;
+
+    const closeButton = dialog.querySelector("button");
+    const closeDialog = () => {
+      dialog.close();
+    };
+
+    closeButton.addEventListener("click", closeDialog);
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      resolve();
+    }, { once: true });
+
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    closeButton.focus();
+  });
+}
+
+function calculateActualMonthlyCost(item) {
+  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+  if (!usageMonths) return null;
+  return Number(item.purchasePrice || 0) / usageMonths;
+}
+
+function summaryMonthlyCost(item) {
+  if (!isUnderusedItem(item)) return calculateMonthlyCost(item);
+  return calculateActualMonthlyCost(item) ?? calculateMonthlyCost(item);
+}
+
 function normalizePcName(value) {
   return pcNameLabels[value] ? value : "main";
 }
@@ -196,17 +244,10 @@ function normalizePcPartItem(value) {
   };
 }
 
-function pcItemsCollectionRef(uid) {
-  return collection(db, "users", uid, PC_ITEMS_COLLECTION);
-}
-
-function pcItemDocRef(uid, itemId) {
-  return doc(db, "users", uid, PC_ITEMS_COLLECTION, itemId);
-}
-
 function toFirestorePayload(item) {
   const normalized = normalizePcPartItem(item);
   return {
+    id: normalized.id,
     dataVersion: DATA_VERSION,
     schemaType: SCHEMA_TYPE,
     sourceType: SOURCE_TYPE,
@@ -227,51 +268,31 @@ function toFirestorePayload(item) {
     monthlyCost: calculateMonthlyCost(normalized),
     additionalCosts: [],
     createdAt: normalized.createdAt,
-    updatedAt: serverTimestamp(),
+    updatedAt: normalized.updatedAt,
   };
 }
 
 async function loadFirestoreItems(uid) {
-  const snapshot = await getDocs(pcItemsCollectionRef(uid));
-  const items = [];
-  snapshot.forEach((documentSnapshot) => {
-    const data = documentSnapshot.data();
-    if (data.sourceType !== SOURCE_TYPE) return;
-    if (Number(data.dataVersion ?? 0) !== DATA_VERSION) return;
-    if (data.schemaType !== SCHEMA_TYPE) return;
-    items.push(normalizePcPartItem({
-      id: documentSnapshot.id,
-      ...data,
-    }));
-  });
-  return sortItems(items);
+  return sortItems((await getPcItems(uid)).map(normalizePcPartItem));
 }
 
 async function saveFirestoreItem(uid, item) {
   const normalized = normalizePcPartItem(item);
-  await setDoc(pcItemDocRef(uid, normalized.id), toFirestorePayload(normalized));
+  await savePcItem(uid, toFirestorePayload(normalized));
 }
 
 async function removeFirestoreItem(uid, itemId) {
-  await deleteDoc(pcItemDocRef(uid, itemId));
+  await deletePcItem(uid, itemId);
 }
 
 async function loadStorageItems(uid) {
-  if (isLocalMode()) {
-    return sortItems((await loadLocalRecords(LOCAL_PC_ITEMS_STORE)).map(normalizePcPartItem));
-  }
   return loadFirestoreItems(uid);
 }
 
 async function saveStorageItem(uid, item) {
-  if (!isLocalMode()) {
-    await saveFirestoreItem(uid, item);
-    return;
-  }
-
   const normalized = normalizePcPartItem(item);
-  const existing = await loadLocalRecord(LOCAL_PC_ITEMS_STORE, normalized.id);
-  await saveLocalRecord(LOCAL_PC_ITEMS_STORE, {
+  const existing = state.items.find((currentItem) => currentItem.id === normalized.id);
+  await saveFirestoreItem(uid, {
     ...existing,
     ...normalized,
     createdAt: existing?.createdAt ?? normalized.createdAt ?? Date.now(),
@@ -280,12 +301,7 @@ async function saveStorageItem(uid, item) {
 }
 
 async function removeStorageItem(uid, itemId) {
-  if (!isLocalMode()) {
-    await removeFirestoreItem(uid, itemId);
-    return;
-  }
-
-  await removeLocalRecord(LOCAL_PC_ITEMS_STORE, itemId);
+  await removeFirestoreItem(uid, itemId);
 }
 
 function sortItems(items) {
@@ -303,6 +319,10 @@ function visibleItems() {
     (TIMELINE_MODE === "hidden" ? item.hideFromTimeline : !item.hideFromTimeline) &&
     state.selectedPcNames.has(item.pcName)
   );
+}
+
+function summaryItems() {
+  return state.items.filter((item) => state.selectedPcNames.has(item.pcName));
 }
 
 function syncSelectedItem(items) {
@@ -563,10 +583,12 @@ function renderTimeline() {
 
 function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
-  const items = visibleItems();
+  const items = summaryItems();
+  const includeUnderusedMonthlyCost = shouldIncludeUnderusedMonthlyCost();
+  const monthlyCostItems = items.filter((item) => !item.endOfUseDate || (includeUnderusedMonthlyCost && isUnderusedItem(item)));
   const activeItems = items.filter((item) => !item.endOfUseDate);
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
-  const monthlyCostTotal = activeItems.reduce((total, item) => total + calculateMonthlyCost(item), 0);
+  const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + summaryMonthlyCost(item), 0);
   elements.summaryCount.textContent = `${items.length} 件`;
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
@@ -635,7 +657,6 @@ function resetForm() {
   elements.yearsOfUse.value = "5";
   elements.hideFromTimeline.checked = false;
   elements.submitButton.textContent = "登録する";
-  elements.cancelButton.hidden = true;
   elements.formError.textContent = "";
   updateCalculationResult();
 }
@@ -659,7 +680,6 @@ function fillForm(item) {
   elements.endOfUseDate.value = item.endOfUseDate;
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
-  elements.cancelButton.hidden = false;
   elements.formError.textContent = "";
   updateEndedUseStyle();
   updateCalculationResult();
@@ -737,6 +757,9 @@ if (elements.form) {
     try {
       elements.submitButton.disabled = true;
       await saveStorageItem(state.uid, item);
+      if (shouldShowHiddenTimelineNotice(item)) {
+        await showHiddenTimelineNoticeDialog();
+      }
       window.location.href = "index.html";
     } catch (error) {
       elements.formError.textContent = firebaseErrorMessage(error, "パーツ情報の保存に失敗しました。");
@@ -745,9 +768,6 @@ if (elements.form) {
     }
   });
 
-  elements.cancelButton.addEventListener("click", () => {
-    window.location.href = "index.html";
-  });
   elements.toListButton.addEventListener("click", () => {
     window.location.href = "index.html";
   });
@@ -868,7 +888,7 @@ updateEndedUseStyle();
 renderCategoryFilter();
 renderLoadingTimeline();
 
-onAuthChanged(async (user) => {
+async function initializePcManagement(user) {
   if (isLocalMode()) {
     state.uid = "local";
   } else if (!user) {
@@ -888,7 +908,6 @@ onAuthChanged(async (user) => {
 
     if (!state.editingId) {
       elements.submitButton.textContent = "登録する";
-      elements.cancelButton.hidden = true;
       elements.pcName.value = "main";
       elements.yearsOfUse.value = elements.yearsOfUse.value || "5";
       updateEndedUseStyle();
@@ -906,6 +925,12 @@ onAuthChanged(async (user) => {
   } catch (error) {
     showError(error, "パーツ情報の取得に失敗しました。");
   }
-});
+}
+
+if (isLocalMode()) {
+  initializePcManagement(null);
+} else {
+  onAuthChanged(initializePcManagement);
+}
 
 registerServiceWorker();

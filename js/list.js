@@ -1,34 +1,35 @@
 import {
-  onAuthChanged,
-  logout,
-  loadItems,
-  removeItem,
   createLocalBackupData,
-  createFirebaseLocalBackupData,
   parseLocalBackupText,
   restoreLocalBackupData,
+  calculateActualMonthlyCost,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
+  calculateUsageMonths,
   formatCurrency,
   CATEGORY_OPTIONS,
   getCategoryLabel,
   isPcManagementItem,
-  isLocalMode,
   firebaseErrorMessage,
-  registerServiceWorker,
 } from "./common.js";
+import { isLocalMode } from "./platform/local-db.js";
+import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
+import { shouldIncludeUnderusedMonthlyCost } from "./services/app-settings.js";
+import { loadItems, removeItem } from "./storage/durable-items/service.js";
+
+const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
 const backupButton = document.getElementById("backup-button");
 const restoreButton = document.getElementById("restore-button");
+const settingsButton = document.getElementById("settings-button");
 const createButton = document.getElementById("create-button");
 const categoryFilter = document.getElementById("category-filter");
 const itemList = document.getElementById("item-list");
 const helpButton = document.getElementById("help-button");
 const helpDialog = document.getElementById("help-dialog");
 const helpCloseButton = document.getElementById("help-close-button");
-const firebaseLocalBackupButton = document.getElementById("firebase-local-backup-button");
 
 const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
@@ -51,10 +52,27 @@ const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 const state = {
   uid: null,
   items: [],
+  summaryItems: [],
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
   selectedItemId: null,
   resizeTimer: null,
 };
+
+function sessionStorageSetItem(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (_error) {
+    // Session storage is best-effort only.
+  }
+}
+
+function sessionStorageRemoveItem(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (_error) {
+    // Session storage is best-effort only.
+  }
+}
 
 function createElement(tagName, className, textContent = "") {
   const element = document.createElement(tagName);
@@ -210,8 +228,24 @@ function timelineMonthlyCost(item) {
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
+function isUnderusedItem(item) {
+  if (!item.endOfUseDate) return false;
+  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+  const plannedMonths = Number(item.yearsOfUse) * 12;
+  return Boolean(usageMonths && Number.isFinite(plannedMonths) && plannedMonths > 0 && usageMonths < plannedMonths);
+}
+
+function itemSummaryMonthlyCost(item) {
+  if (!isUnderusedItem(item)) return timelineMonthlyCost(item);
+  return calculateActualMonthlyCost(item) ?? timelineMonthlyCost(item);
+}
+
 function visibleItems() {
   return state.items.filter((item) => state.selectedCategories.has(item.category));
+}
+
+function summaryItems() {
+  return state.summaryItems.filter((item) => state.selectedCategories.has(item.category));
 }
 
 function syncSelectedItem(items) {
@@ -223,9 +257,11 @@ function syncSelectedItem(items) {
 function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
+  const includeUnderusedMonthlyCost = shouldIncludeUnderusedMonthlyCost();
+  const monthlyCostItems = items.filter((item) => !item.endOfUseDate || (includeUnderusedMonthlyCost && isUnderusedItem(item)));
   const activeItems = items.filter((item) => !item.endOfUseDate);
-  const monthlyCostTotal = activeItems.reduce(
-    (total, item) => total + timelineMonthlyCost(item),
+  const monthlyCostTotal = monthlyCostItems.reduce(
+    (total, item) => total + itemSummaryMonthlyCost(item),
     0
   );
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
@@ -254,7 +290,7 @@ function renderCategoryFilter() {
 function renderCurrentView() {
   const items = visibleItems();
   syncSelectedItem(items);
-  summarizeItems(items);
+  summarizeItems(summaryItems());
   renderTimeline(items);
 }
 
@@ -268,6 +304,13 @@ function renderLoadingTimeline() {
   itemList.appendChild(loading);
 }
 
+function renderTimelineError(message) {
+  itemList.innerHTML = "";
+  const error = createElement("div", "timeline-empty");
+  error.textContent = message;
+  itemList.appendChild(error);
+}
+
 function syncLocalModeUi() {
   const localMode = isLocalMode();
   if (logoutButton) {
@@ -276,7 +319,6 @@ function syncLocalModeUi() {
   }
   if (backupButton) backupButton.hidden = !localMode;
   if (restoreButton) restoreButton.hidden = !localMode;
-  if (firebaseLocalBackupButton) firebaseLocalBackupButton.hidden = localMode;
 }
 
 function renderEmptyTimeline() {
@@ -461,6 +503,7 @@ function openItemNameDialog(item) {
 
 async function refreshList() {
   const loadedItems = await loadItems(state.uid);
+  state.summaryItems = loadedItems.filter((item) => !isPcManagementItem(item));
   state.items =
     TIMELINE_MODE === "hidden"
       ? loadedItems.filter((item) => !isPcManagementItem(item) && item.hideFromTimeline)
@@ -475,9 +518,14 @@ syncLocalModeUi();
 
 if (createButton) {
   createButton.addEventListener("click", () => {
+    sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
     window.location.href = "form.html";
   });
 }
+
+settingsButton?.addEventListener("click", () => {
+  window.location.href = "settings.html";
+});
 
 if (categoryFilter) {
   categoryFilter.addEventListener("click", (event) => {
@@ -521,10 +569,6 @@ function backupFileName() {
   return `月額家電簿-backup-${fileTimestamp()}.json`;
 }
 
-function localRestoreFileName() {
-  return `月額家電簿-local-restore-${fileTimestamp()}.json`;
-}
-
 function downloadBackupFile(backup, fileName = backupFileName()) {
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -551,29 +595,6 @@ if (backupButton) {
       authError.textContent = error?.message || "バックアップの保存に失敗しました。";
     } finally {
       backupButton.disabled = false;
-    }
-  });
-}
-
-if (firebaseLocalBackupButton) {
-  firebaseLocalBackupButton.addEventListener("click", async () => {
-    authError.textContent = "";
-    if (isLocalMode()) {
-      authError.textContent = "Firebase保存データのファイル作成は、通常ログイン時のみ使用できます。";
-      return;
-    }
-    if (!state.uid) {
-      authError.textContent = "Firebaseデータの取得に必要なログイン情報がありません。";
-      return;
-    }
-
-    try {
-      firebaseLocalBackupButton.disabled = true;
-      downloadBackupFile(await createFirebaseLocalBackupData(state.uid), localRestoreFileName());
-    } catch (error) {
-      authError.textContent = firebaseErrorMessage(error, "ローカル保存用ファイルの作成に失敗しました。");
-    } finally {
-      firebaseLocalBackupButton.disabled = false;
     }
   });
 }
@@ -640,6 +661,7 @@ dialogEditButton.addEventListener("click", () => {
     window.location.href = `pc-management/index.html?id=${encodeURIComponent(item.id)}`;
     return;
   }
+  sessionStorageSetItem(EDITING_ITEM_ID_KEY, item.id);
   window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
 });
 
@@ -692,28 +714,35 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
-onAuthChanged(async (user) => {
+async function initializeLocalList() {
   syncLocalModeUi();
-  if (isLocalMode()) {
-    state.uid = "local";
-    try {
-      await refreshList();
-    } catch (error) {
-      authError.textContent = error?.message || "ローカルデータの取得に失敗しました。";
-    }
-    return;
-  }
-
-  if (!user) {
-    window.location.href = "login.html";
-    return;
-  }
-  state.uid = user.uid;
+  state.uid = "local";
   try {
     await refreshList();
   } catch (error) {
-    authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
+    authError.textContent = error?.message || "ローカルデータの取得に失敗しました。";
+    renderTimelineError("データの取得に失敗しました。");
   }
-});
+}
+
+if (isLocalMode()) {
+  initializeLocalList();
+} else {
+  onAuthChanged(async (user) => {
+    syncLocalModeUi();
+
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    state.uid = user.uid;
+    try {
+      await refreshList();
+    } catch (error) {
+      authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
+      renderTimelineError("データの取得に失敗しました。");
+    }
+  });
+}
 
 registerServiceWorker();

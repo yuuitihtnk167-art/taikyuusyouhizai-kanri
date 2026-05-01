@@ -210,6 +210,87 @@ button {
   background: #fff;
 }
 
+.settings-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-header #back-button {
+  flex: 0 0 auto;
+  min-width: 112px;
+  margin-top: 0;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  width: 100%;
+  margin-top: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-toggle input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  padding: 0;
+}
+
+.settings-toggle span {
+  display: grid;
+  gap: 5px;
+}
+
+.settings-toggle strong {
+  font-size: 0.98rem;
+}
+
+.settings-toggle small {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.settings-action-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-action-card strong {
+  display: block;
+  font-size: 0.98rem;
+}
+
+.settings-action-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.settings-action-card .primary-button {
+  min-width: 220px;
+  padding: 0 18px;
+}
+
 .login-page {
   min-height: 100svh;
   background:
@@ -1724,6 +1805,15 @@ button {
     min-width: 0;
     padding: 0 12px;
     font-size: 0.78rem;
+  }
+
+  .settings-action-card {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-action-card .primary-button {
+    width: 100%;
+    min-width: 0;
   }
 
   .help-button {
