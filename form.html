@@ -29,12 +29,20 @@
           <input id="model" type="text" autocomplete="off" required />
           <label for="category">分類</label>
           <select id="category" required></select>
+          <label for="asset-reference-item">耐久消費財品目</label>
+          <select id="asset-reference-item"></select>
           <label for="purchase-date">購入日</label>
           <input id="purchase-date" type="date" required />
           <label for="purchase-price">購入価格（円）</label>
-          <input id="purchase-price" type="number" inputmode="numeric" min="0" step="1" required />
+          <div class="reference-input-row">
+            <input id="purchase-price" type="number" inputmode="numeric" min="0" step="1" required />
+            <span id="unit-price-reference" class="reference-hint" aria-live="polite"></span>
+          </div>
           <label for="years-of-use">使用年数（年）</label>
-          <input id="years-of-use" type="number" inputmode="numeric" min="1" step="1" required />
+          <div class="reference-input-row">
+            <input id="years-of-use" type="number" inputmode="numeric" min="1" step="1" required />
+            <span id="useful-life-reference" class="reference-hint" aria-live="polite"></span>
+          </div>
           <label for="end-of-use-date">使用終了日</label>
           <input id="end-of-use-date" type="date" />
 

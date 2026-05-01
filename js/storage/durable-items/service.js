@@ -15,6 +15,8 @@ const LEGACY_CATEGORY_MAP = {
   pc: "information_device",
 };
 
+const ASSET_REFERENCE_SOURCE_TYPE = "assetReferenceData";
+
 function normalizeCategory(value) {
   const normalizedValue = String(value ?? "");
   const mappedValue = LEGACY_CATEGORY_MAP[normalizedValue] ?? normalizedValue;
@@ -27,6 +29,7 @@ function normalizeStoredItem(item) {
     name: item.name ?? "",
     model: item.model ?? "",
     category: normalizeCategory(item.category),
+    assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
     purchaseDate: item.purchaseDate ?? "",
     purchasePrice: Number(item.purchasePrice ?? 0),
@@ -51,7 +54,9 @@ function sortStoredItems(items) {
 }
 
 export async function loadItems(uid) {
-  return sortStoredItems((await storage.getItems(uid)).map(normalizeStoredItem));
+  return sortStoredItems((await storage.getItems(uid))
+    .filter((item) => item?.sourceType !== ASSET_REFERENCE_SOURCE_TYPE)
+    .map(normalizeStoredItem));
 }
 
 export async function loadItem(uid, itemId) {

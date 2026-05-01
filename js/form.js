@@ -14,6 +14,9 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
+import {
+  loadAssetReferenceData,
+} from "./services/asset-reference.js";
 import { loadItem, saveItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
@@ -30,9 +33,12 @@ const idInput = document.getElementById("item-id");
 const nameInput = document.getElementById("name");
 const modelInput = document.getElementById("model");
 const categoryInput = document.getElementById("category");
+const assetReferenceItemInput = document.getElementById("asset-reference-item");
 const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
+const unitPriceReference = document.getElementById("unit-price-reference");
+const usefulLifeReference = document.getElementById("useful-life-reference");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
 const hideFromTimelineInput = document.getElementById("hide-from-timeline");
 const addCostButton = document.getElementById("add-cost-button");
@@ -105,7 +111,48 @@ function showHiddenTimelineNoticeDialog() {
 const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id") || sessionStorageGetItem(EDITING_ITEM_ID_KEY),
+  assetReferenceData: null,
 };
+
+function updateAssetReferenceDisplay() {
+  if (!unitPriceReference || !usefulLifeReference) return;
+  const selectedCode = assetReferenceItemInput?.value ?? "";
+  const item = state.assetReferenceData?.items?.find((entry) => entry.code === selectedCode);
+
+  if (!item) {
+    unitPriceReference.textContent = "";
+    usefulLifeReference.textContent = "";
+    return;
+  }
+
+  unitPriceReference.textContent = `参考単価: ${formatCurrency(item.unitPrice)}`;
+  usefulLifeReference.textContent = `耐用年数: ${item.usefulLifeYears}年`;
+}
+
+function populateAssetReferenceSelect() {
+  if (!assetReferenceItemInput) return;
+
+  const currentValue = assetReferenceItemInput.value;
+  assetReferenceItemInput.innerHTML = "";
+
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = "なし";
+  assetReferenceItemInput.appendChild(emptyOption);
+
+  for (const item of state.assetReferenceData?.items ?? []) {
+    const option = document.createElement("option");
+    option.value = item.code;
+    option.textContent = `${item.code} ${item.label}`;
+    assetReferenceItemInput.appendChild(option);
+  }
+
+  assetReferenceItemInput.value = [...assetReferenceItemInput.options].some((option) => option.value === currentValue)
+    ? currentValue
+    : "";
+  updateAssetReferenceDisplay();
+}
+
 function populateCategorySelect() {
   categoryInput.innerHTML = "";
   for (const category of CATEGORY_OPTIONS) {
@@ -250,6 +297,7 @@ function fillForm(item) {
     modelInput.title = "";
   }
   categoryInput.value = normalizeCategory(item.category);
+  assetReferenceItemInput.value = item.assetReferenceItemCode ?? "";
   purchaseDateInput.value = item.purchaseDate;
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
@@ -257,6 +305,7 @@ function fillForm(item) {
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
+  updateAssetReferenceDisplay();
 }
 
 populateCategorySelect();
@@ -287,6 +336,7 @@ additionalCostList.addEventListener("click", (event) => {
 
 form.addEventListener("input", updateCalculationResult);
 form.addEventListener("change", updateCalculationResult);
+assetReferenceItemInput?.addEventListener("change", updateAssetReferenceDisplay);
 purchasePriceInput.addEventListener("input", updateCalculationResult);
 yearsOfUseInput.addEventListener("input", updateCalculationResult);
 additionalCostList.addEventListener("input", updateCalculationResult);
@@ -306,6 +356,7 @@ form.addEventListener("submit", async (event) => {
     name: nameInput.value.trim(),
     model: modelInput.dataset.encodedModel || modelInput.value.trim(),
     category: categoryInput.value,
+    assetReferenceItemCode: assetReferenceItemInput?.value ?? "",
     purchaseDate: purchaseDateInput.value,
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
@@ -342,6 +393,13 @@ async function initializeForm(user) {
   } else {
     state.uid = user.uid;
   }
+
+  try {
+    state.assetReferenceData = await loadAssetReferenceData(state.uid);
+  } catch (_error) {
+    state.assetReferenceData = null;
+  }
+  populateAssetReferenceSelect();
 
   if (!state.editingId) {
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);

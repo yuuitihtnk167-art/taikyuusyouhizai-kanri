@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v67";
+const CACHE_NAME = "durable-goods-pwa-v70";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -18,6 +18,7 @@ const APP_SHELL = [
   "js/platform/firebase.js",
   "js/platform/local-db.js",
   "js/services/app-settings.js",
+  "js/services/asset-reference.js",
   "js/services/auth.js",
   "js/storage/durable-items/firestore.js",
   "js/storage/durable-items/index.js",
