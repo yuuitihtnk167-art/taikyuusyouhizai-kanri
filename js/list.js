@@ -264,7 +264,7 @@ function summarizeItems(items) {
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
-  summaryItemCount.textContent = `${items.length} 件`;
+  summaryItemCount.textContent = `${monthlyCostItems.length} 件`;
 }
 
 function renderCategoryFilter() {
