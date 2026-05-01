@@ -1196,6 +1196,10 @@ button {
   white-space: nowrap;
 }
 
+.timeline-row-label.monthly-cost-excluded strong {
+  color: var(--danger);
+}
+
 .category-swatch {
   flex: 0 0 auto;
   width: 14px;

@@ -2,6 +2,7 @@ import {
   CATEGORY_OPTIONS,
   DEFAULT_CATEGORY,
   createId,
+  isPcManagementItem,
   normalizeAdditionalCosts,
 } from "../../common.js";
 import { isLocalMode } from "../../platform/local-db.js";
@@ -56,11 +57,13 @@ function sortStoredItems(items) {
 export async function loadItems(uid) {
   return sortStoredItems((await storage.getItems(uid))
     .filter((item) => item?.sourceType !== ASSET_REFERENCE_SOURCE_TYPE)
+    .filter((item) => !isPcManagementItem(item))
     .map(normalizeStoredItem));
 }
 
 export async function loadItem(uid, itemId) {
   const item = await storage.getItem(uid, itemId);
+  if (isPcManagementItem(item)) return null;
   return item ? normalizeStoredItem(item) : null;
 }
 

@@ -1,10 +1,6 @@
-import {
-  calculateUsageMonths,
-  firebaseErrorMessage,
-} from "../js/common.js";
+import { firebaseErrorMessage } from "../js/common.js";
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
-import { shouldIncludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -160,13 +156,6 @@ function calculateMonthlyCost(item) {
   return purchasePrice / (yearsOfUse * 12);
 }
 
-function isUnderusedItem(item) {
-  if (!item.endOfUseDate) return false;
-  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
-  const plannedMonths = Number(item.yearsOfUse) * 12;
-  return Boolean(usageMonths && Number.isFinite(plannedMonths) && plannedMonths > 0 && usageMonths < plannedMonths);
-}
-
 function shouldShowHiddenTimelineNotice(item) {
   return Boolean(item.hideFromTimeline);
 }
@@ -205,15 +194,16 @@ function showHiddenTimelineNoticeDialog() {
   });
 }
 
-function calculateActualMonthlyCost(item) {
-  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
-  if (!usageMonths) return null;
-  return Number(item.purchasePrice || 0) / usageMonths;
+function summaryMonthlyCost(item) {
+  return calculateMonthlyCost(item);
 }
 
-function summaryMonthlyCost(item) {
-  if (!isUnderusedItem(item)) return calculateMonthlyCost(item);
-  return calculateActualMonthlyCost(item) ?? calculateMonthlyCost(item);
+function displayedMonthlyCost(item) {
+  return Math.round(summaryMonthlyCost(item));
+}
+
+function isMonthlyCostExcluded(item) {
+  return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
 
 function normalizePcName(value) {
@@ -536,7 +526,10 @@ function renderTimeline() {
     const colorClass = pcNameClass(item);
 
     const row = createElement("div", "timeline-row");
-    const label = createElement("div", "timeline-row-label");
+    const label = createElement(
+      "div",
+      `timeline-row-label${isMonthlyCostExcluded(item) ? " monthly-cost-excluded" : ""}`
+    );
     label.innerHTML = `<span class="category-swatch ${colorClass}"></span><strong></strong>`;
     label.querySelector("strong").textContent = pcNameLabels[item.pcName] || "メインPC";
 
@@ -584,11 +577,10 @@ function renderTimeline() {
 function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const items = summaryItems();
-  const includeUnderusedMonthlyCost = shouldIncludeUnderusedMonthlyCost();
-  const monthlyCostItems = items.filter((item) => !item.endOfUseDate || (includeUnderusedMonthlyCost && isUnderusedItem(item)));
+  const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
   const activeItems = items.filter((item) => !item.endOfUseDate);
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
-  const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + summaryMonthlyCost(item), 0);
+  const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
   elements.summaryCount.textContent = `${items.length} 件`;
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);

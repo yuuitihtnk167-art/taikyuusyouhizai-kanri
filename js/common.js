@@ -215,14 +215,37 @@ export async function replaceLocalRecords(storeName, records) {
 }
 
 export async function createLocalBackupData() {
+  const durableGoodsItems = normalizeBackupDurableGoodsItems(
+    await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE)
+  );
+  const pcItems = normalizeBackupPcItems(
+    await loadLocalRecords(LOCAL_PC_ITEMS_STORE)
+  );
+
   return {
     app: LOCAL_BACKUP_APP_NAME,
     version: LOCAL_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    durableGoodsItems: await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE),
-    pcItems: await loadLocalRecords(LOCAL_PC_ITEMS_STORE),
+    durableGoodsItems,
+    pcItems,
     assetReferenceData: loadLocalAssetReferenceBackupData(),
   };
+}
+
+function normalizeBackupDurableGoodsItems(records) {
+  return sortStoredItems(
+    (Array.isArray(records) ? records : [])
+      .filter((record) => record?.sourceType !== ASSET_REFERENCE_SOURCE_TYPE)
+      .filter((record) => !isPcManagementItem(record))
+      .filter((record) => !isLegacyPcManagementItem(record))
+      .map(normalizeStoredItem)
+  );
+}
+
+function normalizeBackupPcItems(records) {
+  return (Array.isArray(records) ? records : [])
+    .map(toBackupValue)
+    .filter(isPcManagementStorageRecord);
 }
 
 function toBackupValue(value) {
@@ -305,6 +328,7 @@ export async function createFirebaseLocalBackupData(uid) {
       return;
     }
     if (record.sourceType === ASSET_REFERENCE_SOURCE_TYPE) return;
+    if (isPcManagementItem(record)) return;
 
     durableGoodsItems.push(normalizeStoredItem(record));
   });
@@ -350,7 +374,11 @@ export function parseLocalBackupText(text) {
   if (Object.hasOwn(backup, "assetReferenceData")) {
     normalizeAssetReferenceBackupData(backup.assetReferenceData);
   }
-  return backup;
+  return {
+    ...backup,
+    durableGoodsItems: normalizeBackupDurableGoodsItems(backup.durableGoodsItems),
+    pcItems: normalizeBackupPcItems(backup.pcItems),
+  };
 }
 
 export async function restoreLocalBackupData(backup) {
@@ -404,7 +432,11 @@ export function decodePcManagementModel(value) {
 }
 
 export function isPcManagementItem(item) {
-  return item?.sourceType === PC_MANAGEMENT_SOURCE_TYPE || Boolean(decodePcManagementModel(item?.model));
+  return item?.sourceType === PC_MANAGEMENT_SOURCE_TYPE || isLegacyPcManagementItem(item);
+}
+
+export function isLegacyPcManagementItem(item) {
+  return String(item?.model ?? "").startsWith(PC_MODEL_PREFIX);
 }
 
 function isPcManagementStorageRecord(item) {
@@ -540,6 +572,7 @@ export async function loadItems(uid) {
   if (isLocalMode()) {
     return sortStoredItems((await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE))
       .filter((item) => item?.sourceType !== ASSET_REFERENCE_SOURCE_TYPE)
+      .filter((item) => !isPcManagementItem(item))
       .map(normalizeStoredItem));
   }
 
@@ -548,6 +581,7 @@ export async function loadItems(uid) {
   snapshot.forEach((documentSnapshot) => {
     const data = documentSnapshot.data();
     if (data.sourceType === ASSET_REFERENCE_SOURCE_TYPE) return;
+    if (isPcManagementItem(data)) return;
     items.push(normalizeStoredItem({
       id: documentSnapshot.id,
       ...data,

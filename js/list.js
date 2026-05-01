@@ -2,10 +2,8 @@ import {
   createLocalBackupData,
   parseLocalBackupText,
   restoreLocalBackupData,
-  calculateActualMonthlyCost,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
-  calculateUsageMonths,
   formatCurrency,
   CATEGORY_OPTIONS,
   getCategoryLabel,
@@ -14,7 +12,6 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
-import { shouldIncludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
@@ -228,16 +225,16 @@ function timelineMonthlyCost(item) {
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
-function isUnderusedItem(item) {
-  if (!item.endOfUseDate) return false;
-  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
-  const plannedMonths = Number(item.yearsOfUse) * 12;
-  return Boolean(usageMonths && Number.isFinite(plannedMonths) && plannedMonths > 0 && usageMonths < plannedMonths);
+function itemSummaryMonthlyCost(item) {
+  return timelineMonthlyCost(item);
 }
 
-function itemSummaryMonthlyCost(item) {
-  if (!isUnderusedItem(item)) return timelineMonthlyCost(item);
-  return calculateActualMonthlyCost(item) ?? timelineMonthlyCost(item);
+function displayedMonthlyCost(item) {
+  return Math.round(itemSummaryMonthlyCost(item));
+}
+
+function isMonthlyCostExcluded(item) {
+  return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
 
 function visibleItems() {
@@ -257,11 +254,10 @@ function syncSelectedItem(items) {
 function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
-  const includeUnderusedMonthlyCost = shouldIncludeUnderusedMonthlyCost();
-  const monthlyCostItems = items.filter((item) => !item.endOfUseDate || (includeUnderusedMonthlyCost && isUnderusedItem(item)));
+  const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
   const activeItems = items.filter((item) => !item.endOfUseDate);
   const monthlyCostTotal = monthlyCostItems.reduce(
-    (total, item) => total + itemSummaryMonthlyCost(item),
+    (total, item) => total + displayedMonthlyCost(item),
     0
   );
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
@@ -433,7 +429,10 @@ function renderTimeline(items) {
     const isSelected = item.id === state.selectedItemId;
 
     const row = createElement("div", "timeline-row");
-    const label = createElement("div", "timeline-row-label");
+    const label = createElement(
+      "div",
+      `timeline-row-label${isMonthlyCostExcluded(item) ? " monthly-cost-excluded" : ""}`
+    );
     label.innerHTML = `<span class="category-swatch category-${item.category}"></span><strong></strong>`;
     label.querySelector("strong").textContent = displayApplianceType(item);
 
