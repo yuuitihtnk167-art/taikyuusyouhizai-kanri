@@ -41,6 +41,7 @@ const unitPriceReference = document.getElementById("unit-price-reference");
 const usefulLifeReference = document.getElementById("useful-life-reference");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
 const hideFromTimelineInput = document.getElementById("hide-from-timeline");
+const excludeFromSummaryInput = document.getElementById("exclude-from-summary");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
 const calculationTotal = document.getElementById("calculation-total");
@@ -303,6 +304,7 @@ function fillForm(item) {
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
+  excludeFromSummaryInput.checked = Boolean(item.excludeFromSummary);
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
   updateAssetReferenceDisplay();
@@ -362,6 +364,7 @@ form.addEventListener("submit", async (event) => {
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
     hideFromTimeline: hideFromTimelineInput.checked,
+    excludeFromSummary: excludeFromSummaryInput.checked,
     additionalCosts: collectAdditionalCosts(),
   };
   const validation = validateItem(item);

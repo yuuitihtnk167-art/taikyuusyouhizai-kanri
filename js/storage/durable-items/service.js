@@ -37,6 +37,7 @@ function normalizeStoredItem(item) {
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     createdAt: item.createdAt ?? null,
     updatedAt: item.updatedAt ?? null,

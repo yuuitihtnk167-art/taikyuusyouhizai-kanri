@@ -66,10 +66,16 @@
           </section>
 
           <p id="form-error" class="form-error"></p>
-          <label class="checkbox-field" for="hide-from-timeline">
-            <input id="hide-from-timeline" type="checkbox" />
-            <span>帯を表示しない</span>
-          </label>
+          <div class="checkbox-row">
+            <label class="checkbox-field" for="hide-from-timeline">
+              <input id="hide-from-timeline" type="checkbox" />
+              <span>帯を表示しない</span>
+            </label>
+            <label class="checkbox-field" for="exclude-from-summary">
+              <input id="exclude-from-summary" type="checkbox" />
+              <span>集計に含めない</span>
+            </label>
+          </div>
           <div class="form-actions">
             <button id="submit-button" class="primary-button" type="submit">登録する</button>
           </div>

@@ -52,6 +52,7 @@ export async function saveItem(uid, item, options = {}) {
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: item.additionalCosts,
     updatedAt: serverTimestamp(),
   };

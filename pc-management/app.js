@@ -58,6 +58,7 @@ const elements = {
   yearsOfUse: document.getElementById("years-of-use"),
   endOfUseDate: document.getElementById("end-of-use-date"),
   hideFromTimeline: document.getElementById("hide-from-timeline"),
+  excludeFromSummary: document.getElementById("exclude-from-summary"),
   itemDialog: document.getElementById("item-dialog"),
   dialogItemName: document.getElementById("dialog-item-name"),
   dialogItemMeta: document.getElementById("dialog-item-meta"),
@@ -206,6 +207,10 @@ function isMonthlyCostExcluded(item) {
   return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
 
+function isSummaryExcluded(item) {
+  return Boolean(item.excludeFromSummary);
+}
+
 function normalizePcName(value) {
   return pcNameLabels[value] ? value : "main";
 }
@@ -225,6 +230,7 @@ function normalizePcPartItem(value) {
     yearsOfUse: Number(item.yearsOfUse ?? 5),
     endOfUseDate: String(item.endOfUseDate ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     createdAt: toMillis(item.createdAt),
     updatedAt: toMillis(item.updatedAt),
   };
@@ -255,6 +261,7 @@ function toFirestorePayload(item) {
     yearsOfUse: normalized.yearsOfUse,
     endOfUseDate: normalized.endOfUseDate,
     hideFromTimeline: normalized.hideFromTimeline,
+    excludeFromSummary: normalized.excludeFromSummary,
     monthlyCost: calculateMonthlyCost(normalized),
     additionalCosts: [],
     createdAt: normalized.createdAt,
@@ -577,11 +584,12 @@ function renderTimeline() {
 function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const items = summaryItems();
-  const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
-  const activeItems = items.filter((item) => !item.endOfUseDate);
+  const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
+  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
+  const activeItems = summaryTargetItems.filter((item) => !item.endOfUseDate);
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
   const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
-  elements.summaryCount.textContent = `${items.length} 件`;
+  elements.summaryCount.textContent = `${summaryTargetItems.length} 件`;
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
 }
@@ -635,6 +643,7 @@ function collectPcItem() {
     yearsOfUse: Number(elements.yearsOfUse.value),
     endOfUseDate: elements.endOfUseDate.value,
     hideFromTimeline: elements.hideFromTimeline.checked,
+    excludeFromSummary: elements.excludeFromSummary.checked,
     createdAt: existingItem?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   });
@@ -648,6 +657,7 @@ function resetForm() {
   elements.pcName.value = "main";
   elements.yearsOfUse.value = "5";
   elements.hideFromTimeline.checked = false;
+  elements.excludeFromSummary.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
   updateCalculationResult();
@@ -671,6 +681,7 @@ function fillForm(item) {
   elements.yearsOfUse.value = item.yearsOfUse;
   elements.endOfUseDate.value = item.endOfUseDate;
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
+  elements.excludeFromSummary.checked = Boolean(item.excludeFromSummary);
   elements.submitButton.textContent = "更新する";
   elements.formError.textContent = "";
   updateEndedUseStyle();

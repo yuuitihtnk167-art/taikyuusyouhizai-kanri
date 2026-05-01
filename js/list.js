@@ -237,6 +237,10 @@ function isMonthlyCostExcluded(item) {
   return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
 
+function isSummaryExcluded(item) {
+  return Boolean(item.excludeFromSummary);
+}
+
 function visibleItems() {
   return state.items.filter((item) => state.selectedCategories.has(item.category));
 }
@@ -254,8 +258,9 @@ function syncSelectedItem(items) {
 function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
-  const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
-  const activeItems = items.filter((item) => !item.endOfUseDate);
+  const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
+  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
+  const activeItems = summaryTargetItems.filter((item) => !item.endOfUseDate);
   const monthlyCostTotal = monthlyCostItems.reduce(
     (total, item) => total + displayedMonthlyCost(item),
     0
@@ -264,7 +269,7 @@ function summarizeItems(items) {
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
-  summaryItemCount.textContent = `${items.length} 件`;
+  summaryItemCount.textContent = `${summaryTargetItems.length} 件`;
 }
 
 function renderCategoryFilter() {

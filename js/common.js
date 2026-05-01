@@ -245,7 +245,12 @@ function normalizeBackupDurableGoodsItems(records) {
 function normalizeBackupPcItems(records) {
   return (Array.isArray(records) ? records : [])
     .map(toBackupValue)
-    .filter(isPcManagementStorageRecord);
+    .filter(isPcManagementStorageRecord)
+    .map((item) => ({
+      ...item,
+      hideFromTimeline: Boolean(item.hideFromTimeline),
+      excludeFromSummary: Boolean(item.excludeFromSummary),
+    }));
 }
 
 function toBackupValue(value) {
@@ -551,6 +556,7 @@ function normalizeStoredItem(item) {
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     createdAt: item.createdAt ?? null,
     updatedAt: item.updatedAt ?? null,
@@ -621,6 +627,7 @@ export async function saveItem(uid, item) {
       yearsOfUse: item.yearsOfUse,
       endOfUseDate: item.endOfUseDate,
       hideFromTimeline: Boolean(item.hideFromTimeline),
+      excludeFromSummary: Boolean(item.excludeFromSummary),
       additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
       createdAt: existing?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
@@ -638,6 +645,7 @@ export async function saveItem(uid, item) {
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     updatedAt: serverTimestamp(),
   };
