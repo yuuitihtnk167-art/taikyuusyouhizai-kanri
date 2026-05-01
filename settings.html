@@ -44,6 +44,35 @@
         </div>
         <p id="settings-status" class="form-error"></p>
       </section>
+
+      <section class="panel settings-panel" aria-labelledby="asset-reference-settings-title">
+        <h2 id="asset-reference-settings-title">耐用年数・単価の参照データ</h2>
+        <div class="settings-action-card asset-reference-card">
+          <div>
+            <strong>PDF表テキストのインポート</strong>
+            <p>
+              総務省統計局のPDFを開き、「耐久消費財の耐用年数，評価に用いる単価及び取得時期別残価率（二人以上の世帯）」の表をコピーして貼り付けます。
+              PDFのダウンロード元:
+              <a href="https://www.stat.go.jp/data/zensho/2014/pdf/assetest4.pdf" target="_blank" rel="noopener">assetest4.pdf</a>
+            </p>
+            <p>
+              貼り付け後にインポートすると、商品名に一致した品目だけ、入力フォームの購入価格に参考単価、使用年数に耐用年数を薄字で表示します。
+              入力値は自動変更しません。
+            </p>
+          </div>
+          <textarea
+            id="asset-reference-text"
+            class="asset-reference-textarea"
+            rows="10"
+            placeholder="PDFからコピーした二人以上の世帯の表テキストを貼り付けてください"
+          ></textarea>
+          <div class="settings-action-row">
+            <button id="asset-reference-import-button" type="button" class="primary-button">インポート</button>
+            <span id="asset-reference-summary" class="settings-muted-text">未インポート</span>
+          </div>
+        </div>
+        <p id="asset-reference-status" class="form-error"></p>
+      </section>
     </main>
     <script type="module" src="js/settings.js"></script>
   </body>

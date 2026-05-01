@@ -31,6 +31,9 @@ const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
 const LOCAL_DB_VERSION = 1;
 const LOCAL_BACKUP_APP_NAME = "月額家電簿";
 const LOCAL_BACKUP_VERSION = 1;
+const LOCAL_ASSET_REFERENCE_KEY = "monthlyApplianceBook.assetReferenceData";
+const ASSET_REFERENCE_DOC_ID = "__assetReferenceData";
+const ASSET_REFERENCE_SOURCE_TYPE = "assetReferenceData";
 export const CATEGORY_OPTIONS = [
   { value: "information_device", label: "情報機器" },
   { value: "smartphone", label: "スマホ" },
@@ -218,6 +221,7 @@ export async function createLocalBackupData() {
     exportedAt: new Date().toISOString(),
     durableGoodsItems: await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE),
     pcItems: await loadLocalRecords(LOCAL_PC_ITEMS_STORE),
+    assetReferenceData: loadLocalAssetReferenceBackupData(),
   };
 }
 
@@ -229,6 +233,55 @@ function toBackupValue(value) {
 
   return Object.fromEntries(
     Object.entries(value).map(([key, entryValue]) => [key, toBackupValue(entryValue)])
+  );
+}
+
+function userReferenceDocRef(uid) {
+  return doc(db, "users", uid, ITEMS_COLLECTION, ASSET_REFERENCE_DOC_ID);
+}
+
+function normalizeAssetReferenceBackupData(value) {
+  if (!value) return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("参照データのバックアップ形式が正しくありません。");
+  }
+  if (!Array.isArray(value.items)) {
+    throw new Error("参照データのバックアップに品目一覧が含まれていません。");
+  }
+  return {
+    source: value.source && typeof value.source === "object" && !Array.isArray(value.source) ? value.source : {},
+    importedAt: value.importedAt ?? null,
+    items: value.items,
+  };
+}
+
+function loadLocalAssetReferenceBackupData() {
+  const value = storageGetItem(LOCAL_ASSET_REFERENCE_KEY);
+  if (!value) return null;
+  try {
+    return normalizeAssetReferenceBackupData(JSON.parse(value));
+  } catch (_error) {
+    return null;
+  }
+}
+
+async function loadFirebaseAssetReferenceBackupData(uid) {
+  const snapshot = await getDoc(userReferenceDocRef(uid));
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data();
+  if (data.sourceType !== ASSET_REFERENCE_SOURCE_TYPE) return null;
+  return normalizeAssetReferenceBackupData(toBackupValue(data));
+}
+
+function restoreLocalAssetReferenceBackupData(backup) {
+  if (!Object.hasOwn(backup, "assetReferenceData")) return;
+  if (!backup.assetReferenceData) {
+    storageRemoveItem(LOCAL_ASSET_REFERENCE_KEY);
+    return;
+  }
+  storageSetItem(
+    LOCAL_ASSET_REFERENCE_KEY,
+    JSON.stringify(normalizeAssetReferenceBackupData(backup.assetReferenceData))
   );
 }
 
@@ -251,6 +304,7 @@ export async function createFirebaseLocalBackupData(uid) {
       pcItems.push(record);
       return;
     }
+    if (record.sourceType === ASSET_REFERENCE_SOURCE_TYPE) return;
 
     durableGoodsItems.push(normalizeStoredItem(record));
   });
@@ -261,6 +315,7 @@ export async function createFirebaseLocalBackupData(uid) {
     exportedAt: new Date().toISOString(),
     durableGoodsItems: sortStoredItems(durableGoodsItems),
     pcItems,
+    assetReferenceData: await loadFirebaseAssetReferenceBackupData(uid),
   };
 }
 
@@ -292,12 +347,16 @@ export function parseLocalBackupText(text) {
 
   validateBackupRecordIds(backup.durableGoodsItems, "通常家電");
   validateBackupRecordIds(backup.pcItems, "パソコン管理");
+  if (Object.hasOwn(backup, "assetReferenceData")) {
+    normalizeAssetReferenceBackupData(backup.assetReferenceData);
+  }
   return backup;
 }
 
 export async function restoreLocalBackupData(backup) {
   await replaceLocalRecords(LOCAL_DURABLE_ITEMS_STORE, backup.durableGoodsItems);
   await replaceLocalRecords(LOCAL_PC_ITEMS_STORE, backup.pcItems);
+  restoreLocalAssetReferenceBackupData(backup);
 }
 
 export function onAuthChanged(callback) {
@@ -453,6 +512,7 @@ function normalizeStoredItem(item) {
     name: item.name ?? "",
     model: item.model ?? "",
     category: normalizeCategory(item.category),
+    assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
     purchaseDate: item.purchaseDate ?? "",
     purchasePrice: Number(item.purchasePrice ?? 0),
@@ -478,13 +538,16 @@ function sortStoredItems(items) {
 
 export async function loadItems(uid) {
   if (isLocalMode()) {
-    return sortStoredItems((await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE)).map(normalizeStoredItem));
+    return sortStoredItems((await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE))
+      .filter((item) => item?.sourceType !== ASSET_REFERENCE_SOURCE_TYPE)
+      .map(normalizeStoredItem));
   }
 
   const snapshot = await getDocs(userItemsCollectionRef(uid));
   const items = [];
   snapshot.forEach((documentSnapshot) => {
     const data = documentSnapshot.data();
+    if (data.sourceType === ASSET_REFERENCE_SOURCE_TYPE) return;
     items.push(normalizeStoredItem({
       id: documentSnapshot.id,
       ...data,
@@ -518,6 +581,7 @@ export async function saveItem(uid, item) {
       name: item.name,
       model: item.model,
       category: item.category,
+      assetReferenceItemCode: item.assetReferenceItemCode,
       purchaseDate: item.purchaseDate,
       purchasePrice: item.purchasePrice,
       yearsOfUse: item.yearsOfUse,
@@ -534,6 +598,7 @@ export async function saveItem(uid, item) {
     name: item.name,
     model: item.model,
     category: normalizeCategory(item.category),
+    assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,

@@ -46,6 +46,7 @@ export async function saveItem(uid, item, options = {}) {
     name: item.name,
     model: item.model,
     category: item.category,
+    assetReferenceItemCode: item.assetReferenceItemCode,
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
