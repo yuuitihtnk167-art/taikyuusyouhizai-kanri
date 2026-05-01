@@ -2,6 +2,7 @@ import {
   createLocalBackupData,
   parseLocalBackupText,
   restoreLocalBackupData,
+  calculateAdditionalCostTotal,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
@@ -233,6 +234,10 @@ function displayedMonthlyCost(item) {
   return Math.round(itemSummaryMonthlyCost(item));
 }
 
+function totalPurchaseCost(item) {
+  return Number(item.purchasePrice || 0) + calculateAdditionalCostTotal(item);
+}
+
 function isMonthlyCostExcluded(item) {
   return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
@@ -255,16 +260,15 @@ function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
   const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
-  const activeItems = items.filter((item) => !item.endOfUseDate);
   const monthlyCostTotal = monthlyCostItems.reduce(
     (total, item) => total + displayedMonthlyCost(item),
     0
   );
-  const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+  const purchaseTotal = monthlyCostItems.reduce((total, item) => total + totalPurchaseCost(item), 0);
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
-  summaryItemCount.textContent = `${items.length} 件`;
+  summaryItemCount.textContent = `${monthlyCostItems.length} 件`;
 }
 
 function renderCategoryFilter() {

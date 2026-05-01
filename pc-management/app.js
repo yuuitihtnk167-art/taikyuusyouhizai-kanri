@@ -578,10 +578,9 @@ function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const items = summaryItems();
   const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
-  const activeItems = items.filter((item) => !item.endOfUseDate);
-  const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+  const purchaseTotal = monthlyCostItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
   const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
-  elements.summaryCount.textContent = `${items.length} 件`;
+  elements.summaryCount.textContent = `${monthlyCostItems.length} 件`;
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
 }
