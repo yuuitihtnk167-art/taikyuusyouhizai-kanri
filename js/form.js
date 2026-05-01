@@ -1,7 +1,4 @@
 import {
-  onAuthChanged,
-  loadItem,
-  saveItem,
   validateItem,
   createId,
   normalizeAdditionalCosts,
@@ -14,9 +11,13 @@ import {
   formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
-  isLocalMode,
-  registerServiceWorker,
 } from "./common.js";
+import { isLocalMode } from "./platform/local-db.js";
+import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
+import { loadItem, saveItem } from "./storage/durable-items/service.js";
+
+const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
+const HIDDEN_TIMELINE_NOTICE_MESSAGE = "非表示でも使用年数が未達の場合は加算されます。";
 
 const authError = document.getElementById("auth-error");
 const toListButton = document.getElementById("to-list-button");
@@ -24,7 +25,6 @@ const form = document.getElementById("item-form");
 const formPanel = document.getElementById("form-panel");
 const formError = document.getElementById("form-error");
 const submitButton = document.getElementById("submit-button");
-const cancelButton = document.getElementById("cancel-button");
 
 const idInput = document.getElementById("item-id");
 const nameInput = document.getElementById("name");
@@ -40,9 +40,71 @@ const additionalCostList = document.getElementById("additional-cost-list");
 const calculationTotal = document.getElementById("calculation-total");
 const calculationMonthlyCost = document.getElementById("calculation-monthly-cost");
 
+function sessionStorageGetItem(key) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function sessionStorageSetItem(key, value) {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch (_error) {
+    // Session storage is best-effort only.
+  }
+}
+
+function sessionStorageRemoveItem(key) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch (_error) {
+    // Session storage is best-effort only.
+  }
+}
+
+function shouldShowHiddenTimelineNotice(item) {
+  return Boolean(item.hideFromTimeline);
+}
+
+function showHiddenTimelineNoticeDialog() {
+  return new Promise((resolve) => {
+    const dialog = document.createElement("dialog");
+    dialog.className = "item-name-dialog";
+    dialog.innerHTML = `
+      <article class="item-name-dialog-card">
+        <p class="dialog-item-meta">${HIDDEN_TIMELINE_NOTICE_MESSAGE}</p>
+        <div class="dialog-actions">
+          <button type="button" class="primary-button">OK</button>
+        </div>
+      </article>
+    `;
+
+    const closeButton = dialog.querySelector("button");
+    const closeDialog = () => {
+      dialog.close();
+    };
+
+    closeButton.addEventListener("click", closeDialog);
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      resolve();
+    }, { once: true });
+
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+    closeButton.focus();
+  });
+}
+
 const state = {
   uid: null,
-  editingId: new URLSearchParams(window.location.search).get("id"),
+  editingId: new URLSearchParams(window.location.search).get("id") || sessionStorageGetItem(EDITING_ITEM_ID_KEY),
 };
 function populateCategorySelect() {
   categoryInput.innerHTML = "";
@@ -200,12 +262,10 @@ function fillForm(item) {
 populateCategorySelect();
 
 toListButton.addEventListener("click", () => {
+  sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
   window.location.href = "list.html";
 });
 
-cancelButton.addEventListener("click", () => {
-  window.location.href = "list.html";
-});
 
 addCostButton.addEventListener("click", () => {
   const row = createAdditionalCostRow({ createdAt: Date.now() });
@@ -261,6 +321,10 @@ form.addEventListener("submit", async (event) => {
   try {
     submitButton.disabled = true;
     await saveItem(state.uid, item);
+    if (shouldShowHiddenTimelineNotice(item)) {
+      await showHiddenTimelineNoticeDialog();
+    }
+    sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
     window.location.href = "list.html";
   } catch (error) {
     formError.textContent = firebaseErrorMessage(error, "保存に失敗しました。");
@@ -269,7 +333,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-onAuthChanged(async (user) => {
+async function initializeForm(user) {
   if (isLocalMode()) {
     state.uid = "local";
   } else if (!user) {
@@ -280,19 +344,20 @@ onAuthChanged(async (user) => {
   }
 
   if (!state.editingId) {
+    sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
     submitButton.textContent = "登録する";
-    cancelButton.hidden = true;
     updateEndedUseStyle();
     renderAdditionalCosts([]);
     return;
   }
 
   submitButton.textContent = "更新する";
-  cancelButton.hidden = false;
 
+  sessionStorageSetItem(EDITING_ITEM_ID_KEY, state.editingId);
   try {
     const item = await loadItem(state.uid, state.editingId);
     if (!item) {
+      sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
       authError.textContent = "編集対象が見つかりません。";
       return;
     }
@@ -300,6 +365,12 @@ onAuthChanged(async (user) => {
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
   }
-});
+}
+
+if (isLocalMode()) {
+  initializeForm(null);
+} else {
+  onAuthChanged(initializeForm);
+}
 
 registerServiceWorker();

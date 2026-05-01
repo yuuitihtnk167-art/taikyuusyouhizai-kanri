@@ -1,6 +1,4 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getFirestore,
   collection,
   getDocs,
   getDoc,
@@ -11,31 +9,21 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
-  getAuth,
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { auth, db } from "./platform/firebase.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAVfS2GVebf5rEhrF9iQo79xtnpOqPkpCE",
-  authDomain: "taikyuusyouhizai-kanri.firebaseapp.com",
-  projectId: "taikyuusyouhizai-kanri",
-  storageBucket: "taikyuusyouhizai-kanri.firebasestorage.app",
-  messagingSenderId: "580176190013",
-  appId: "1:580176190013:web:e4c213e42645ac10f5e854",
-  measurementId: "G-NRYNZS8E9R",
-};
-
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const auth = getAuth(app);
 export const ITEMS_COLLECTION = "durableGoodsItems";
 export const LOCAL_DURABLE_ITEMS_STORE = "durableGoodsItems";
 export const LOCAL_PC_ITEMS_STORE = "pcItems";
 export const DEFAULT_CATEGORY = "other";
 export const PC_MODEL_PREFIX = "[pcManagement]";
 export const PC_PART_MEMO_PREFIX = "[pcPart]";
+const PC_MANAGEMENT_SOURCE_TYPE = "pcManagement";
+const PC_MANAGEMENT_DATA_VERSION = 7;
+const PC_MANAGEMENT_SCHEMA_TYPE = "pcPartLifecycle";
 const LOCAL_STORAGE_MODE_KEY = "monthlyApplianceBook.storageMode";
 export const LOCAL_WARNING_DISMISSED_KEY = "monthlyApplianceBook.localWarningDismissed";
 const STORAGE_MODE_LOCAL = "local";
@@ -259,7 +247,7 @@ export async function createFirebaseLocalBackupData(uid) {
       ...documentSnapshot.data(),
     });
 
-    if (isPcManagementItem(record)) {
+    if (isPcManagementStorageRecord(record)) {
       pcItems.push(record);
       return;
     }
@@ -357,7 +345,15 @@ export function decodePcManagementModel(value) {
 }
 
 export function isPcManagementItem(item) {
-  return item?.sourceType === "pcManagement" || Boolean(decodePcManagementModel(item?.model));
+  return item?.sourceType === PC_MANAGEMENT_SOURCE_TYPE || Boolean(decodePcManagementModel(item?.model));
+}
+
+function isPcManagementStorageRecord(item) {
+  return (
+    item?.sourceType === PC_MANAGEMENT_SOURCE_TYPE &&
+    Number(item?.dataVersion ?? 0) === PC_MANAGEMENT_DATA_VERSION &&
+    item?.schemaType === PC_MANAGEMENT_SCHEMA_TYPE
+  );
 }
 
 function parsePrefixedJson(value, prefix) {
