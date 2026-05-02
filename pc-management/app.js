@@ -594,10 +594,9 @@ function renderSummary() {
   const items = summaryItems();
   const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
   const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
-  const activeItems = summaryTargetItems.filter((item) => !item.endOfUseDate);
-  const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+  const purchaseTotal = monthlyCostItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
   const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
-  elements.summaryCount.textContent = `${summaryTargetItems.length} 件`;
+  elements.summaryCount.textContent = `${monthlyCostItems.length} 件`;
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
 }
