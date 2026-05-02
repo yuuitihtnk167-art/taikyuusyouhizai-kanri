@@ -30,6 +30,7 @@ function normalizeStoredItem(item) {
     name: item.name ?? "",
     model: item.model ?? "",
     category: normalizeCategory(item.category),
+    assetReferenceItemId: String(item.assetReferenceItemId ?? item.assetReferenceItemCode ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
     purchaseDate: item.purchaseDate ?? "",

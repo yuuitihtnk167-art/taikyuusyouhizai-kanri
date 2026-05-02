@@ -41,7 +41,6 @@ const unitPriceReference = document.getElementById("unit-price-reference");
 const usefulLifeReference = document.getElementById("useful-life-reference");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
 const hideFromTimelineInput = document.getElementById("hide-from-timeline");
-const excludeFromSummaryInput = document.getElementById("exclude-from-summary");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
 const calculationTotal = document.getElementById("calculation-total");
@@ -113,12 +112,13 @@ const state = {
   uid: null,
   editingId: new URLSearchParams(window.location.search).get("id") || sessionStorageGetItem(EDITING_ITEM_ID_KEY),
   assetReferenceData: null,
+  excludeFromSummary: false,
 };
 
 function updateAssetReferenceDisplay() {
   if (!unitPriceReference || !usefulLifeReference) return;
-  const selectedCode = assetReferenceItemInput?.value ?? "";
-  const item = state.assetReferenceData?.items?.find((entry) => entry.code === selectedCode);
+  const selectedItemId = assetReferenceItemInput?.value ?? "";
+  const item = state.assetReferenceData?.items?.find((entry) => entry.id === selectedItemId);
 
   if (!item) {
     unitPriceReference.textContent = "";
@@ -143,8 +143,8 @@ function populateAssetReferenceSelect() {
 
   for (const item of state.assetReferenceData?.items ?? []) {
     const option = document.createElement("option");
-    option.value = item.code;
-    option.textContent = `${item.code} ${item.label}`;
+    option.value = item.id;
+    option.textContent = item.name;
     assetReferenceItemInput.appendChild(option);
   }
 
@@ -298,13 +298,13 @@ function fillForm(item) {
     modelInput.title = "";
   }
   categoryInput.value = normalizeCategory(item.category);
-  assetReferenceItemInput.value = item.assetReferenceItemCode ?? "";
+  assetReferenceItemInput.value = item.assetReferenceItemId ?? "";
   purchaseDateInput.value = item.purchaseDate;
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
-  excludeFromSummaryInput.checked = Boolean(item.excludeFromSummary);
+  state.excludeFromSummary = Boolean(item.excludeFromSummary);
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
   updateAssetReferenceDisplay();
@@ -358,13 +358,14 @@ form.addEventListener("submit", async (event) => {
     name: nameInput.value.trim(),
     model: modelInput.dataset.encodedModel || modelInput.value.trim(),
     category: categoryInput.value,
-    assetReferenceItemCode: assetReferenceItemInput?.value ?? "",
+    assetReferenceItemId: assetReferenceItemInput?.value ?? "",
+    assetReferenceItemCode: "",
     purchaseDate: purchaseDateInput.value,
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
     hideFromTimeline: hideFromTimelineInput.checked,
-    excludeFromSummary: excludeFromSummaryInput.checked,
+    excludeFromSummary: state.excludeFromSummary,
     additionalCosts: collectAdditionalCosts(),
   };
   const validation = validateItem(item);

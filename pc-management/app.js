@@ -58,7 +58,6 @@ const elements = {
   yearsOfUse: document.getElementById("years-of-use"),
   endOfUseDate: document.getElementById("end-of-use-date"),
   hideFromTimeline: document.getElementById("hide-from-timeline"),
-  excludeFromSummary: document.getElementById("exclude-from-summary"),
   itemDialog: document.getElementById("item-dialog"),
   dialogItemName: document.getElementById("dialog-item-name"),
   dialogItemMeta: document.getElementById("dialog-item-meta"),
@@ -211,8 +210,11 @@ function isSummaryExcluded(item) {
   return Boolean(item.excludeFromSummary);
 }
 
-function shouldHighlightTimelineLabel(item) {
-  return isMonthlyCostExcluded(item) || isSummaryExcluded(item);
+function timelineLabelClass(item) {
+  const classes = ["timeline-row-label"];
+  if (isMonthlyCostExcluded(item)) classes.push("monthly-cost-excluded");
+  if (isSummaryExcluded(item)) classes.push("summary-excluded");
+  return classes.join(" ");
 }
 
 function normalizePcName(value) {
@@ -539,8 +541,10 @@ function renderTimeline() {
     const row = createElement("div", "timeline-row");
     const label = createElement(
       "div",
-      `timeline-row-label${shouldHighlightTimelineLabel(item) ? " monthly-cost-excluded" : ""}`
+      timelineLabelClass(item)
     );
+    label.dataset.action = "toggle-summary";
+    label.dataset.id = item.id;
     label.innerHTML = `<span class="category-swatch ${colorClass}"></span><strong></strong>`;
     label.querySelector("strong").textContent = pcNameLabels[item.pcName] || "メインPC";
 
@@ -647,7 +651,7 @@ function collectPcItem() {
     yearsOfUse: Number(elements.yearsOfUse.value),
     endOfUseDate: elements.endOfUseDate.value,
     hideFromTimeline: elements.hideFromTimeline.checked,
-    excludeFromSummary: elements.excludeFromSummary.checked,
+    excludeFromSummary: Boolean(existingItem?.excludeFromSummary),
     createdAt: existingItem?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   });
@@ -661,7 +665,6 @@ function resetForm() {
   elements.pcName.value = "main";
   elements.yearsOfUse.value = "5";
   elements.hideFromTimeline.checked = false;
-  elements.excludeFromSummary.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
   updateCalculationResult();
@@ -685,7 +688,6 @@ function fillForm(item) {
   elements.yearsOfUse.value = item.yearsOfUse;
   elements.endOfUseDate.value = item.endOfUseDate;
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
-  elements.excludeFromSummary.checked = Boolean(item.excludeFromSummary);
   elements.submitButton.textContent = "更新する";
   elements.formError.textContent = "";
   updateEndedUseStyle();
@@ -731,6 +733,21 @@ function selectItem(itemId) {
   state.selectedItemId = itemId;
   renderTimeline();
   openItemDialog(selectedItem());
+}
+
+async function toggleSummaryExclusion(itemId) {
+  const item = state.items.find((currentItem) => currentItem.id === itemId);
+  if (!item || !state.uid) return;
+
+  try {
+    await saveStorageItem(state.uid, {
+      ...item,
+      excludeFromSummary: !isSummaryExcluded(item),
+    });
+    await refreshItems();
+  } catch (error) {
+    showError(error, "集計対象の切り替えに失敗しました。");
+  }
 }
 
 function showError(error, fallback) {
@@ -837,6 +854,13 @@ if (elements.itemList) {
   elements.itemList.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+
+    const summaryToggle = target.closest("[data-action='toggle-summary']");
+    if (summaryToggle instanceof HTMLElement) {
+      toggleSummaryExclusion(summaryToggle.dataset.id ?? "");
+      return;
+    }
+
     const band = target.closest(".lifecycle-band, .post-end-band");
     if (!(band instanceof HTMLButtonElement)) return;
     selectItem(band.dataset.id ?? "");

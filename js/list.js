@@ -12,7 +12,7 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
-import { loadItems, removeItem } from "./storage/durable-items/service.js";
+import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -241,8 +241,11 @@ function isSummaryExcluded(item) {
   return Boolean(item.excludeFromSummary);
 }
 
-function shouldHighlightTimelineLabel(item) {
-  return isMonthlyCostExcluded(item) || isSummaryExcluded(item);
+function timelineLabelClass(item) {
+  const classes = ["timeline-row-label"];
+  if (isMonthlyCostExcluded(item)) classes.push("monthly-cost-excluded");
+  if (isSummaryExcluded(item)) classes.push("summary-excluded");
+  return classes.join(" ");
 }
 
 function visibleItems() {
@@ -440,8 +443,10 @@ function renderTimeline(items) {
     const row = createElement("div", "timeline-row");
     const label = createElement(
       "div",
-      `timeline-row-label${shouldHighlightTimelineLabel(item) ? " monthly-cost-excluded" : ""}`
+      timelineLabelClass(item)
     );
+    label.dataset.action = "toggle-summary";
+    label.dataset.id = item.id;
     label.innerHTML = `<span class="category-swatch category-${item.category}"></span><strong></strong>`;
     label.querySelector("strong").textContent = displayApplianceType(item);
 
@@ -517,6 +522,23 @@ async function refreshList() {
       ? loadedItems.filter((item) => !isPcManagementItem(item) && item.hideFromTimeline)
       : loadedItems.filter((item) => !isPcManagementItem(item) && !item.hideFromTimeline);
   renderCurrentView();
+}
+
+async function toggleSummaryExclusion(itemId) {
+  const item = state.summaryItems.find((currentItem) => currentItem.id === itemId);
+  if (!item || !state.uid) return;
+
+  authError.textContent = "";
+  try {
+    await saveItem(state.uid, {
+      ...item,
+      isUpdate: true,
+      excludeFromSummary: !isSummaryExcluded(item),
+    });
+    await refreshList();
+  } catch (error) {
+    authError.textContent = firebaseErrorMessage(error, "集計対象の切り替えに失敗しました。");
+  }
 }
 
 summarizeItems([]);
@@ -655,6 +677,12 @@ if (restoreButton) {
 itemList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
+
+  const summaryToggle = target.closest("[data-action='toggle-summary']");
+  if (summaryToggle instanceof HTMLElement) {
+    toggleSummaryExclusion(summaryToggle.dataset.id ?? "");
+    return;
+  }
 
   const band = target.closest(".lifecycle-band, .post-end-band");
   if (!(band instanceof HTMLButtonElement)) return;
