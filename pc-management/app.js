@@ -206,6 +206,17 @@ function isMonthlyCostExcluded(item) {
   return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
 }
 
+function isSummaryExcluded(item) {
+  return Boolean(item.excludeFromSummary);
+}
+
+function timelineLabelClass(item) {
+  const classes = ["timeline-row-label"];
+  if (isMonthlyCostExcluded(item)) classes.push("monthly-cost-excluded");
+  if (isSummaryExcluded(item)) classes.push("summary-excluded");
+  return classes.join(" ");
+}
+
 function normalizePcName(value) {
   return pcNameLabels[value] ? value : "main";
 }
@@ -225,6 +236,7 @@ function normalizePcPartItem(value) {
     yearsOfUse: Number(item.yearsOfUse ?? 5),
     endOfUseDate: String(item.endOfUseDate ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     createdAt: toMillis(item.createdAt),
     updatedAt: toMillis(item.updatedAt),
   };
@@ -255,6 +267,7 @@ function toFirestorePayload(item) {
     yearsOfUse: normalized.yearsOfUse,
     endOfUseDate: normalized.endOfUseDate,
     hideFromTimeline: normalized.hideFromTimeline,
+    excludeFromSummary: normalized.excludeFromSummary,
     monthlyCost: calculateMonthlyCost(normalized),
     additionalCosts: [],
     createdAt: normalized.createdAt,
@@ -528,8 +541,10 @@ function renderTimeline() {
     const row = createElement("div", "timeline-row");
     const label = createElement(
       "div",
-      `timeline-row-label${isMonthlyCostExcluded(item) ? " monthly-cost-excluded" : ""}`
+      timelineLabelClass(item)
     );
+    label.dataset.action = "toggle-summary";
+    label.dataset.id = item.id;
     label.innerHTML = `<span class="category-swatch ${colorClass}"></span><strong></strong>`;
     label.querySelector("strong").textContent = pcNameLabels[item.pcName] || "メインPC";
 
@@ -577,7 +592,8 @@ function renderTimeline() {
 function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const items = summaryItems();
-  const monthlyCostItems = items.filter((item) => !isMonthlyCostExcluded(item));
+  const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
+  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
   const purchaseTotal = monthlyCostItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
   const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
   elements.summaryCount.textContent = `${monthlyCostItems.length} 件`;
@@ -634,6 +650,7 @@ function collectPcItem() {
     yearsOfUse: Number(elements.yearsOfUse.value),
     endOfUseDate: elements.endOfUseDate.value,
     hideFromTimeline: elements.hideFromTimeline.checked,
+    excludeFromSummary: Boolean(existingItem?.excludeFromSummary),
     createdAt: existingItem?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   });
@@ -715,6 +732,21 @@ function selectItem(itemId) {
   state.selectedItemId = itemId;
   renderTimeline();
   openItemDialog(selectedItem());
+}
+
+async function toggleSummaryExclusion(itemId) {
+  const item = state.items.find((currentItem) => currentItem.id === itemId);
+  if (!item || !state.uid) return;
+
+  try {
+    await saveStorageItem(state.uid, {
+      ...item,
+      excludeFromSummary: !isSummaryExcluded(item),
+    });
+    await refreshItems();
+  } catch (error) {
+    showError(error, "集計対象の切り替えに失敗しました。");
+  }
 }
 
 function showError(error, fallback) {
@@ -821,6 +853,13 @@ if (elements.itemList) {
   elements.itemList.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+
+    const summaryToggle = target.closest("[data-action='toggle-summary']");
+    if (summaryToggle instanceof HTMLElement) {
+      toggleSummaryExclusion(summaryToggle.dataset.id ?? "");
+      return;
+    }
+
     const band = target.closest(".lifecycle-band, .post-end-band");
     if (!(band instanceof HTMLButtonElement)) return;
     selectItem(band.dataset.id ?? "");

@@ -245,7 +245,12 @@ function normalizeBackupDurableGoodsItems(records) {
 function normalizeBackupPcItems(records) {
   return (Array.isArray(records) ? records : [])
     .map(toBackupValue)
-    .filter(isPcManagementStorageRecord);
+    .filter(isPcManagementStorageRecord)
+    .map((item) => ({
+      ...item,
+      hideFromTimeline: Boolean(item.hideFromTimeline),
+      excludeFromSummary: Boolean(item.excludeFromSummary),
+    }));
 }
 
 function toBackupValue(value) {
@@ -271,10 +276,25 @@ function normalizeAssetReferenceBackupData(value) {
   if (!Array.isArray(value.items)) {
     throw new Error("参照データのバックアップに品目一覧が含まれていません。");
   }
+  const items = value.items
+    .map((item) => {
+      const name = String(item?.name ?? item?.label ?? "").trim();
+      const usefulLifeYears = Number(String(item?.usefulLifeYears ?? "").replaceAll(",", ""));
+      const unitPrice = Number(String(item?.unitPrice ?? "").replaceAll(",", ""));
+      if (!name || !Number.isFinite(usefulLifeYears) || usefulLifeYears <= 0) return null;
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
+      return {
+        id: String(item?.id ?? item?.code ?? createId()),
+        name,
+        usefulLifeYears,
+        unitPrice,
+      };
+    })
+    .filter(Boolean);
   return {
-    source: value.source && typeof value.source === "object" && !Array.isArray(value.source) ? value.source : {},
-    importedAt: value.importedAt ?? null,
-    items: value.items,
+    source: "manual",
+    updatedAt: value.updatedAt ?? value.importedAt ?? null,
+    items,
   };
 }
 
@@ -544,6 +564,7 @@ function normalizeStoredItem(item) {
     name: item.name ?? "",
     model: item.model ?? "",
     category: normalizeCategory(item.category),
+    assetReferenceItemId: String(item.assetReferenceItemId ?? item.assetReferenceItemCode ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
     purchaseDate: item.purchaseDate ?? "",
@@ -551,6 +572,7 @@ function normalizeStoredItem(item) {
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     createdAt: item.createdAt ?? null,
     updatedAt: item.updatedAt ?? null,
@@ -615,12 +637,14 @@ export async function saveItem(uid, item) {
       name: item.name,
       model: item.model,
       category: item.category,
+      assetReferenceItemId: item.assetReferenceItemId,
       assetReferenceItemCode: item.assetReferenceItemCode,
       purchaseDate: item.purchaseDate,
       purchasePrice: item.purchasePrice,
       yearsOfUse: item.yearsOfUse,
       endOfUseDate: item.endOfUseDate,
       hideFromTimeline: Boolean(item.hideFromTimeline),
+      excludeFromSummary: Boolean(item.excludeFromSummary),
       additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
       createdAt: existing?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
@@ -632,12 +656,14 @@ export async function saveItem(uid, item) {
     name: item.name,
     model: item.model,
     category: normalizeCategory(item.category),
+    assetReferenceItemId: String(item.assetReferenceItemId ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
     hideFromTimeline: Boolean(item.hideFromTimeline),
+    excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
     updatedAt: serverTimestamp(),
   };

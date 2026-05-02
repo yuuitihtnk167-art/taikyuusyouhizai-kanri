@@ -131,6 +131,18 @@ textarea {
   font-weight: 700;
 }
 
+.checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 4px;
+}
+
+.checkbox-row .checkbox-field {
+  margin-top: 0;
+}
+
 .checkbox-field input {
   width: 18px;
   height: 18px;
@@ -315,6 +327,54 @@ button {
   min-height: 220px;
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.9rem;
+}
+
+.asset-reference-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px 12px;
+}
+
+.asset-reference-form label {
+  margin-top: 0;
+}
+
+.asset-reference-form .settings-action-row {
+  grid-column: 1 / -1;
+}
+
+.asset-reference-list {
+  display: grid;
+  gap: 8px;
+}
+
+.asset-reference-item {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(90px, auto) minmax(120px, auto) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.asset-reference-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-reference-item span {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.asset-reference-item-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .settings-action-row {
@@ -1186,6 +1246,7 @@ button {
   background: linear-gradient(90deg, rgba(32, 43, 54, 0.98), rgba(32, 43, 54, 0.9));
   color: #f8fafc;
   border-right: 1px solid rgba(226, 232, 240, 0.12);
+  cursor: pointer;
 }
 
 .timeline-row-label strong {
@@ -1198,6 +1259,10 @@ button {
 
 .timeline-row-label.monthly-cost-excluded strong {
   color: var(--danger);
+}
+
+.timeline-row-label.summary-excluded strong {
+  color: #8b5cf6;
 }
 
 .category-swatch {
@@ -1865,6 +1930,15 @@ button {
   .settings-action-card .primary-button {
     width: 100%;
     min-width: 0;
+  }
+
+  .asset-reference-form,
+  .asset-reference-item {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-reference-item-actions {
+    flex-wrap: wrap;
   }
 
   .help-button {
