@@ -211,6 +211,10 @@ function isSummaryExcluded(item) {
   return Boolean(item.excludeFromSummary);
 }
 
+function shouldHighlightTimelineLabel(item) {
+  return isMonthlyCostExcluded(item) || isSummaryExcluded(item);
+}
+
 function normalizePcName(value) {
   return pcNameLabels[value] ? value : "main";
 }
@@ -535,7 +539,7 @@ function renderTimeline() {
     const row = createElement("div", "timeline-row");
     const label = createElement(
       "div",
-      `timeline-row-label${isMonthlyCostExcluded(item) ? " monthly-cost-excluded" : ""}`
+      `timeline-row-label${shouldHighlightTimelineLabel(item) ? " monthly-cost-excluded" : ""}`
     );
     label.innerHTML = `<span class="category-swatch ${colorClass}"></span><strong></strong>`;
     label.querySelector("strong").textContent = pcNameLabels[item.pcName] || "メインPC";

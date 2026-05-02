@@ -241,6 +241,10 @@ function isSummaryExcluded(item) {
   return Boolean(item.excludeFromSummary);
 }
 
+function shouldHighlightTimelineLabel(item) {
+  return isMonthlyCostExcluded(item) || isSummaryExcluded(item);
+}
+
 function visibleItems() {
   return state.items.filter((item) => state.selectedCategories.has(item.category));
 }
@@ -436,7 +440,7 @@ function renderTimeline(items) {
     const row = createElement("div", "timeline-row");
     const label = createElement(
       "div",
-      `timeline-row-label${isMonthlyCostExcluded(item) ? " monthly-cost-excluded" : ""}`
+      `timeline-row-label${shouldHighlightTimelineLabel(item) ? " monthly-cost-excluded" : ""}`
     );
     label.innerHTML = `<span class="category-swatch category-${item.category}"></span><strong></strong>`;
     label.querySelector("strong").textContent = displayApplianceType(item);
