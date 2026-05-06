@@ -6,16 +6,30 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasEmail() {
+      return isSignedIn() && request.auth.token.email != null;
+    }
+
+    function isAllowedUser() {
+      return hasEmail()
+        && exists(/databases/$(database)/documents/allowedUsers/$(request.auth.token.email));
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    match /allowedUsers/{email} {
+      allow get: if hasEmail() && request.auth.token.email == email;
+      allow list, create, update, delete: if false;
+    }
+
     match /users/{userId}/durableGoodsItems/{itemId} {
-      allow read, create, update, delete: if isOwner(userId);
+      allow read, create, update, delete: if isOwner(userId) && isAllowedUser();
     }
 
     match /users/{userId}/pcItems/{pcId} {
-      allow read, create, update, delete: if isOwner(userId);
+      allow read, create, update, delete: if isOwner(userId) && isAllowedUser();
     }
   }
 }
