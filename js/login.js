@@ -5,48 +5,43 @@ import {
   firebaseErrorMessage,
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
-import { enterLocalMode, login, onAuthChanged, registerServiceWorker } from "./services/auth.js";
+import {
+  ensureAllowedUser,
+  enterLocalMode,
+  loginWithGoogle,
+  onAuthChanged,
+  registerServiceWorker,
+} from "./services/auth.js";
 
 const authError = document.getElementById("auth-error");
-const emailInput = document.getElementById("auth-email");
-const passwordInput = document.getElementById("auth-password");
-const loginButton = document.getElementById("login-button");
+const googleLoginButton = document.getElementById("google-login-button");
 const localModeButton = document.getElementById("local-mode-button");
 const localModeDialog = document.getElementById("local-mode-dialog");
 const localModeStartButton = document.getElementById("local-mode-start-button");
 const localModeCancelButton = document.getElementById("local-mode-cancel-button");
 const hideLocalModeWarningInput = document.getElementById("hide-local-mode-warning");
+let isLoginActionPending = false;
 
 function setButtonDisabled(button, disabled) {
   if (button) button.disabled = disabled;
 }
 
 function setButtonsDisabled(disabled) {
-  setButtonDisabled(loginButton, disabled);
+  setButtonDisabled(googleLoginButton, disabled);
   setButtonDisabled(localModeButton, disabled);
 }
 
-function getCredentials() {
-  return {
-    email: emailInput.value.trim(),
-    password: passwordInput.value,
-  };
-}
-
-loginButton.addEventListener("click", async () => {
+googleLoginButton?.addEventListener("click", async () => {
   authError.textContent = "";
-  const { email, password } = getCredentials();
-  if (!email || !password) {
-    authError.textContent = "メールアドレスとパスワードを入力してください。";
-    return;
-  }
   try {
+    isLoginActionPending = true;
     setButtonsDisabled(true);
-    await login(email, password);
+    await loginWithGoogle();
     window.location.href = "list.html";
   } catch (error) {
-    authError.textContent = firebaseErrorMessage(error, "ログインに失敗しました。");
+    authError.textContent = firebaseErrorMessage(error, "Googleログインに失敗しました。");
   } finally {
+    isLoginActionPending = false;
     setButtonsDisabled(false);
   }
 });
@@ -90,8 +85,16 @@ localModeCancelButton?.addEventListener("click", () => {
   localModeDialog?.close();
 });
 
-onAuthChanged((user) => {
-  if (user && !isLocalMode()) {
+onAuthChanged(async (user) => {
+  if (user && !isLocalMode() && !isLoginActionPending) {
+    try {
+      setButtonsDisabled(true);
+      await ensureAllowedUser(user);
+    } catch (error) {
+      authError.textContent = firebaseErrorMessage(error, "ログイン状態の確認に失敗しました。");
+      setButtonsDisabled(false);
+      return;
+    }
     window.location.href = "list.html";
   }
 });

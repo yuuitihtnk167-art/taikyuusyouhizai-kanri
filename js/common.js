@@ -9,7 +9,6 @@ import {
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import {
-  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -411,11 +410,6 @@ export function onAuthChanged(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
-export async function login(email, password) {
-  exitLocalMode();
-  return signInWithEmailAndPassword(auth, email, password);
-}
-
 export async function logout() {
   if (isLocalMode()) {
     exitLocalMode();
@@ -707,6 +701,11 @@ export function firebaseErrorMessage(error, fallback) {
   if (code === "auth/email-already-in-use") return "そのメールアドレスは既に登録されています。";
   if (code === "auth/weak-password") return "パスワードは6文字以上で入力してください。";
   if (code === "auth/invalid-email") return "メールアドレスの形式が正しくありません。";
+  if (code === "auth/email-not-found") return "Googleアカウントのメールアドレスを取得できませんでした。";
+  if (code === "auth/user-not-allowed") return "このアカウントは許可されていません";
+  if (code === "auth/account-exists-with-different-credential") return "このメールアドレスは既に別の方法で登録されています。管理者に確認してください。";
+  if (code === "auth/popup-closed-by-user") return "ログインをキャンセルしました。";
+  if (code === "auth/network-request-failed") return "ネットワークを確認してください。";
   if (code === "unavailable") return "Firebase接続エラー（unavailable）です。ネットワークを確認してください。";
   return fallback;
 }
