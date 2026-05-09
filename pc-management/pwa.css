@@ -2,12 +2,6 @@
   display: none;
 }
 
-@media (display-mode: standalone) {
-  #back-button {
-    display: none;
-  }
-}
-
 .pc-management-title-actions {
   display: flex;
   flex-wrap: wrap;

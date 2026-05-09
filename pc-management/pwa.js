@@ -20,17 +20,18 @@ const authError = document.getElementById("auth-error");
 
 function enableStandaloneAppMode() {
   const params = new URLSearchParams(window.location.search);
-  const isStandaloneLaunch =
-    params.get("standalone") === "pc" ||
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigator.standalone === true;
+  const isPcStandaloneLaunch = params.get("standalone") === "pc";
+  const referrer = document.referrer ? new URL(document.referrer) : null;
+  const cameFromPcManagement = referrer?.pathname.includes("/pc-management/") === true;
 
-  if (params.get("standalone") === "pc") {
+  if (isPcStandaloneLaunch) {
     sessionStorage.setItem(STANDALONE_SESSION_KEY, "true");
     setLocalModeEnabled();
+  } else if (!cameFromPcManagement) {
+    sessionStorage.removeItem(STANDALONE_SESSION_KEY);
   }
 
-  if (isStandaloneLaunch || sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
+  if (isPcStandaloneLaunch || sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
     document.body.classList.add("pc-standalone-app");
     if (backButton) backButton.hidden = true;
   }
