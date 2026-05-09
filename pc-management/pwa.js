@@ -3,6 +3,7 @@ import {
   isLocalMode,
   loadLocalRecords,
   replaceLocalRecords,
+  setLocalModeEnabled,
 } from "../js/platform/local-db.js";
 
 const SOURCE_TYPE = "pcManagement";
@@ -20,6 +21,7 @@ function enableStandaloneAppMode() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("standalone") === "pc") {
     sessionStorage.setItem(STANDALONE_SESSION_KEY, "true");
+    setLocalModeEnabled();
   }
 
   if (sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
