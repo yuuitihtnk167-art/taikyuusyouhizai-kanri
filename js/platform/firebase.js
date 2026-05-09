@@ -7,7 +7,7 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/10.14.1/firebas
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAVfS2GVebf5rEhrF9iQo79xtnpOqPkpCE",
+  apiKey: "AIzaSyAcZ0Te9RO3EjSDWuG4HVqEGhjDNOEDmbs",
   authDomain: "taikyuusyouhizai-kanri.firebaseapp.com",
   projectId: "taikyuusyouhizai-kanri",
   storageBucket: "taikyuusyouhizai-kanri.firebasestorage.app",
