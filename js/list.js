@@ -54,6 +54,7 @@ const state = {
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
   selectedItemId: null,
   resizeTimer: null,
+  isBusy: false,
 };
 
 function sessionStorageSetItem(key, value) {
@@ -623,11 +624,13 @@ if (backupButton) {
       return;
     }
     try {
+      state.isBusy = true;
       backupButton.disabled = true;
       downloadBackupFile(await createLocalBackupData());
     } catch (error) {
       authError.textContent = error?.message || "バックアップの保存に失敗しました。";
     } finally {
+      state.isBusy = false;
       backupButton.disabled = false;
     }
   });
@@ -660,6 +663,7 @@ if (restoreButton) {
       return;
     }
     try {
+      state.isBusy = true;
       const file = await selectBackupFile();
       if (!file) return;
       const backup = parseLocalBackupText(await readFileAsText(file));
@@ -673,6 +677,7 @@ if (restoreButton) {
     } catch (error) {
       authError.textContent = error?.message || "バックアップの復元に失敗しました。";
     } finally {
+      state.isBusy = false;
       restoreButton.disabled = false;
     }
   });
@@ -785,4 +790,6 @@ if (isLocalMode()) {
   });
 }
 
-registerServiceWorker();
+registerServiceWorker({
+  isBusy: () => state.isBusy,
+});

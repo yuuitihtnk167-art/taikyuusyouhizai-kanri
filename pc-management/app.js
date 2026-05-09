@@ -73,6 +73,8 @@ const state = {
   selectedItemId: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
   resizeTimer: null,
+  isDirty: false,
+  isBusy: false,
 };
 function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -666,6 +668,7 @@ function resetForm() {
   elements.hideFromTimeline.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
+  state.isDirty = false;
   updateCalculationResult();
 }
 
@@ -758,6 +761,12 @@ function showError(error, fallback) {
 if (elements.form) {
   elements.form.addEventListener("input", updateCalculationResult);
   elements.form.addEventListener("change", updateCalculationResult);
+  elements.form.addEventListener("input", () => {
+    state.isDirty = true;
+  });
+  elements.form.addEventListener("change", () => {
+    state.isDirty = true;
+  });
   elements.endOfUseDate.addEventListener("input", updateEndedUseStyle);
 
   elements.form.addEventListener("submit", async (event) => {
@@ -778,15 +787,18 @@ if (elements.form) {
     }
 
     try {
+      state.isBusy = true;
       elements.submitButton.disabled = true;
       await saveStorageItem(state.uid, item);
       if (shouldShowHiddenTimelineNotice(item)) {
         await showHiddenTimelineNoticeDialog();
       }
+      state.isDirty = false;
       window.location.href = "index.html";
     } catch (error) {
       elements.formError.textContent = firebaseErrorMessage(error, "パーツ情報の保存に失敗しました。");
     } finally {
+      state.isBusy = false;
       elements.submitButton.disabled = false;
     }
   });
@@ -942,6 +954,7 @@ async function initializePcManagement(user) {
       elements.yearsOfUse.value = elements.yearsOfUse.value || "5";
       updateEndedUseStyle();
       updateCalculationResult();
+      state.isDirty = false;
       return;
     }
 
@@ -952,6 +965,7 @@ async function initializePcManagement(user) {
       return;
     }
     fillForm(item);
+    state.isDirty = false;
   } catch (error) {
     showError(error, "パーツ情報の取得に失敗しました。");
   }
@@ -963,4 +977,7 @@ if (isLocalMode()) {
   onAuthChanged(initializePcManagement);
 }
 
-registerServiceWorker();
+registerServiceWorker({
+  isBusy: () => state.isBusy,
+  isFormDirty: () => Boolean(elements.form) && state.isDirty,
+});
