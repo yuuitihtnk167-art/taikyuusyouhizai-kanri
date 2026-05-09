@@ -46,7 +46,7 @@ function isPcManagementRecord(record) {
 }
 
 function syncBackupButtons() {
-  const showBackupControls = isLocalMode();
+  const showBackupControls = isLocalMode() && sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true";
   if (backupButton) backupButton.hidden = !showBackupControls;
   if (restoreButton) restoreButton.hidden = !showBackupControls;
 }
@@ -85,7 +85,9 @@ function validateBackupData(backup) {
   if (!backup || typeof backup !== "object" || Array.isArray(backup)) {
     throw new Error("バックアップファイルの形式が正しくありません。");
   }
-  if (backup.app !== BACKUP_APP_NAME || Number(backup.version) !== BACKUP_VERSION) {
+  const isPcManagementBackup = backup.app === BACKUP_APP_NAME && Number(backup.version) === BACKUP_VERSION;
+  const isMonthlyAppBackup = Array.isArray(backup.durableGoodsItems) || Object.hasOwn(backup, "assetReferenceData");
+  if (!isPcManagementBackup && !isMonthlyAppBackup) {
     throw new Error("パソコン管理のバックアップファイルではありません。");
   }
   if (!Array.isArray(backup.pcItems)) {
