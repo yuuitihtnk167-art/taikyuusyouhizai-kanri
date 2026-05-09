@@ -33,7 +33,9 @@ function enableStandaloneAppMode() {
 
   if (isPcStandaloneLaunch || sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
     document.body.classList.add("pc-standalone-app");
-    if (backButton) backButton.hidden = true;
+    if (backButton && document.body.dataset.timelineMode === "visible") {
+      backButton.hidden = true;
+    }
   }
 }
 

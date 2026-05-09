@@ -1,4 +1,4 @@
-.pc-standalone-app #back-button {
+.pc-standalone-app[data-timeline-mode="visible"] #back-button {
   display: none;
 }
 
