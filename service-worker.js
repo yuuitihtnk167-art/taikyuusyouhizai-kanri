@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v81";
+const CACHE_NAME = "durable-goods-pwa-v93";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -30,8 +30,13 @@ const APP_SHELL = [
   "pc-management/index.html",
   "pc-management/form.html",
   "pc-management/hidden.html",
+  "pc-management/manifest.webmanifest",
+  "pc-management/pwa.css",
+  "pc-management/pwa.js",
   "pc-management/styles.css",
   "pc-management/app.js",
+  "pc-management/icons/icon-192.png",
+  "pc-management/icons/icon-512.png",
   "manifest.webmanifest",
   "icons/icon-192.png",
   "icons/icon-512.png",

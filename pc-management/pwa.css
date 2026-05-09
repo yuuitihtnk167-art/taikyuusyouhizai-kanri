@@ -1,0 +1,15 @@
+.pc-standalone-app[data-timeline-mode="visible"] #back-button,
+.pc-standalone-app[data-timeline-mode="visible"] .back-button {
+  display: none;
+}
+
+.pc-management-title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pc-management-title-actions .ghost-button[hidden] {
+  display: none;
+}

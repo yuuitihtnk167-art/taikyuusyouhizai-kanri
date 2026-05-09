@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>パソコン管理</title>
     <meta name="theme-color" content="#1f2933" />
-    <link rel="manifest" href="../manifest.webmanifest" />
-    <link rel="icon" href="../icons/icon-192.png" type="image/png" />
-    <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="pwa.css" />
   </head>
   <body class="dashboard-body" data-timeline-mode="visible">
     <main class="app dashboard-app">
@@ -16,7 +17,11 @@
         <div class="dashboard-title">
           <div class="dashboard-title-row">
             <h1>パソコン管理</h1>
-            <button id="back-button" type="button" class="ghost-button">戻る</button>
+            <div class="dashboard-title-actions pc-management-title-actions">
+              <button id="backup-button" type="button" class="ghost-button" hidden>保存</button>
+              <button id="restore-button" type="button" class="ghost-button" hidden>復元</button>
+              <button id="back-button" type="button" class="ghost-button">戻る</button>
+            </div>
           </div>
           <p class="subtitle">パーツの月割りコスト管理</p>
         </div>
@@ -68,6 +73,7 @@
             <span class="legend-item"><span class="legend-band legend-unused"></span>無色部分は使用年数に達しなかった期間</span>
           </div>
           <p>分類名をタップすると、その商品を集計に含める／含めないを切り替えられます。集計に含めない商品は分類名が青紫で表示されます。</p>
+          <p>赤色は、使用終了日を入力済みで、現在の月額計算から除外されているパーツを示します。</p>
         </section>
 
         <section class="help-section" aria-labelledby="help-concept-title">
@@ -91,6 +97,7 @@
         </div>
       </article>
     </dialog>
+    <script type="module" src="pwa.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>
