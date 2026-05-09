@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>パソコン管理</title>
     <meta name="theme-color" content="#1f2933" />
-    <link rel="manifest" href="../manifest.webmanifest" />
-    <link rel="icon" href="../icons/icon-192.png" type="image/png" />
-    <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="pwa.css" />
   </head>
   <body class="dashboard-body" data-timeline-mode="visible">
     <main class="app dashboard-app">
@@ -16,7 +17,11 @@
         <div class="dashboard-title">
           <div class="dashboard-title-row">
             <h1>パソコン管理</h1>
-            <button id="back-button" type="button" class="ghost-button">戻る</button>
+            <div class="dashboard-title-actions pc-management-title-actions">
+              <button id="backup-button" type="button" class="ghost-button" hidden>保存</button>
+              <button id="restore-button" type="button" class="ghost-button" hidden>復元</button>
+              <button id="back-button" type="button" class="ghost-button">戻る</button>
+            </div>
           </div>
           <p class="subtitle">パーツの月割りコスト管理</p>
         </div>
@@ -92,5 +97,6 @@
       </article>
     </dialog>
     <script type="module" src="app.js"></script>
+    <script type="module" src="pwa.js"></script>
   </body>
 </html>

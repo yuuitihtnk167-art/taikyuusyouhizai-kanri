@@ -1,0 +1,25 @@
+{
+  "name": "パソコン管理",
+  "short_name": "PC管理",
+  "description": "パソコンのパーツ交換時期と月額コストを管理するアプリ",
+  "start_url": "./index.html?standalone=pc",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#1f2933",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
