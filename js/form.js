@@ -113,6 +113,8 @@ const state = {
   editingId: new URLSearchParams(window.location.search).get("id") || sessionStorageGetItem(EDITING_ITEM_ID_KEY),
   assetReferenceData: null,
   excludeFromSummary: false,
+  isDirty: false,
+  isBusy: false,
 };
 
 function updateAssetReferenceDisplay() {
@@ -319,6 +321,7 @@ toListButton.addEventListener("click", () => {
 
 
 addCostButton.addEventListener("click", () => {
+  state.isDirty = true;
   const row = createAdditionalCostRow({ createdAt: Date.now() });
   additionalCostList.prepend(row);
   row.querySelector(".additional-cost-amount")?.focus();
@@ -329,6 +332,7 @@ additionalCostList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   if (!target.classList.contains("additional-cost-delete")) return;
+  state.isDirty = true;
   target.closest(".additional-cost-row")?.remove();
   if (additionalCostList.children.length === 0) {
     additionalCostList.appendChild(createAdditionalCostRow({ createdAt: Date.now() }));
@@ -338,6 +342,12 @@ additionalCostList.addEventListener("click", (event) => {
 
 form.addEventListener("input", updateCalculationResult);
 form.addEventListener("change", updateCalculationResult);
+form.addEventListener("input", () => {
+  state.isDirty = true;
+});
+form.addEventListener("change", () => {
+  state.isDirty = true;
+});
 assetReferenceItemInput?.addEventListener("change", updateAssetReferenceDisplay);
 purchasePriceInput.addEventListener("input", updateCalculationResult);
 yearsOfUseInput.addEventListener("input", updateCalculationResult);
@@ -374,16 +384,19 @@ form.addEventListener("submit", async (event) => {
     return;
   }
   try {
+    state.isBusy = true;
     submitButton.disabled = true;
     await saveItem(state.uid, item);
     if (shouldShowHiddenTimelineNotice(item)) {
       await showHiddenTimelineNoticeDialog();
     }
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
+    state.isDirty = false;
     window.location.href = "list.html";
   } catch (error) {
     formError.textContent = firebaseErrorMessage(error, "保存に失敗しました。");
   } finally {
+    state.isBusy = false;
     submitButton.disabled = false;
   }
 });
@@ -410,6 +423,7 @@ async function initializeForm(user) {
     submitButton.textContent = "登録する";
     updateEndedUseStyle();
     renderAdditionalCosts([]);
+    state.isDirty = false;
     return;
   }
 
@@ -424,6 +438,7 @@ async function initializeForm(user) {
       return;
     }
     fillForm(item);
+    state.isDirty = false;
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
   }
@@ -435,4 +450,7 @@ if (isLocalMode()) {
   onAuthChanged(initializeForm);
 }
 
-registerServiceWorker();
+registerServiceWorker({
+  isBusy: () => state.isBusy,
+  isFormDirty: () => state.isDirty,
+});

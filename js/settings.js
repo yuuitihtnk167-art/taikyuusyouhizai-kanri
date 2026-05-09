@@ -35,6 +35,7 @@ const assetReferenceStatus = document.getElementById("asset-reference-status");
 
 const state = {
   uid: null,
+  isBusy: false,
   assetReferenceData: {
     items: [],
   },
@@ -189,12 +190,14 @@ firebaseLocalBackupButton?.addEventListener("click", async () => {
   }
 
   try {
+    state.isBusy = true;
     firebaseLocalBackupButton.disabled = true;
     const backup = await createFirebaseLocalBackupData(state.uid);
     downloadBackupFile(backup, localRestoreFileName());
   } catch (error) {
     setStatus(firebaseErrorMessage(error, "ローカル保存用ファイルの作成に失敗しました。"));
   } finally {
+    state.isBusy = false;
     syncFirebaseLocalBackupButton();
   }
 });
@@ -204,6 +207,7 @@ assetReferenceForm?.addEventListener("submit", async (event) => {
   setAssetReferenceStatus("");
 
   try {
+    state.isBusy = true;
     const editingId = assetReferenceIdInput instanceof HTMLInputElement ? assetReferenceIdInput.value : "";
     const item = createAssetReferenceItem({
       name: assetReferenceNameInput?.value ?? "",
@@ -233,6 +237,8 @@ assetReferenceForm?.addEventListener("submit", async (event) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "参照データの保存に失敗しました。";
     setAssetReferenceStatus(firebaseErrorMessage(error, message));
+  } finally {
+    state.isBusy = false;
   }
 });
 
@@ -292,6 +298,7 @@ assetReferenceList?.addEventListener("click", async (event) => {
 
   setAssetReferenceStatus("");
   try {
+    state.isBusy = true;
     button.disabled = true;
     const items = (state.assetReferenceData.items ?? []).filter((currentItem) => currentItem.id !== item.id);
     const resetCount = await resetDeletedAssetReferenceSelections(item.id);
@@ -310,6 +317,7 @@ assetReferenceList?.addEventListener("click", async (event) => {
   } catch (error) {
     setAssetReferenceStatus(firebaseErrorMessage(error, "参照項目の削除に失敗しました。"));
   } finally {
+    state.isBusy = false;
     button.disabled = false;
   }
 });
@@ -337,4 +345,6 @@ if (isLocalMode()) {
   });
 }
 
-registerServiceWorker();
+registerServiceWorker({
+  isBusy: () => state.isBusy,
+});

@@ -33,6 +33,13 @@ body {
   font-size: 1.5rem;
 }
 
+.app-header-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .subtitle {
   margin: 8px 0 0;
   color: var(--muted);
@@ -235,6 +242,47 @@ button {
   color: var(--text);
   border: 1px solid var(--line);
   background: #fff;
+}
+
+.version-upgrade-button[hidden] {
+  display: none;
+}
+
+.version-upgrade-button {
+  flex: 0 0 auto;
+  min-width: 128px;
+  min-height: 40px;
+  margin-top: 0;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.version-upgrade-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.version-upgrade-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.version-upgrade-dialog-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
+}
+
+.version-upgrade-dialog-card p {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-line;
 }
 
 .settings-header {
@@ -836,7 +884,8 @@ button {
 .dashboard-title-row #logout-button,
 .dashboard-title-row #back-button,
 .dashboard-title-row #backup-button,
-.dashboard-title-row #restore-button {
+.dashboard-title-row #restore-button,
+.dashboard-title-row .version-upgrade-button {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -855,10 +904,16 @@ button {
   background: rgba(36, 46, 57, 0.58);
 }
 
+.dashboard-title-row .version-upgrade-button {
+  width: auto;
+  min-width: 132px;
+}
+
 .dashboard-title-row #logout-button:hover,
 .dashboard-title-row #back-button:hover,
 .dashboard-title-row #backup-button:hover,
-.dashboard-title-row #restore-button:hover {
+.dashboard-title-row #restore-button:hover,
+.dashboard-title-row .version-upgrade-button:hover {
   background: rgba(54, 68, 82, 0.72);
 }
 
@@ -1710,13 +1765,19 @@ button {
   .dashboard-title-row #logout-button,
   .dashboard-title-row #back-button,
   .dashboard-title-row #backup-button,
-  .dashboard-title-row #restore-button {
+  .dashboard-title-row #restore-button,
+  .dashboard-title-row .version-upgrade-button {
     width: 96px;
     min-width: 96px;
     min-height: 38px;
     padding: 0 10px;
     border-radius: 4px;
     font-size: 0.72rem;
+  }
+
+  .dashboard-title-row .version-upgrade-button {
+    width: auto;
+    min-width: 116px;
   }
 
   .dashboard-body .subtitle {

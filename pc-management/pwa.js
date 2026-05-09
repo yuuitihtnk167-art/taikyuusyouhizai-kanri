@@ -61,6 +61,10 @@ function setStatus(message) {
   if (authError) authError.textContent = message;
 }
 
+function setVersionUpgradeBusy(isBusy) {
+  document.body.dataset.versionUpgradeBusy = isBusy ? "true" : "false";
+}
+
 function downloadJson(data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -144,11 +148,13 @@ backupButton?.addEventListener("click", async () => {
   }
 
   try {
+    setVersionUpgradeBusy(true);
     backupButton.disabled = true;
     downloadJson(await createBackupData());
   } catch (error) {
     setStatus(error?.message || "バックアップの保存に失敗しました。");
   } finally {
+    setVersionUpgradeBusy(false);
     backupButton.disabled = false;
   }
 });
@@ -162,6 +168,7 @@ restoreButton?.addEventListener("click", async () => {
   }
 
   try {
+    setVersionUpgradeBusy(true);
     const file = await selectBackupFile();
     if (!file) return;
     const records = parseBackupText(await readFileAsText(file));
@@ -174,6 +181,7 @@ restoreButton?.addEventListener("click", async () => {
   } catch (error) {
     setStatus(error?.message || "バックアップの復元に失敗しました。");
   } finally {
+    setVersionUpgradeBusy(false);
     restoreButton.disabled = false;
   }
 });

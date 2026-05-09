@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v93";
+const CACHE_NAME = "durable-goods-pwa-v94";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -57,7 +57,6 @@ self.addEventListener("install", (event) => {
       return cache.addAll(APP_SHELL);
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -101,4 +100,10 @@ self.addEventListener("fetch", (event) => {
         });
       })
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
