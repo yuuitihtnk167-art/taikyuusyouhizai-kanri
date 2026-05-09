@@ -1669,6 +1669,10 @@ button {
     justify-content: flex-start;
   }
 
+  .dashboard-body[data-timeline-mode="hidden"] .dashboard-actions {
+    justify-content: flex-end;
+  }
+
   .dashboard-title-row {
     justify-content: space-between;
   }
