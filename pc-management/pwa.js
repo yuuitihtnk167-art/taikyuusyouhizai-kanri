@@ -15,17 +15,24 @@ const STANDALONE_SESSION_KEY = "pcManagement.standaloneApp";
 
 const backupButton = document.getElementById("backup-button");
 const restoreButton = document.getElementById("restore-button");
+const backButton = document.getElementById("back-button");
 const authError = document.getElementById("auth-error");
 
 function enableStandaloneAppMode() {
   const params = new URLSearchParams(window.location.search);
+  const isStandaloneLaunch =
+    params.get("standalone") === "pc" ||
+    window.matchMedia("(display-mode: standalone)").matches ||
+    navigator.standalone === true;
+
   if (params.get("standalone") === "pc") {
     sessionStorage.setItem(STANDALONE_SESSION_KEY, "true");
     setLocalModeEnabled();
   }
 
-  if (sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
+  if (isStandaloneLaunch || sessionStorage.getItem(STANDALONE_SESSION_KEY) === "true") {
     document.body.classList.add("pc-standalone-app");
+    if (backButton) backButton.hidden = true;
   }
 }
 
