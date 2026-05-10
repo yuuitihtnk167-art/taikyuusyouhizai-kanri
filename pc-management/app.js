@@ -1021,7 +1021,4 @@ if (isLocalMode()) {
   onAuthChanged(initializePcManagement);
 }
 
-registerServiceWorker({
-  isBusy: () => state.isBusy,
-  isFormDirty: () => Boolean(elements.form) && state.isDirty,
-});
+registerServiceWorker();
