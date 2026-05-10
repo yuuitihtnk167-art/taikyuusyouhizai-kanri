@@ -3,6 +3,7 @@ import {
   parseLocalBackupText,
   restoreLocalBackupData,
   calculateAdditionalCostTotal,
+  calculateActualMonthlyCost,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
@@ -13,6 +14,7 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
+import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
@@ -228,6 +230,9 @@ function timelineMonthlyCost(item) {
 }
 
 function itemSummaryMonthlyCost(item) {
+  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
+    return calculateActualMonthlyCost(item) ?? timelineMonthlyCost(item);
+  }
   return timelineMonthlyCost(item);
 }
 
@@ -240,7 +245,29 @@ function totalPurchaseCost(item) {
 }
 
 function isMonthlyCostExcluded(item) {
-  return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
+  return isActualUseEnded(item) && itemPlannedEndMonth(item) <= currentMonthIndex();
+}
+
+function isActualUseEnded(item) {
+  return Boolean(item.endOfUseDate) && itemActualEndMonth(item) <= currentMonthIndex();
+}
+
+function isUnderusedEndedItem(item) {
+  return (
+    isActualUseEnded(item) &&
+    itemActualEndMonth(item) < itemPlannedEndMonth(item) &&
+    currentMonthIndex() < itemPlannedEndMonth(item)
+  );
+}
+
+function isMonthlyCostSummaryExcluded(item) {
+  if (isMonthlyCostExcluded(item)) {
+    return true;
+  }
+  if (isUnderusedEndedItem(item)) {
+    return shouldExcludeUnderusedMonthlyCost();
+  }
+  return false;
 }
 
 function isSummaryExcluded(item) {
@@ -249,7 +276,7 @@ function isSummaryExcluded(item) {
 
 function timelineLabelClass(item) {
   const classes = ["timeline-row-label"];
-  if (isMonthlyCostExcluded(item)) classes.push("monthly-cost-excluded");
+  if (isMonthlyCostSummaryExcluded(item)) classes.push("monthly-cost-excluded");
   if (isSummaryExcluded(item)) classes.push("summary-excluded");
   return classes.join(" ");
 }
@@ -272,7 +299,7 @@ function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
   const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
-  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
+  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostSummaryExcluded(item));
   const monthlyCostTotal = monthlyCostItems.reduce(
     (total, item) => total + displayedMonthlyCost(item),
     0

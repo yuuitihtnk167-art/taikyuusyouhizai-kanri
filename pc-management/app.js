@@ -1,6 +1,10 @@
-import { firebaseErrorMessage } from "../js/common.js";
+import {
+  calculateUsageMonths,
+  firebaseErrorMessage,
+} from "../js/common.js";
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
+import { shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -35,6 +39,7 @@ const elements = {
   createButton: document.getElementById("create-button"),
   categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
+  settingsButton: document.getElementById("settings-button"),
   backButton: document.getElementById("back-button"),
   helpButton: document.getElementById("help-button"),
   helpDialog: document.getElementById("help-dialog"),
@@ -158,6 +163,14 @@ function calculateMonthlyCost(item) {
   return purchasePrice / (yearsOfUse * 12);
 }
 
+function calculateActualMonthlyCost(item) {
+  const usageMonths = calculateUsageMonths(item.purchaseDate, item.endOfUseDate);
+  if (!usageMonths) return null;
+  const purchasePrice = Number(item.purchasePrice ?? 0);
+  if (!Number.isFinite(purchasePrice)) return null;
+  return purchasePrice / usageMonths;
+}
+
 function shouldShowHiddenTimelineNotice(item) {
   return Boolean(item.hideFromTimeline);
 }
@@ -197,6 +210,9 @@ function showHiddenTimelineNoticeDialog() {
 }
 
 function summaryMonthlyCost(item) {
+  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
+    return calculateActualMonthlyCost(item) ?? calculateMonthlyCost(item);
+  }
   return calculateMonthlyCost(item);
 }
 
@@ -205,7 +221,29 @@ function displayedMonthlyCost(item) {
 }
 
 function isMonthlyCostExcluded(item) {
-  return Boolean(item.endOfUseDate) && itemPlannedEndMonth(item) < currentMonthIndex();
+  return isActualUseEnded(item) && itemPlannedEndMonth(item) <= currentMonthIndex();
+}
+
+function isActualUseEnded(item) {
+  return Boolean(item.endOfUseDate) && itemActualEndMonth(item) <= currentMonthIndex();
+}
+
+function isUnderusedEndedItem(item) {
+  return (
+    isActualUseEnded(item) &&
+    itemActualEndMonth(item) < itemPlannedEndMonth(item) &&
+    currentMonthIndex() < itemPlannedEndMonth(item)
+  );
+}
+
+function isMonthlyCostSummaryExcluded(item) {
+  if (isMonthlyCostExcluded(item)) {
+    return true;
+  }
+  if (isUnderusedEndedItem(item)) {
+    return shouldExcludeUnderusedMonthlyCost();
+  }
+  return false;
 }
 
 function isSummaryExcluded(item) {
@@ -214,7 +252,7 @@ function isSummaryExcluded(item) {
 
 function timelineLabelClass(item) {
   const classes = ["timeline-row-label"];
-  if (isMonthlyCostExcluded(item)) classes.push("monthly-cost-excluded");
+  if (isMonthlyCostSummaryExcluded(item)) classes.push("monthly-cost-excluded");
   if (isSummaryExcluded(item)) classes.push("summary-excluded");
   return classes.join(" ");
 }
@@ -595,7 +633,7 @@ function renderSummary() {
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const items = summaryItems();
   const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
-  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostExcluded(item));
+  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostSummaryExcluded(item));
   const purchaseTotal = monthlyCostItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
   const monthlyCostTotal = monthlyCostItems.reduce((total, item) => total + displayedMonthlyCost(item), 0);
   elements.summaryCount.textContent = `${monthlyCostItems.length} 件`;
@@ -838,6 +876,12 @@ if (elements.categoryFilter) {
 if (elements.hiddenButton) {
   elements.hiddenButton.addEventListener("click", () => {
     window.location.href = "hidden.html";
+  });
+}
+
+if (elements.settingsButton) {
+  elements.settingsButton.addEventListener("click", () => {
+    window.location.href = "settings.html";
   });
 }
 

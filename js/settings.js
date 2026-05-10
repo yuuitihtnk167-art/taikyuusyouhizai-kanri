@@ -1,6 +1,6 @@
 import {
-  setIncludeUnderusedMonthlyCost,
-  shouldIncludeUnderusedMonthlyCost,
+  setExcludeUnderusedMonthlyCost,
+  shouldExcludeUnderusedMonthlyCost,
 } from "./services/app-settings.js";
 import {
   createFirebaseLocalBackupData,
@@ -18,7 +18,7 @@ import {
   saveItem,
 } from "./storage/durable-items/service.js";
 
-const includeUnderusedMonthlyCostInput = document.getElementById("include-underused-monthly-cost");
+const excludeUnderusedMonthlyCostInput = document.getElementById("exclude-underused-monthly-cost");
 const backButton = document.getElementById("back-button");
 const firebaseLocalBackupButton = document.getElementById("firebase-local-backup-button");
 const settingsStatus = document.getElementById("settings-status");
@@ -41,10 +41,10 @@ const state = {
   },
 };
 
-if (includeUnderusedMonthlyCostInput instanceof HTMLInputElement) {
-  includeUnderusedMonthlyCostInput.checked = shouldIncludeUnderusedMonthlyCost();
-  includeUnderusedMonthlyCostInput.addEventListener("change", () => {
-    setIncludeUnderusedMonthlyCost(includeUnderusedMonthlyCostInput.checked);
+if (excludeUnderusedMonthlyCostInput instanceof HTMLInputElement) {
+  excludeUnderusedMonthlyCostInput.checked = shouldExcludeUnderusedMonthlyCost();
+  excludeUnderusedMonthlyCostInput.addEventListener("change", () => {
+    setExcludeUnderusedMonthlyCost(excludeUnderusedMonthlyCostInput.checked);
   });
 }
 
