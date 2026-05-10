@@ -450,7 +450,4 @@ if (isLocalMode()) {
   onAuthChanged(initializeForm);
 }
 
-registerServiceWorker({
-  isBusy: () => state.isBusy,
-  isFormDirty: () => state.isDirty,
-});
+registerServiceWorker();

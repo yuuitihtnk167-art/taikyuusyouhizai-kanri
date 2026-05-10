@@ -53,27 +53,6 @@ const LEGACY_CATEGORY_MAP = {
   pc: "information_device",
 };
 
-export function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return;
-  let isReloadingForUpdate = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (isReloadingForUpdate) return;
-    isReloadingForUpdate = true;
-    window.location.reload();
-  });
-
-  window.addEventListener("load", async () => {
-    try {
-      const registration = await navigator.serviceWorker.register(new URL("../service-worker.js", import.meta.url), {
-        scope: "../",
-      });
-      await registration.update();
-    } catch (_error) {
-      // SW registration failure is non-fatal.
-    }
-  });
-}
-
 export function storageGetItem(key) {
   try {
     return localStorage.getItem(key);

@@ -345,6 +345,4 @@ if (isLocalMode()) {
   });
 }
 
-registerServiceWorker({
-  isBusy: () => state.isBusy,
-});
+registerServiceWorker();

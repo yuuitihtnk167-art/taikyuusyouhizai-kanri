@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v98";
+const CACHE_NAME = "durable-goods-pwa-v99";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -102,10 +102,4 @@ self.addEventListener("fetch", (event) => {
         });
       })
   );
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
 });
