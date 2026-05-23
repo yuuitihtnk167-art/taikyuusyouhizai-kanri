@@ -1279,6 +1279,11 @@ button {
   white-space: nowrap;
 }
 
+.timeline-row-label[data-action="toggle-summary"] {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
 .timeline-row-label.monthly-cost-excluded strong {
   color: var(--danger);
 }

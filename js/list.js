@@ -49,6 +49,8 @@ const DESKTOP_LABEL_WIDTH = 230;
 const MOBILE_YEAR_WIDTH = 28;
 const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
+const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
+const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
 const state = {
   uid: null,
   items: [],
@@ -57,6 +59,7 @@ const state = {
   selectedItemId: null,
   resizeTimer: null,
   isBusy: false,
+  summaryToggleLongPress: null,
 };
 
 function sessionStorageSetItem(key, value) {
@@ -559,17 +562,91 @@ async function refreshList() {
 async function toggleSummaryExclusion(itemId) {
   const item = state.summaryItems.find((currentItem) => currentItem.id === itemId);
   if (!item || !state.uid) return;
+  const shouldExclude = !isSummaryExcluded(item);
 
   authError.textContent = "";
   try {
     await saveItem(state.uid, {
       ...item,
       isUpdate: true,
-      excludeFromSummary: !isSummaryExcluded(item),
+      excludeFromSummary: shouldExclude,
     });
     await refreshList();
+    showSummaryToggleMessage(shouldExclude ? "月額合計から除外しました" : "月額合計に含めました");
   } catch (error) {
     authError.textContent = firebaseErrorMessage(error, "集計対象の切り替えに失敗しました。");
+  }
+}
+
+function showSummaryToggleMessage(message) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "item-name-dialog";
+
+  const card = document.createElement("article");
+  card.className = "item-name-dialog-card";
+
+  const text = document.createElement("p");
+  text.className = "dialog-item-meta";
+  text.textContent = message;
+
+  card.append(text);
+  dialog.append(card);
+  document.body.append(dialog);
+
+  const closeDialog = () => {
+    if (dialog.open) dialog.close();
+  };
+
+  dialog.addEventListener("click", closeDialog);
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+  dialog.showModal();
+  window.setTimeout(closeDialog, 1400);
+}
+
+function summaryToggleTarget(target) {
+  if (!(target instanceof HTMLElement)) return null;
+  const summaryToggle = target.closest("[data-action='toggle-summary']");
+  return summaryToggle instanceof HTMLElement ? summaryToggle : null;
+}
+
+function clearSummaryToggleLongPress() {
+  if (!state.summaryToggleLongPress) return;
+  window.clearTimeout(state.summaryToggleLongPress.timer);
+  state.summaryToggleLongPress = null;
+}
+
+function startSummaryToggleLongPress(event) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  const summaryToggle = summaryToggleTarget(event.target);
+  const itemId = summaryToggle?.dataset.id;
+  if (!summaryToggle || !itemId) return;
+
+  clearSummaryToggleLongPress();
+  state.summaryToggleLongPress = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    timer: window.setTimeout(() => {
+      state.summaryToggleLongPress = null;
+      toggleSummaryExclusion(itemId);
+    }, SUMMARY_TOGGLE_LONG_PRESS_MS),
+  };
+}
+
+function cancelSummaryToggleLongPress(event) {
+  if (!state.summaryToggleLongPress || state.summaryToggleLongPress.pointerId !== event.pointerId) return;
+  clearSummaryToggleLongPress();
+}
+
+function cancelMovedSummaryToggleLongPress(event) {
+  const longPress = state.summaryToggleLongPress;
+  if (!longPress || longPress.pointerId !== event.pointerId) return;
+
+  const movedX = Math.abs(event.clientX - longPress.startX);
+  const movedY = Math.abs(event.clientY - longPress.startY);
+  if (movedX > SUMMARY_TOGGLE_MOVE_CANCEL_PX || movedY > SUMMARY_TOGGLE_MOVE_CANCEL_PX) {
+    clearSummaryToggleLongPress();
   }
 }
 
@@ -714,17 +791,17 @@ itemList.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
 
-  const summaryToggle = target.closest("[data-action='toggle-summary']");
-  if (summaryToggle instanceof HTMLElement) {
-    toggleSummaryExclusion(summaryToggle.dataset.id ?? "");
-    return;
-  }
-
   const band = target.closest(".lifecycle-band, .post-end-band");
   if (!(band instanceof HTMLButtonElement)) return;
 
   selectItem(band.dataset.id ?? "");
 });
+
+itemList.addEventListener("pointerdown", startSummaryToggleLongPress);
+itemList.addEventListener("pointerup", cancelSummaryToggleLongPress);
+itemList.addEventListener("pointercancel", cancelSummaryToggleLongPress);
+itemList.addEventListener("pointerleave", cancelSummaryToggleLongPress);
+itemList.addEventListener("pointermove", cancelMovedSummaryToggleLongPress);
 
 dialogEditButton.addEventListener("click", () => {
   const item = selectedItem();
