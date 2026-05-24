@@ -4,25 +4,15 @@
     {
       "label": "local-server-5501",
       "type": "process",
-      "command": "python",
-      "args": ["-u", "-m", "http.server", "5501", "--bind", "127.0.0.1"],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "isBackground": true,
-      "problemMatcher": {
-        "owner": "local-server",
-        "pattern": {
-          "regexp": "^(LOCAL_SERVER_NEVER_MATCHES)$",
-          "file": 1,
-          "message": 1
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".*",
-          "endsPattern": "Serving HTTP on .* port 5501"
-        }
-      },
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$port = 5501; $address = '127.0.0.1'; $url = 'http://' + $address + ':' + $port + '/'; $outLog = Join-Path $env:TEMP 'taikyuusyouhizai-kanri-local-server-5501.out.log'; $errLog = Join-Path $env:TEMP 'taikyuusyouhizai-kanri-local-server-5501.err.log'; $listener = Get-NetTCPConnection -LocalAddress $address -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if (-not $listener) { Start-Process -FilePath python -ArgumentList '-u -m http.server 5501 --bind 127.0.0.1' -WorkingDirectory '${workspaceFolder}' -WindowStyle Hidden -RedirectStandardOutput $outLog -RedirectStandardError $errLog }; for ($i = 0; $i -lt 20; $i++) { $listener = Get-NetTCPConnection -LocalAddress $address -LocalPort $port -State Listen -ErrorAction SilentlyContinue; if ($listener) { Write-Host \"Local server ready: $url\"; exit 0 }; Start-Sleep -Milliseconds 250 }; Write-Error \"Local server did not start: $url\"; exit 1"
+      ],
+      "problemMatcher": [],
       "presentation": {
         "reveal": "silent",
         "panel": "dedicated",

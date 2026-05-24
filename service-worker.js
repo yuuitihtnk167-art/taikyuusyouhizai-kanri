@@ -28,6 +28,7 @@ const APP_SHELL = [
   "js/storage/pc-items/index.js",
   "js/storage/pc-items/local.js",
   "pc-management/index.html",
+  "pc-management/specs.html",
   "pc-management/form.html",
   "pc-management/hidden.html",
   "pc-management/settings.html",
