@@ -1549,6 +1549,132 @@ button {
   background: rgba(63, 78, 92, 0.86);
 }
 
+.spec-list-header {
+  align-items: flex-start;
+}
+
+.spec-list-panel {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.spec-list-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.spec-list-scroll:focus {
+  outline: 2px solid rgba(59, 163, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.spec-list-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #f8fafc;
+}
+
+.spec-list-table th,
+.spec-list-table td {
+  min-width: 140px;
+  max-width: 280px;
+  padding: 12px 14px;
+  border-right: 1px solid rgba(226, 232, 240, 0.16);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.16);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.spec-list-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #e5edf5;
+  background: rgba(25, 35, 45, 0.98);
+  font-size: 0.86rem;
+}
+
+.spec-list-table td {
+  background: rgba(46, 59, 70, 0.74);
+  font-size: 0.94rem;
+}
+
+.spec-list-table tr:nth-child(even) td {
+  background: rgba(37, 50, 61, 0.8);
+}
+
+.spec-list-table th:first-child,
+.spec-list-table td:first-child {
+  min-width: 180px;
+}
+
+.spec-list-table th:nth-child(3),
+.spec-list-table td:nth-child(3) {
+  min-width: 260px;
+}
+
+.spec-list-value-button {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  color: #f8fafc;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spec-list-value-button:hover,
+.spec-list-value-button:focus-visible {
+  color: #ffffff;
+  outline: 2px solid rgba(59, 163, 255, 0.58);
+  outline-offset: 2px;
+}
+
+.spec-value-dialog {
+  width: min(560px, calc(100% - 32px));
+}
+
+.spec-value-dialog-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.spec-list-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0;
+  color: #d4dee8;
+  font-weight: 800;
+}
+
+.spec-list-total strong {
+  color: #f8fafc;
+  font-size: 1.35rem;
+}
+
+.spec-list-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+  padding-bottom: 12px;
+}
+
 .help-button {
   min-width: 120px;
 }

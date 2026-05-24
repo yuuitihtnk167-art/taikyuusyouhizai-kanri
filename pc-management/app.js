@@ -25,6 +25,8 @@ const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
+const PC_FILTER_LONG_PRESS_MS = 600;
+const PC_FILTER_MOVE_CANCEL_PX = 10;
 
 const pcNameLabels = {
   main: "メインPC",
@@ -71,6 +73,9 @@ const elements = {
   dialogEditButton: document.getElementById("dialog-edit-button"),
   dialogDeleteButton: document.getElementById("dialog-delete-button"),
   dialogCloseButton: document.getElementById("dialog-close-button"),
+  specListTitle: document.getElementById("spec-list-title"),
+  specListContent: document.getElementById("spec-list-content"),
+  specSaveButton: document.getElementById("spec-save-button"),
 };
 
 const state = {
@@ -83,6 +88,8 @@ const state = {
   isDirty: false,
   isBusy: false,
   summaryToggleLongPress: null,
+  pcFilterLongPress: null,
+  ignoreNextCategoryClick: false,
 };
 function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -157,6 +164,22 @@ function formatYearMonthFromIndex(monthIndex) {
 
 function formatMonthlyCost(value) {
   return `${formatCurrency(value)} /月`;
+}
+
+function formatTextValue(value) {
+  return String(value ?? "").trim() || "未入力";
+}
+
+function fileTimestamp() {
+  const now = new Date();
+  const parts = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+  ];
+  return `${parts[0]}${parts[1]}${parts[2]}-${parts[3]}${parts[4]}`;
 }
 
 function calculateMonthlyCost(item) {
@@ -665,6 +688,195 @@ function render() {
   renderCategoryFilter();
   renderSummary();
   renderTimeline();
+  renderSpecList();
+}
+
+function specListPcName() {
+  return normalizePcName(new URLSearchParams(window.location.search).get("pcName"));
+}
+
+function specListItems() {
+  const pcName = specListPcName();
+  return sortItems(state.items).filter((item) =>
+    item.pcName === pcName &&
+    !isSummaryExcluded(item) &&
+    (!item.hideFromTimeline || !item.endOfUseDate)
+  );
+}
+
+function specListRows() {
+  return specListItems().map((item) => ({
+    partName: formatTextValue(item.partName),
+    modelNumber: formatTextValue(item.modelNumber),
+    specDetail: formatTextValue(item.specDetail),
+    purchaseDate: formatTextValue(item.purchaseDate),
+    purchasePrice: formatCurrency(item.purchasePrice),
+    yearsOfUse: `${Number(item.yearsOfUse) || 0} 年`,
+    endOfUseDate: formatTextValue(item.endOfUseDate),
+    monthlyCost: formatMonthlyCost(calculateMonthlyCost(item)),
+  }));
+}
+
+function specListPurchaseTotal() {
+  return specListItems().reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
+}
+
+function openSpecListValueDialog(value) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "item-name-dialog spec-value-dialog";
+
+  const card = document.createElement("article");
+  card.className = "item-name-dialog-card";
+
+  const text = document.createElement("p");
+  text.className = "dialog-item-meta spec-value-dialog-text";
+  text.textContent = value;
+
+  const actions = document.createElement("div");
+  actions.className = "dialog-actions";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "ghost-button";
+  closeButton.textContent = "閉じる";
+
+  closeButton.addEventListener("click", () => {
+    dialog.close();
+  });
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener("close", () => dialog.remove(), { once: true });
+
+  actions.appendChild(closeButton);
+  card.append(text, actions);
+  dialog.appendChild(card);
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  closeButton.focus();
+}
+
+function renderSpecList() {
+  if (!elements.specListContent) return;
+
+  const pcName = specListPcName();
+  const pcLabel = pcNameLabels[pcName] || pcNameLabels.main;
+  const rows = specListRows();
+  if (elements.specListTitle) {
+    elements.specListTitle.textContent = `${pcLabel} スペック一覧`;
+  }
+
+  elements.specListContent.innerHTML = "";
+  if (rows.length === 0) {
+    const empty = createElement("div", "timeline-empty");
+    empty.innerHTML = `
+      <strong>表示できるパーツがありません</strong>
+      <span>月額合計から除外していないパーツが表示されます。</span>
+    `;
+    elements.specListContent.appendChild(empty);
+    return;
+  }
+
+  const scroll = createElement("div", "spec-list-scroll");
+  scroll.tabIndex = 0;
+  scroll.setAttribute("aria-label", "スペック一覧。横にスクロールできます。");
+
+  const table = createElement("table", "spec-list-table");
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>商品名</th>
+        <th>型番</th>
+        <th>スペック</th>
+        <th>購入日</th>
+        <th>購入価格</th>
+        <th>使用年数</th>
+        <th>使用終了日</th>
+        <th>月額コスト</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector("tbody");
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    for (const key of [
+      "partName",
+      "modelNumber",
+      "specDetail",
+      "purchaseDate",
+      "purchasePrice",
+      "yearsOfUse",
+      "endOfUseDate",
+      "monthlyCost",
+    ]) {
+      const td = document.createElement("td");
+      if (key === "partName" || key === "specDetail") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "spec-list-value-button";
+        button.textContent = row[key];
+        button.title = row[key];
+        button.addEventListener("click", () => {
+          openSpecListValueDialog(row[key]);
+        });
+        td.appendChild(button);
+      } else {
+        td.textContent = row[key];
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+
+  const total = createElement("p", "spec-list-total");
+  total.innerHTML = `<span>${pcLabel}の総購入金額</span><strong>${formatCurrency(specListPurchaseTotal())}</strong>`;
+
+  scroll.appendChild(table);
+  elements.specListContent.append(scroll, total);
+}
+
+function csvValue(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function specListCsv() {
+  const pcLabel = pcNameLabels[specListPcName()] || pcNameLabels.main;
+  const lines = [
+    [csvValue(`${pcLabel} スペック一覧`)],
+    [],
+    ["商品名", "型番", "スペック", "購入日", "購入価格", "使用年数", "使用終了日", "月額コスト"].map(csvValue),
+  ];
+
+  for (const row of specListRows()) {
+    lines.push([
+      row.partName,
+      row.modelNumber,
+      row.specDetail,
+      row.purchaseDate,
+      row.purchasePrice,
+      row.yearsOfUse,
+      row.endOfUseDate,
+      row.monthlyCost,
+    ].map(csvValue));
+  }
+
+  lines.push([], ["総購入金額", formatCurrency(specListPurchaseTotal())].map(csvValue));
+  return lines.map((line) => line.join(",")).join("\r\n");
+}
+
+function saveSpecListCsv() {
+  const pcName = specListPcName();
+  const blob = new Blob([`\uFEFF${specListCsv()}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `pc-spec-list-${pcName}-${fileTimestamp()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function validatePcItem(item) {
@@ -867,6 +1079,28 @@ function cancelMovedSummaryToggleLongPress(event) {
   }
 }
 
+function clearPcFilterLongPress() {
+  if (!state.pcFilterLongPress) return;
+  window.clearTimeout(state.pcFilterLongPress.timer);
+  state.pcFilterLongPress = null;
+}
+
+function cancelPcFilterLongPress(event) {
+  if (!state.pcFilterLongPress || state.pcFilterLongPress.pointerId !== event.pointerId) return;
+  clearPcFilterLongPress();
+}
+
+function cancelMovedPcFilterLongPress(event) {
+  const longPress = state.pcFilterLongPress;
+  if (!longPress || longPress.pointerId !== event.pointerId) return;
+
+  const movedX = Math.abs(event.clientX - longPress.startX);
+  const movedY = Math.abs(event.clientY - longPress.startY);
+  if (movedX > PC_FILTER_MOVE_CANCEL_PX || movedY > PC_FILTER_MOVE_CANCEL_PX) {
+    clearPcFilterLongPress();
+  }
+}
+
 function showError(error, fallback) {
   if (elements.authError) {
     elements.authError.textContent = firebaseErrorMessage(error, fallback);
@@ -931,6 +1165,12 @@ if (elements.createButton) {
 
 if (elements.categoryFilter) {
   elements.categoryFilter.addEventListener("click", (event) => {
+    if (state.ignoreNextCategoryClick) {
+      state.ignoreNextCategoryClick = false;
+      event.preventDefault();
+      return;
+    }
+
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
 
@@ -948,6 +1188,35 @@ if (elements.categoryFilter) {
 
     render();
   });
+
+  elements.categoryFilter.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const button = target.closest(".category-filter-button");
+    if (!(button instanceof HTMLButtonElement)) return;
+
+    const pcName = button.dataset.pcName;
+    if (!pcName) return;
+
+    clearPcFilterLongPress();
+    state.pcFilterLongPress = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      timer: window.setTimeout(() => {
+        state.pcFilterLongPress = null;
+        state.ignoreNextCategoryClick = true;
+        window.location.href = `specs.html?pcName=${encodeURIComponent(pcName)}`;
+      }, PC_FILTER_LONG_PRESS_MS),
+    };
+  });
+
+  elements.categoryFilter.addEventListener("pointerup", cancelPcFilterLongPress);
+  elements.categoryFilter.addEventListener("pointercancel", cancelPcFilterLongPress);
+  elements.categoryFilter.addEventListener("pointerleave", cancelPcFilterLongPress);
+  elements.categoryFilter.addEventListener("pointermove", cancelMovedPcFilterLongPress);
 }
 
 if (elements.hiddenButton) {
@@ -962,7 +1231,7 @@ if (elements.settingsButton) {
   });
 }
 
-if (elements.backButton) {
+if (elements.backButton && !elements.specListContent) {
   elements.backButton.addEventListener("click", () => {
     window.location.href = TIMELINE_MODE === "hidden" ? "index.html" : "../list.html";
   });
@@ -1033,6 +1302,16 @@ if (elements.dialogCloseButton) {
   elements.dialogCloseButton.addEventListener("click", () => {
     elements.itemDialog.close();
   });
+}
+
+if (elements.backButton && elements.specListContent) {
+  elements.backButton.addEventListener("click", () => {
+    window.location.href = "index.html";
+  });
+}
+
+if (elements.specSaveButton) {
+  elements.specSaveButton.addEventListener("click", saveSpecListCsv);
 }
 
 if (elements.itemDialog) {
