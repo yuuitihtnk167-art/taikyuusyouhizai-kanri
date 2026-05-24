@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>スペック一覧 | パソコン管理</title>
+    <meta name="theme-color" content="#1f2933" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="pwa.css" />
+  </head>
+  <body class="dashboard-body spec-list-body">
+    <main class="app dashboard-app">
+      <header class="app-header dashboard-header spec-list-header">
+        <div class="dashboard-title">
+          <div class="dashboard-title-row">
+            <h1 id="spec-list-title">スペック一覧</h1>
+            <div class="dashboard-title-actions pc-management-title-actions">
+              <button id="back-button" type="button" class="ghost-button">戻る</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="panel spec-list-panel" aria-labelledby="spec-list-title">
+        <p id="auth-error" class="form-error"></p>
+        <div id="spec-list-content"></div>
+      </section>
+
+      <section class="spec-list-actions" aria-label="スペック一覧の操作">
+        <button id="spec-save-button" type="button" class="pc-management-button">保存</button>
+      </section>
+    </main>
+    <script type="module" src="pwa.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
