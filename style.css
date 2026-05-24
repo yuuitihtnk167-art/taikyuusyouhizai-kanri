@@ -1553,14 +1553,39 @@ button {
   align-items: flex-start;
 }
 
+.spec-list-body {
+  overflow-x: hidden;
+}
+
+.spec-list-body .dashboard-app,
+.spec-list-body .dashboard-header,
+.spec-list-body .dashboard-title,
+.spec-list-body .dashboard-title-row,
+.spec-list-body .spec-list-actions {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .spec-list-panel {
   display: grid;
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 18px;
 }
 
+#spec-list-content {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .spec-list-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
