@@ -541,8 +541,14 @@ function renderCurrentLine(grid, minYear, maxYear) {
   if (currentPosition !== null) {
     const currentLine = createElement("div", "timeline-current-line");
     currentLine.style.left = `${currentPosition}px`;
-    currentLine.innerHTML = '<button type="button" class="timeline-current-handle" data-action="drag-current-line" aria-label="現在ラインを動かす">✋</button>';
     grid.appendChild(currentLine);
+
+    const currentHandle = createElement("button", "timeline-current-handle", "✋");
+    currentHandle.type = "button";
+    currentHandle.dataset.action = "drag-current-line";
+    currentHandle.setAttribute("aria-label", "現在ラインを動かす");
+    currentHandle.style.left = `${currentPosition}px`;
+    grid.appendChild(currentHandle);
   }
 
   if (currentLabelPosition !== null) {
@@ -1098,7 +1104,10 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
 function applyTimelineMarkerDragPosition(drag) {
   state.timelineMarkerMonth = timelineMonthFromClientX(drag.clientX, drag.scroll, drag.minYear, drag.maxYear);
   const position = currentLinePosition(drag.minYear, drag.maxYear);
-  if (position !== null) drag.line.style.left = `${position}px`;
+  if (position !== null) {
+    drag.line.style.left = `${position}px`;
+    drag.handle.style.left = `${position}px`;
+  }
   renderSummary();
 }
 
@@ -1198,6 +1207,7 @@ function clearTimelineMarkerDrag() {
   stopTimelineMarkerAutoScroll(drag);
   if (drag.isDragging) {
     drag.line.classList.remove("dragging");
+    drag.handle.classList.remove("dragging");
     try {
       drag.handle.releasePointerCapture(drag.pointerId);
     } catch (_error) {
@@ -1210,6 +1220,7 @@ function clearTimelineMarkerDrag() {
 function beginTimelineMarkerDrag(event, drag) {
   drag.isDragging = true;
   drag.line.classList.add("dragging");
+  drag.handle.classList.add("dragging");
   drag.handle.setPointerCapture?.(event.pointerId);
   updateTimelineMarkerDrag(event);
 }
@@ -1220,10 +1231,12 @@ function startTimelineMarkerDrag(event) {
   const handle = timelineMarkerDragTarget(event.target);
   if (!handle) return;
 
-  const line = handle.closest(".timeline-current-line");
   const grid = handle.closest(".timeline-grid");
   const scroll = handle.closest(".timeline-scroll");
-  if (!(line instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(scroll instanceof HTMLElement)) return;
+  if (!(grid instanceof HTMLElement) || !(scroll instanceof HTMLElement)) return;
+
+  const line = grid.querySelector(".timeline-current-line");
+  if (!(line instanceof HTMLElement)) return;
 
   const drag = {
     handle,
