@@ -1212,6 +1212,34 @@ button {
   pointer-events: none;
 }
 
+.timeline-current-handle {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  transform: translateX(-50%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 999px;
+  background: rgba(20, 35, 50, 0.86);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+  font-size: 1.08rem;
+  line-height: 1;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.timeline-current-handle:active,
+.timeline-current-line.dragging .timeline-current-handle {
+  cursor: grabbing;
+}
+
 .timeline-current-line::before,
 .timeline-current-line::after {
   content: "";
@@ -1232,16 +1260,26 @@ button {
   border-top: 14px solid #51b7ff;
 }
 
-.timeline-current-line span {
-  position: sticky;
-  top: 74px;
-  display: inline-block;
+.timeline-current-label {
+  position: absolute;
+  top: 68px;
+  z-index: 9;
   transform: translateX(-50%);
-  margin-top: 26px;
   color: #51b7ff;
   font-size: 0.78rem;
   font-weight: 800;
   text-shadow: 0 0 12px rgba(81, 183, 255, 0.85);
+}
+
+.timeline-current-label::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  border-bottom: 8px solid #51b7ff;
 }
 
 .timeline-row {
@@ -2031,6 +2069,14 @@ button {
     width: 1px;
   }
 
+  .timeline-current-handle {
+    top: -26px;
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    font-size: 0.9rem;
+  }
+
   .timeline-current-line::before,
   .timeline-current-line::after {
     border-right-width: 5px;
@@ -2047,9 +2093,16 @@ button {
     border-top-width: 8px;
   }
 
-  .timeline-current-line span {
+  .timeline-current-label {
     margin-top: 14px;
     font-size: 0.54rem;
+  }
+
+  .timeline-current-label::before {
+    top: -9px;
+    border-right-width: 4px;
+    border-left-width: 4px;
+    border-bottom-width: 6px;
   }
 
   .timeline-row {

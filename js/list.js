@@ -51,6 +51,11 @@ const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
+const TIMELINE_MARKER_LONG_PRESS_MS = 500;
+const TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX = 48;
+const TIMELINE_MARKER_AUTO_SCROLL_MAX_PX = 18;
+const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX = 72;
+const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX = 16;
 const state = {
   uid: null,
   items: [],
@@ -60,6 +65,8 @@ const state = {
   resizeTimer: null,
   isBusy: false,
   summaryToggleLongPress: null,
+  timelineMarkerMonth: currentMonthIndex(),
+  timelineMarkerDrag: null,
 };
 
 function sessionStorageSetItem(key, value) {
@@ -247,6 +254,19 @@ function totalPurchaseCost(item) {
   return Number(item.purchasePrice || 0) + calculateAdditionalCostTotal(item);
 }
 
+function timelineMarkerMonth() {
+  return Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+}
+
+function activeEndMonth(item) {
+  if (item.endOfUseDate) return itemActualEndMonth(item);
+  return Math.max(itemPlannedEndMonth(item), currentMonthIndex());
+}
+
+function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
+  return itemStartMonth(item) <= monthPosition && monthPosition <= activeEndMonth(item);
+}
+
 function isMonthlyCostExcluded(item) {
   return isActualUseEnded(item) && itemPlannedEndMonth(item) <= currentMonthIndex();
 }
@@ -301,17 +321,16 @@ function syncSelectedItem(items) {
 function summarizeItems(items) {
   if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
 
-  const summaryTargetItems = items.filter((item) => !isSummaryExcluded(item));
-  const monthlyCostItems = summaryTargetItems.filter((item) => !isMonthlyCostSummaryExcluded(item));
-  const monthlyCostTotal = monthlyCostItems.reduce(
-    (total, item) => total + displayedMonthlyCost(item),
-    0
+  const monthPosition = timelineMarkerMonth();
+  const activeItems = items.filter(
+    (item) => !isSummaryExcluded(item) && isActiveAtTimelineMarker(item, monthPosition)
   );
-  const purchaseTotal = monthlyCostItems.reduce((total, item) => total + totalPurchaseCost(item), 0);
+  const monthlyCostTotal = activeItems.reduce((total, item) => total + Math.round(timelineMonthlyCost(item)), 0);
+  const purchaseTotal = activeItems.reduce((total, item) => total + totalPurchaseCost(item), 0);
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
-  summaryItemCount.textContent = `${monthlyCostItems.length} 件`;
+  summaryItemCount.textContent = `${activeItems.length} 件`;
 }
 
 function renderCategoryFilter() {
@@ -402,24 +421,40 @@ function renderAxis(grid, minYear, maxYear, positionClass) {
 
 function renderCurrentLine(grid, minYear, maxYear) {
   const currentPosition = currentLinePosition(minYear, maxYear);
+  const currentLabelPosition = actualCurrentLinePosition(minYear, maxYear);
 
-  if (currentPosition === null) return;
+  if (currentPosition !== null) {
+    const currentLine = createElement("div", "timeline-current-line");
+    currentLine.style.left = `${currentPosition}px`;
+    currentLine.innerHTML = '<button type="button" class="timeline-current-handle" data-action="drag-current-line" aria-label="現在ラインを動かす">✋</button>';
+    grid.appendChild(currentLine);
+  }
 
-  const currentLine = createElement("div", "timeline-current-line");
-  currentLine.style.left = `${currentPosition}px`;
-  currentLine.innerHTML = '<span>現在</span>';
-  grid.appendChild(currentLine);
+  if (currentLabelPosition !== null) {
+    const currentLabel = createElement("div", "timeline-current-label", "現在");
+    currentLabel.style.left = `${currentLabelPosition}px`;
+    grid.appendChild(currentLabel);
+  }
+}
+
+function actualCurrentLinePosition(minYear, maxYear) {
+  const { labelWidth, yearWidth } = timelineLayout();
+  const minMonth = minYear * 12;
+  const maxMonth = maxYear * 12;
+  const nowPosition = currentMonthIndex();
+
+  if (nowPosition < minMonth || nowPosition > maxMonth) return null;
+  return labelWidth + ((nowPosition - minMonth) / 12) * yearWidth;
 }
 
 function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
-  const now = new Date();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const nowPosition = toMonthPosition(now);
+  const markerMonth = timelineMarkerMonth();
 
-  if (nowPosition < minMonth || nowPosition > maxMonth) return null;
-  return labelWidth + ((nowPosition - minMonth) / 12) * yearWidth;
+  if (markerMonth < minMonth || markerMonth > maxMonth) return null;
+  return labelWidth + ((markerMonth - minMonth) / 12) * yearWidth;
 }
 
 function centerCurrentLine(scroll, minYear, maxYear) {
@@ -453,6 +488,8 @@ function renderTimeline(items) {
   scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
 
   const grid = createElement("div", "timeline-grid");
+  grid.dataset.minYear = String(minYear);
+  grid.dataset.maxYear = String(maxYear);
   grid.style.width = `${timelineWidth}px`;
   grid.style.setProperty("--label-width", `${labelWidth}px`);
   grid.style.setProperty("--year-width", `${yearWidth}px`);
@@ -607,6 +644,205 @@ function summaryToggleTarget(target) {
   if (!(target instanceof HTMLElement)) return null;
   const summaryToggle = target.closest("[data-action='toggle-summary']");
   return summaryToggle instanceof HTMLElement ? summaryToggle : null;
+}
+
+function timelineMarkerDragTarget(target) {
+  if (!(target instanceof HTMLElement)) return null;
+  const handle = target.closest("[data-action='drag-current-line']");
+  return handle instanceof HTMLElement ? handle : null;
+}
+
+function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
+  const { labelWidth, yearWidth } = timelineLayout();
+  const rect = scroll.getBoundingClientRect();
+  const minMonth = minYear * 12;
+  const maxMonth = maxYear * 12;
+  const x = scroll.scrollLeft + clientX - rect.left;
+  const monthPosition = minMonth + ((x - labelWidth) / yearWidth) * 12;
+  return Math.min(Math.max(monthPosition, minMonth), maxMonth);
+}
+
+function applyTimelineMarkerDragPosition(drag) {
+  state.timelineMarkerMonth = timelineMonthFromClientX(drag.clientX, drag.scroll, drag.minYear, drag.maxYear);
+  const position = currentLinePosition(drag.minYear, drag.maxYear);
+  if (position !== null) drag.line.style.left = `${position}px`;
+  summarizeItems(summaryItems());
+}
+
+function timelineMarkerAutoScrollSpeed(drag) {
+  const rect = drag.scroll.getBoundingClientRect();
+  const leftDistance = drag.clientX - rect.left;
+  const rightDistance = rect.right - drag.clientX;
+  const edge = TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX;
+  const maxSpeed = TIMELINE_MARKER_AUTO_SCROLL_MAX_PX;
+
+  if (leftDistance < edge) {
+    return -Math.ceil(((edge - Math.max(leftDistance, 0)) / edge) * maxSpeed);
+  }
+  if (rightDistance < edge) {
+    return Math.ceil(((edge - Math.max(rightDistance, 0)) / edge) * maxSpeed);
+  }
+  return 0;
+}
+
+function timelineMarkerVerticalAutoScrollSpeed(drag) {
+  const edge = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX;
+  const maxSpeed = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX;
+  const topDistance = drag.clientY;
+  const bottomDistance = window.innerHeight - drag.clientY;
+
+  if (topDistance < edge) {
+    return -Math.ceil(((edge - Math.max(topDistance, 0)) / edge) * maxSpeed);
+  }
+  if (bottomDistance < edge) {
+    return Math.ceil(((edge - Math.max(bottomDistance, 0)) / edge) * maxSpeed);
+  }
+  return 0;
+}
+
+function stopTimelineMarkerAutoScroll(drag) {
+  if (!drag?.autoScrollFrame) return;
+  cancelAnimationFrame(drag.autoScrollFrame);
+  drag.autoScrollFrame = null;
+}
+
+function startTimelineMarkerAutoScroll(drag) {
+  if (drag.autoScrollFrame) return;
+
+  const scroll = () => {
+    if (state.timelineMarkerDrag !== drag || !drag.isDragging) {
+      stopTimelineMarkerAutoScroll(drag);
+      return;
+    }
+
+    const horizontalSpeed = timelineMarkerAutoScrollSpeed(drag);
+    const verticalSpeed = timelineMarkerVerticalAutoScrollSpeed(drag);
+    if (horizontalSpeed === 0 && verticalSpeed === 0) {
+      stopTimelineMarkerAutoScroll(drag);
+      return;
+    }
+
+    const beforeScrollLeft = drag.scroll.scrollLeft;
+    const beforeScrollY = window.scrollY;
+    const maxScrollLeft = Math.max(drag.scroll.scrollWidth - drag.scroll.clientWidth, 0);
+    drag.scroll.scrollLeft = Math.min(Math.max(beforeScrollLeft + horizontalSpeed, 0), maxScrollLeft);
+    if (verticalSpeed !== 0) {
+      window.scrollBy(0, verticalSpeed);
+    }
+
+    if (drag.scroll.scrollLeft === beforeScrollLeft && window.scrollY === beforeScrollY) {
+      stopTimelineMarkerAutoScroll(drag);
+      return;
+    }
+
+    applyTimelineMarkerDragPosition(drag);
+    drag.autoScrollFrame = requestAnimationFrame(scroll);
+  };
+
+  drag.autoScrollFrame = requestAnimationFrame(scroll);
+}
+
+function updateTimelineMarkerDrag(event) {
+  const drag = state.timelineMarkerDrag;
+  if (!drag?.isDragging) return;
+
+  drag.clientX = event.clientX;
+  drag.clientY = event.clientY;
+  applyTimelineMarkerDragPosition(drag);
+
+  if (timelineMarkerAutoScrollSpeed(drag) === 0 && timelineMarkerVerticalAutoScrollSpeed(drag) === 0) {
+    stopTimelineMarkerAutoScroll(drag);
+  } else {
+    startTimelineMarkerAutoScroll(drag);
+  }
+}
+
+function clearTimelineMarkerDrag() {
+  const drag = state.timelineMarkerDrag;
+  if (!drag) return;
+
+  window.clearTimeout(drag.timer);
+  stopTimelineMarkerAutoScroll(drag);
+  if (drag.isDragging) {
+    drag.line.classList.remove("dragging");
+    try {
+      drag.handle.releasePointerCapture(drag.pointerId);
+    } catch (_error) {
+      // Pointer capture may already be released by the browser.
+    }
+  }
+  state.timelineMarkerDrag = null;
+}
+
+function beginTimelineMarkerDrag(event, drag) {
+  drag.isDragging = true;
+  drag.line.classList.add("dragging");
+  drag.handle.setPointerCapture?.(event.pointerId);
+  updateTimelineMarkerDrag(event);
+}
+
+function startTimelineMarkerDrag(event) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+
+  const handle = timelineMarkerDragTarget(event.target);
+  if (!handle) return;
+
+  const line = handle.closest(".timeline-current-line");
+  const grid = handle.closest(".timeline-grid");
+  const scroll = handle.closest(".timeline-scroll");
+  if (!(line instanceof HTMLElement) || !(grid instanceof HTMLElement) || !(scroll instanceof HTMLElement)) return;
+
+  const drag = {
+    handle,
+    line,
+    scroll,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    minYear: Number(grid.dataset.minYear),
+    maxYear: Number(grid.dataset.maxYear),
+    isDragging: false,
+    timer: 0,
+    autoScrollFrame: null,
+  };
+  if (!Number.isFinite(drag.minYear) || !Number.isFinite(drag.maxYear)) return;
+
+  clearTimelineMarkerDrag();
+  state.timelineMarkerDrag = drag;
+
+  if (event.pointerType === "mouse") {
+    event.preventDefault();
+    beginTimelineMarkerDrag(event, drag);
+    return;
+  }
+
+  drag.timer = window.setTimeout(() => {
+    beginTimelineMarkerDrag(event, drag);
+  }, TIMELINE_MARKER_LONG_PRESS_MS);
+}
+
+function moveTimelineMarkerDrag(event) {
+  const drag = state.timelineMarkerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+
+  if (!drag.isDragging) {
+    const movedX = Math.abs(event.clientX - drag.startX);
+    const movedY = Math.abs(event.clientY - drag.startY);
+    if (movedX > SUMMARY_TOGGLE_MOVE_CANCEL_PX || movedY > SUMMARY_TOGGLE_MOVE_CANCEL_PX) {
+      clearTimelineMarkerDrag();
+    }
+    return;
+  }
+
+  event.preventDefault();
+  updateTimelineMarkerDrag(event);
+}
+
+function endTimelineMarkerDrag(event) {
+  if (!state.timelineMarkerDrag || state.timelineMarkerDrag.pointerId !== event.pointerId) return;
+  clearTimelineMarkerDrag();
 }
 
 function clearSummaryToggleLongPress() {
@@ -797,6 +1033,11 @@ itemList.addEventListener("click", (event) => {
   selectItem(band.dataset.id ?? "");
 });
 
+itemList.addEventListener("pointerdown", startTimelineMarkerDrag);
+itemList.addEventListener("pointermove", moveTimelineMarkerDrag);
+itemList.addEventListener("pointerup", endTimelineMarkerDrag);
+itemList.addEventListener("pointercancel", endTimelineMarkerDrag);
+itemList.addEventListener("pointerleave", endTimelineMarkerDrag);
 itemList.addEventListener("pointerdown", startSummaryToggleLongPress);
 itemList.addEventListener("pointerup", cancelSummaryToggleLongPress);
 itemList.addEventListener("pointercancel", cancelSummaryToggleLongPress);
