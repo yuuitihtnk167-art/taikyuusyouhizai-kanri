@@ -48,6 +48,7 @@ export async function saveItem(uid, item, options = {}) {
     category: item.category,
     assetReferenceItemId: item.assetReferenceItemId,
     assetReferenceItemCode: item.assetReferenceItemCode,
+    pcManagementLinked: Boolean(item.pcManagementLinked),
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,

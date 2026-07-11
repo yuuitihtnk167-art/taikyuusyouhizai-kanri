@@ -540,6 +540,7 @@ function normalizeStoredItem(item) {
     assetReferenceItemId: String(item.assetReferenceItemId ?? item.assetReferenceItemCode ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
+    pcManagementLinked: Boolean(item.pcManagementLinked),
     purchaseDate: item.purchaseDate ?? "",
     purchasePrice: Number(item.purchasePrice ?? 0),
     yearsOfUse: Number(item.yearsOfUse ?? 0),
@@ -612,6 +613,7 @@ export async function saveItem(uid, item) {
       category: item.category,
       assetReferenceItemId: item.assetReferenceItemId,
       assetReferenceItemCode: item.assetReferenceItemCode,
+      pcManagementLinked: Boolean(item.pcManagementLinked),
       purchaseDate: item.purchaseDate,
       purchasePrice: item.purchasePrice,
       yearsOfUse: item.yearsOfUse,
@@ -631,6 +633,7 @@ export async function saveItem(uid, item) {
     category: normalizeCategory(item.category),
     assetReferenceItemId: String(item.assetReferenceItemId ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
+    pcManagementLinked: Boolean(item.pcManagementLinked),
     purchaseDate: item.purchaseDate,
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
@@ -657,11 +660,11 @@ export async function removeItem(uid, itemId) {
 
 export function validateItem(item) {
   if (!item.name.trim()) return "商品名を入力してください。";
-  if (!item.model.trim()) return "型番を入力してください。";
+  if (!item.pcManagementLinked && !item.model.trim()) return "型番を入力してください。";
   if (normalizeCategory(item.category) !== item.category) return "分類を選択してください。";
-  if (!item.purchaseDate) return "購入日を入力してください。";
-  if (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0) return "購入価格は0以上で入力してください。";
-  if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用年数は1以上で入力してください。";
+  if (!item.pcManagementLinked && !item.purchaseDate) return "購入日を入力してください。";
+  if (!item.pcManagementLinked && (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0)) return "購入価格は0以上で入力してください。";
+  if (!item.pcManagementLinked && (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0)) return "使用年数は1以上で入力してください。";
   if (item.endOfUseDate && calculateUsageMonths(item.purchaseDate, item.endOfUseDate) === 0) {
     return "使用終了日は購入日以降の日付を入力してください。";
   }

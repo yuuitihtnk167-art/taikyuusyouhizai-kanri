@@ -209,6 +209,17 @@ textarea:focus {
   font-size: 0.9rem;
 }
 
+#pc-reflect-button[hidden],
+#use-form-data-button[hidden],
+#dialog-pc-prompt[hidden],
+#dialog-pc-button[hidden] {
+  display: none;
+}
+
+#dialog-pc-button {
+  width: 100%;
+}
+
 .form-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -1435,6 +1446,42 @@ button {
   display: none;
 }
 
+.lifecycle-band.pc-management-linked .band-name,
+.lifecycle-band.pc-management-linked .band-cost {
+  display: none;
+}
+
+.pc-linked-cost-label {
+  position: absolute;
+  top: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  transform: translateX(-50%);
+  color: #f8fafc;
+  font-size: 0.86rem;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.pc-linked-reflection {
+  color: #b8c5d1;
+  font-size: 0.78rem;
+}
+
+.pc-linked-selected-cost {
+  padding-left: 8px;
+  border-left: 1px solid rgba(248, 250, 252, 0.32);
+}
+
+.pc-linked-selected-cost[hidden] {
+  display: none;
+}
+
 .timeline-end-label {
   position: absolute;
   top: 27px;
@@ -2175,7 +2222,8 @@ button {
   .band-cost,
   .timeline-end-label,
   .timeline-planned-cost-label,
-  .timeline-zero-cost-label {
+  .timeline-zero-cost-label,
+  .pc-linked-cost-label {
     display: none;
   }
 
@@ -2235,5 +2283,15 @@ button {
 
   .dialog-actions {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .band-cost,
+  .timeline-end-label,
+  .timeline-planned-cost-label,
+  .timeline-zero-cost-label,
+  .pc-linked-cost-label {
+    display: none;
   }
 }
