@@ -15,6 +15,7 @@ import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
+import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -37,6 +38,8 @@ const summaryItemCount = document.getElementById("summary-item-count");
 const itemNameDialog = document.getElementById("item-name-dialog");
 const dialogItemName = document.getElementById("dialog-item-name");
 const dialogItemMeta = document.getElementById("dialog-item-meta");
+const dialogPcPrompt = document.getElementById("dialog-pc-prompt");
+const dialogPcButton = document.getElementById("dialog-pc-button");
 const dialogEditButton = document.getElementById("dialog-edit-button");
 const dialogDeleteButton = document.getElementById("dialog-delete-button");
 const dialogCloseButton = document.getElementById("dialog-close-button");
@@ -59,6 +62,10 @@ const state = {
   uid: null,
   items: [],
   summaryItems: [],
+  pcItems: [],
+  pcCurrentMonthlyCost: 0,
+  pcMonthlyCost: 0,
+  pcPurchaseTotal: 0,
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
   selectedItemId: null,
   resizeTimer: null,
@@ -123,7 +130,12 @@ function formatYearMonthFromIndex(monthIndex) {
   return `${year}/${String(month).padStart(2, "0")}`;
 }
 
+function isPcManagementLinkedItem(item) {
+  return Boolean(item?.pcManagementLinked);
+}
+
 function itemStartMonth(item) {
+  if (isPcManagementLinkedItem(item)) return TIMELINE_MIN_YEAR * 12;
   const purchaseDate = parseDate(item.purchaseDate);
   return purchaseDate ? toMonthPosition(purchaseDate) : TIMELINE_MIN_YEAR * 12;
 }
@@ -133,6 +145,7 @@ function currentMonthIndex() {
 }
 
 function itemPlannedEndMonth(item) {
+  if (isPcManagementLinkedItem(item)) return TIMELINE_MAX_YEAR * 12;
   const purchaseDate = parseDate(item.purchaseDate);
   const yearsOfUse = Math.max(Number(item.yearsOfUse) || 1, 1);
   if (!purchaseDate) {
@@ -169,6 +182,7 @@ function itemTimelineEndMonth(item) {
 }
 
 function itemEndLabel(item, endMonth) {
+  if (isPcManagementLinkedItem(item)) return "";
   if (item.endOfUseDate) {
     return `${formatYearMonthFromIndex(endMonth)} (使用終了)`;
   }
@@ -234,11 +248,33 @@ function lifecycleStatus(item) {
   return "normal";
 }
 
+function updatePcSummaryForMonth(monthPosition = timelineMarkerMonth()) {
+  const summary = calculatePcSummaryAt(state.pcItems, monthPosition);
+  state.pcMonthlyCost = summary.monthlyCost;
+  state.pcPurchaseTotal = summary.purchaseTotal;
+}
+
+function isTimelineMarkerAtCurrentMonth() {
+  return Math.floor(timelineMarkerMonth()) === currentMonthIndex();
+}
+
+function updatePcLinkedCostDisplays() {
+  itemList.querySelectorAll(".pc-linked-current-cost").forEach((element) => {
+    element.textContent = `${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`;
+  });
+  itemList.querySelectorAll(".pc-linked-selected-cost").forEach((element) => {
+    element.textContent = `\u9078\u629e\u6708 ${formatCurrency(state.pcMonthlyCost)} /\u6708`;
+    element.hidden = isTimelineMarkerAtCurrentMonth();
+  });
+}
+
 function timelineMonthlyCost(item) {
+  if (isPcManagementLinkedItem(item)) return state.pcMonthlyCost;
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
 function itemSummaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
+  if (isPcManagementLinkedItem(item)) return state.pcMonthlyCost;
   return itemPlannedEndMonth(item) < monthPosition ? 0 : timelineMonthlyCost(item);
 }
 
@@ -247,6 +283,7 @@ function displayedMonthlyCost(item) {
 }
 
 function totalPurchaseCost(item) {
+  if (isPcManagementLinkedItem(item)) return state.pcPurchaseTotal;
   return Number(item.purchasePrice || 0) + calculateAdditionalCostTotal(item);
 }
 
@@ -525,17 +562,18 @@ function renderTimeline(items) {
 
   const rows = createElement("div", "timeline-rows");
   for (const item of sortedItems) {
-    const startMonth = itemStartMonth(item);
-    const endMonth = itemEndMonth(item);
+    const isLinkedToPcManagement = isPcManagementLinkedItem(item);
+    const startMonth = isLinkedToPcManagement ? minMonth : itemStartMonth(item);
+    const endMonth = isLinkedToPcManagement ? maxYear * 12 : itemEndMonth(item);
     const unusedPeriodEndMonth = itemUnusedPeriodEndMonth(item);
-    const plannedEndMonth = itemPlannedEndMonth(item);
+    const plannedEndMonth = isLinkedToPcManagement ? maxYear * 12 : itemPlannedEndMonth(item);
     const status = lifecycleStatus(item);
     const left = labelWidth + ((startMonth - minMonth) / 12) * yearWidth;
     const width = Math.max(((endMonth - startMonth) / 12) * yearWidth, timelineLayout().isCompact ? 32 : 84);
     const unusedPeriodLeft = labelWidth + ((endMonth - minMonth) / 12) * yearWidth;
     const unusedPeriodWidth = ((unusedPeriodEndMonth - endMonth) / 12) * yearWidth;
     const overuseStartPercent = ((plannedEndMonth - startMonth) / Math.max(endMonth - startMonth, 1)) * 100;
-    const isOverused = itemActualEndMonth(item) > plannedEndMonth;
+    const isOverused = !isLinkedToPcManagement && itemActualEndMonth(item) > plannedEndMonth;
     const isSelected = item.id === state.selectedItemId;
 
     const row = createElement("div", "timeline-row");
@@ -555,6 +593,9 @@ function renderTimeline(items) {
     band.setAttribute("aria-label", `${item.name}の詳細を表示`);
     band.style.left = `${left}px`;
     band.style.width = `${width}px`;
+    if (isLinkedToPcManagement) {
+      band.classList.add("pc-management-linked");
+    }
     if (isOverused) {
       band.style.setProperty("--overuse-start", `${Math.min(Math.max(overuseStartPercent, 0), 100)}%`);
       band.classList.add("is-overused");
@@ -563,6 +604,22 @@ function renderTimeline(items) {
     const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
     const costText = createElement("span", "band-cost", `${formatCurrency(timelineMonthlyCost(item))} /月`);
     band.append(purchaseText, costText);
+
+    if (isLinkedToPcManagement) {
+      const linkedLabel = createElement("span", "pc-linked-cost-label");
+      const selectedCost = createElement(
+        "span",
+        "pc-linked-selected-cost",
+        `\u9078\u629e\u6708 ${formatCurrency(state.pcMonthlyCost)} /\u6708`
+      );
+      selectedCost.hidden = isTimelineMarkerAtCurrentMonth();
+      linkedLabel.append(
+        createElement("span", "pc-linked-reflection", "PC\u7ba1\u7406\u3092\u53cd\u6620"),
+        createElement("span", "pc-linked-current-cost", `${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`),
+        selectedCost
+      );
+      row.appendChild(linkedLabel);
+    }
 
     if (isOverused) {
       const plannedCostLabel = costText.cloneNode(true);
@@ -604,6 +661,17 @@ function renderTimeline(items) {
   renderAxis(grid, minYear, maxYear, "timeline-axis-bottom");
   scroll.appendChild(grid);
   itemList.appendChild(scroll);
+
+  const updateLinkedLabelPosition = () => {
+    const visibleLeft = scroll.scrollLeft + labelWidth;
+    const visibleRight = scroll.scrollLeft + scroll.clientWidth;
+    const visibleCenter = (visibleLeft + visibleRight) / 2;
+    grid.querySelectorAll(".pc-linked-cost-label").forEach((label) => {
+      label.style.left = `${visibleCenter}px`;
+    });
+  };
+  scroll.addEventListener("scroll", updateLinkedLabelPosition, { passive: true });
+  requestAnimationFrame(updateLinkedLabelPosition);
   centerCurrentLine(scroll, minYear, maxYear);
 }
 
@@ -621,14 +689,29 @@ function selectItem(itemId) {
 function openItemNameDialog(item) {
   if (!item || !itemNameDialog) return;
   dialogItemName.textContent = item.name || "商品名未入力";
-  dialogItemMeta.textContent = `購入金額${formatCurrency(Number(item.purchasePrice || 0))} / ${formatCurrency(
-    timelineMonthlyCost(item)
-  )} /月`;
+  const isLinked = isPcManagementLinkedItem(item);
+  dialogItemMeta.textContent = isLinked
+    ? `PC\u7ba1\u7406\u3092\u53cd\u6620 ${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`
+    : `\u8cfc\u5165\u91d1\u984d${formatCurrency(Number(item.purchasePrice || 0))} / ${formatCurrency(
+      timelineMonthlyCost(item)
+    )} /\u6708`;
+  if (dialogPcPrompt && dialogPcButton) {
+    dialogPcPrompt.hidden = !isLinked;
+    dialogPcButton.hidden = !isLinked;
+    dialogPcPrompt.textContent = "PC\u7ba1\u7406\u3092\u8868\u793a\u3057\u307e\u3059\u304b\uff1f";
+    dialogPcButton.textContent = "PC\u7ba1\u7406\u3092\u8868\u793a";
+  }
   itemNameDialog.showModal();
 }
 
 async function refreshList() {
-  const loadedItems = await loadItems(state.uid);
+  const [loadedItems, pcItems] = await Promise.all([
+    loadItems(state.uid),
+    loadPcSummaryItems(state.uid),
+  ]);
+  state.pcItems = pcItems;
+  state.pcCurrentMonthlyCost = calculatePcSummaryAt(pcItems, currentMonthIndex()).monthlyCost;
+  updatePcSummaryForMonth();
   state.summaryItems = loadedItems.filter((item) => !isPcManagementItem(item));
   state.items =
     TIMELINE_MODE === "hidden"
@@ -705,6 +788,7 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
 
 function applyTimelineMarkerDragPosition(drag) {
   state.timelineMarkerMonth = timelineMonthFromClientX(drag.clientX, drag.scroll, drag.minYear, drag.maxYear);
+  updatePcSummaryForMonth();
   const position = currentLinePosition(drag.minYear, drag.maxYear);
   if (position !== null) {
     drag.line.style.left = `${position}px`;
@@ -713,6 +797,7 @@ function applyTimelineMarkerDragPosition(drag) {
     });
   }
   summarizeItems(summaryItems());
+  updatePcLinkedCostDisplays();
 }
 
 function timelineMarkerAutoScrollSpeed(drag) {
@@ -1094,6 +1179,12 @@ itemList.addEventListener("pointerup", cancelSummaryToggleLongPress);
 itemList.addEventListener("pointercancel", cancelSummaryToggleLongPress);
 itemList.addEventListener("pointerleave", cancelSummaryToggleLongPress);
 itemList.addEventListener("pointermove", cancelMovedSummaryToggleLongPress);
+
+dialogPcButton?.addEventListener("click", () => {
+  const item = selectedItem();
+  if (!isPcManagementLinkedItem(item)) return;
+  window.location.href = "pc-management/index.html";
+});
 
 dialogEditButton.addEventListener("click", () => {
   const item = selectedItem();

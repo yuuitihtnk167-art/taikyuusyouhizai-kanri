@@ -20,6 +20,8 @@ import {
 import { loadItem, saveItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
+const PC_TOTAL_ITEM_NAME = "\u30d1\u30bd\u30b3\u30f3\u7dcf\u8cbb\u7528";
+const PC_TOTAL_CATEGORY = "information_device";
 const HIDDEN_TIMELINE_NOTICE_MESSAGE = "非表示でも使用年数が未達の場合は加算されます。";
 
 const authError = document.getElementById("auth-error");
@@ -28,6 +30,8 @@ const form = document.getElementById("item-form");
 const formPanel = document.getElementById("form-panel");
 const formError = document.getElementById("form-error");
 const submitButton = document.getElementById("submit-button");
+const pcReflectButton = document.getElementById("pc-reflect-button");
+const useFormDataButton = document.getElementById("use-form-data-button");
 
 const idInput = document.getElementById("item-id");
 const nameInput = document.getElementById("name");
@@ -113,9 +117,21 @@ const state = {
   editingId: new URLSearchParams(window.location.search).get("id") || sessionStorageGetItem(EDITING_ITEM_ID_KEY),
   assetReferenceData: null,
   excludeFromSummary: false,
+  pcManagementLinked: false,
   isDirty: false,
   isBusy: false,
 };
+
+function updatePcReflectButton() {
+  const canReflect =
+    !state.pcManagementLinked &&
+    nameInput.value.trim() === PC_TOTAL_ITEM_NAME &&
+    categoryInput.value === PC_TOTAL_CATEGORY;
+  if (pcReflectButton) pcReflectButton.hidden = !canReflect;
+  if (useFormDataButton) {
+    useFormDataButton.hidden = !(state.editingId && state.pcManagementLinked);
+  }
+}
 
 function updateAssetReferenceDisplay() {
   if (!unitPriceReference || !usefulLifeReference) return;
@@ -307,6 +323,8 @@ function fillForm(item) {
   endOfUseDateInput.value = item.endOfUseDate;
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   state.excludeFromSummary = Boolean(item.excludeFromSummary);
+  state.pcManagementLinked = Boolean(item.pcManagementLinked);
+  updatePcReflectButton();
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
   updateAssetReferenceDisplay();
@@ -340,6 +358,8 @@ additionalCostList.addEventListener("click", (event) => {
   updateCalculationResult();
 });
 
+nameInput.addEventListener("input", updatePcReflectButton);
+categoryInput.addEventListener("change", updatePcReflectButton);
 form.addEventListener("input", updateCalculationResult);
 form.addEventListener("change", updateCalculationResult);
 form.addEventListener("input", () => {
@@ -361,6 +381,8 @@ endOfUseDateInput.addEventListener("input", () => {
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   formError.textContent = "";
+  const usePcManagement = event.submitter === pcReflectButton;
+  const useFormData = event.submitter === useFormDataButton;
 
   const item = {
     id: idInput.value || createId(),
@@ -376,6 +398,7 @@ form.addEventListener("submit", async (event) => {
     endOfUseDate: endOfUseDateInput.value,
     hideFromTimeline: hideFromTimelineInput.checked,
     excludeFromSummary: state.excludeFromSummary,
+    pcManagementLinked: usePcManagement || (!useFormData && state.pcManagementLinked),
     additionalCosts: collectAdditionalCosts(),
   };
   const validation = validateItem(item);
@@ -419,6 +442,8 @@ async function initializeForm(user) {
   populateAssetReferenceSelect();
 
   if (!state.editingId) {
+    state.pcManagementLinked = false;
+    updatePcReflectButton();
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
     submitButton.textContent = "登録する";
     updateEndedUseStyle();

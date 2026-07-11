@@ -33,6 +33,7 @@ function normalizeStoredItem(item) {
     assetReferenceItemId: String(item.assetReferenceItemId ?? item.assetReferenceItemCode ?? ""),
     assetReferenceItemCode: String(item.assetReferenceItemCode ?? ""),
     sourceType: item.sourceType ?? "",
+    pcManagementLinked: Boolean(item.pcManagementLinked),
     purchaseDate: item.purchaseDate ?? "",
     purchasePrice: Number(item.purchasePrice ?? 0),
     yearsOfUse: Number(item.yearsOfUse ?? 0),
