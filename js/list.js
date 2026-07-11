@@ -3,7 +3,6 @@ import {
   parseLocalBackupText,
   restoreLocalBackupData,
   calculateAdditionalCostTotal,
-  calculateActualMonthlyCost,
   calculateMonthlyCost,
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
@@ -239,11 +238,8 @@ function timelineMonthlyCost(item) {
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
-function itemSummaryMonthlyCost(item) {
-  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
-    return calculateActualMonthlyCost(item) ?? timelineMonthlyCost(item);
-  }
-  return timelineMonthlyCost(item);
+function itemSummaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
+  return itemPlannedEndMonth(item) < monthPosition ? 0 : timelineMonthlyCost(item);
 }
 
 function displayedMonthlyCost(item) {
@@ -259,12 +255,29 @@ function timelineMarkerMonth() {
 }
 
 function activeEndMonth(item) {
+  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
+    return itemPlannedEndMonth(item);
+  }
   if (item.endOfUseDate) return itemActualEndMonth(item);
   return Math.max(itemPlannedEndMonth(item), currentMonthIndex());
 }
 
 function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
   return itemStartMonth(item) <= monthPosition && monthPosition <= activeEndMonth(item);
+}
+
+function summaryActiveEndMonth(item) {
+  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
+    return itemPlannedEndMonth(item);
+  }
+  if (item.endOfUseDate) {
+    return Math.min(itemActualEndMonth(item), itemPlannedEndMonth(item));
+  }
+  return itemPlannedEndMonth(item);
+}
+
+function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
+  return itemStartMonth(item) <= monthPosition && monthPosition <= summaryActiveEndMonth(item);
 }
 
 function isMonthlyCostExcluded(item) {
@@ -323,9 +336,12 @@ function summarizeItems(items) {
 
   const monthPosition = timelineMarkerMonth();
   const activeItems = items.filter(
-    (item) => !isSummaryExcluded(item) && isActiveAtTimelineMarker(item, monthPosition)
+    (item) => !isSummaryExcluded(item) && isActiveInSummaryAtTimelineMarker(item, monthPosition)
   );
-  const monthlyCostTotal = activeItems.reduce((total, item) => total + Math.round(timelineMonthlyCost(item)), 0);
+  const monthlyCostTotal = activeItems.reduce(
+    (total, item) => total + Math.round(itemSummaryMonthlyCost(item, monthPosition)),
+    0
+  );
   const purchaseTotal = activeItems.reduce((total, item) => total + totalPurchaseCost(item), 0);
 
   summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
@@ -434,6 +450,10 @@ function renderCurrentLine(grid, minYear, maxYear) {
     currentHandle.setAttribute("aria-label", "現在ラインを動かす");
     currentHandle.style.left = `${currentPosition}px`;
     grid.appendChild(currentHandle);
+
+    const bottomHandle = currentHandle.cloneNode(true);
+    bottomHandle.classList.add("bottom");
+    grid.appendChild(bottomHandle);
   }
 
   if (currentLabelPosition !== null) {
@@ -537,11 +557,19 @@ function renderTimeline(items) {
     band.style.width = `${width}px`;
     if (isOverused) {
       band.style.setProperty("--overuse-start", `${Math.min(Math.max(overuseStartPercent, 0), 100)}%`);
+      band.classList.add("is-overused");
     }
 
     const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
     const costText = createElement("span", "band-cost", `${formatCurrency(timelineMonthlyCost(item))} /月`);
     band.append(purchaseText, costText);
+
+    if (isOverused) {
+      const plannedCostLabel = costText.cloneNode(true);
+      plannedCostLabel.className = "timeline-planned-cost-label";
+      plannedCostLabel.style.left = `${labelWidth + ((plannedEndMonth - minMonth) / 12) * yearWidth}px`;
+      row.appendChild(plannedCostLabel);
+    }
 
     if (item.endOfUseDate && unusedPeriodWidth > 0) {
       const postEndBand = createElement("button", "post-end-band");
@@ -560,6 +588,13 @@ function renderTimeline(items) {
       itemEndLabel(item, endMonth)
     );
     endLabel.style.left = `${left + width + 10}px`;
+
+    if (isOverused) {
+      const zeroCostLabel = costText.cloneNode(true);
+      zeroCostLabel.className = "timeline-zero-cost-label";
+      zeroCostLabel.textContent = `${formatCurrency(0)} /${String.fromCharCode(26376)}`;
+      endLabel.append(" ", zeroCostLabel);
+    }
 
     row.append(label, band, endLabel);
     rows.appendChild(row);
@@ -673,7 +708,9 @@ function applyTimelineMarkerDragPosition(drag) {
   const position = currentLinePosition(drag.minYear, drag.maxYear);
   if (position !== null) {
     drag.line.style.left = `${position}px`;
-    drag.handle.style.left = `${position}px`;
+    drag.handles.forEach((handle) => {
+      handle.style.left = `${position}px`;
+    });
   }
   summarizeItems(summaryItems());
 }
@@ -774,7 +811,7 @@ function clearTimelineMarkerDrag() {
   stopTimelineMarkerAutoScroll(drag);
   if (drag.isDragging) {
     drag.line.classList.remove("dragging");
-    drag.handle.classList.remove("dragging");
+    drag.handles.forEach((handle) => handle.classList.remove("dragging"));
     try {
       drag.handle.releasePointerCapture(drag.pointerId);
     } catch (_error) {
@@ -787,7 +824,7 @@ function clearTimelineMarkerDrag() {
 function beginTimelineMarkerDrag(event, drag) {
   drag.isDragging = true;
   drag.line.classList.add("dragging");
-  drag.handle.classList.add("dragging");
+  drag.handles.forEach((handle) => handle.classList.add("dragging"));
   drag.handle.setPointerCapture?.(event.pointerId);
   updateTimelineMarkerDrag(event);
 }
@@ -807,6 +844,7 @@ function startTimelineMarkerDrag(event) {
 
   const drag = {
     handle,
+    handles: [...grid.querySelectorAll(".timeline-current-handle")],
     line,
     scroll,
     pointerId: event.pointerId,

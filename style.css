@@ -1236,6 +1236,11 @@ button {
   touch-action: none;
 }
 
+.timeline-current-handle.bottom {
+  top: auto;
+  bottom: 10px;
+}
+
 .timeline-current-handle:active,
 .timeline-current-handle.dragging {
   cursor: grabbing;
@@ -1426,16 +1431,36 @@ button {
   text-align: right;
 }
 
+.lifecycle-band.is-overused .band-cost {
+  display: none;
+}
+
 .timeline-end-label {
   position: absolute;
   top: 27px;
   z-index: 2;
   overflow: hidden;
-  max-width: 180px;
+  max-width: 240px;
   font-size: 0.94rem;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.timeline-planned-cost-label {
+  position: absolute;
+  top: 27px;
+  z-index: 4;
+  overflow: hidden;
+  max-width: 140px;
+  transform: translateX(calc(-100% - 10px));
+  color: #f8fafc;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .status-normal {
@@ -2078,6 +2103,11 @@ button {
     font-size: 0.9rem;
   }
 
+  .timeline-current-handle.bottom {
+    top: auto;
+    bottom: 1px;
+  }
+
   .timeline-current-line::before,
   .timeline-current-line::after {
     border-right-width: 5px;
@@ -2143,7 +2173,9 @@ button {
   }
 
   .band-cost,
-  .timeline-end-label {
+  .timeline-end-label,
+  .timeline-planned-cost-label,
+  .timeline-zero-cost-label {
     display: none;
   }
 
