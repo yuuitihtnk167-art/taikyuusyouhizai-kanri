@@ -2222,8 +2222,18 @@ button {
   .band-cost,
   .timeline-end-label,
   .timeline-planned-cost-label,
-  .timeline-zero-cost-label,
+  .timeline-zero-cost-label {
+    display: none;
+  }
+
   .pc-linked-cost-label {
+    top: 7px;
+    display: flex;
+    height: 24px;
+  }
+
+  .pc-linked-current-cost,
+  .pc-linked-selected-cost {
     display: none;
   }
 
@@ -2286,7 +2296,7 @@ button {
   }
 }
 
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer: coarse) and (min-width: 641px) {
   .band-cost,
   .timeline-end-label,
   .timeline-planned-cost-label,
