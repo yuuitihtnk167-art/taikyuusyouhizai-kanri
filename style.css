@@ -1979,7 +1979,7 @@ button {
 
   .dashboard-actions button {
     width: 82px;
-    min-height: 30px;
+    min-height: 28px;
     min-width: 82px;
     padding: 0 10px;
     border-radius: 4px;
@@ -1991,10 +1991,10 @@ button {
   }
 
   .dashboard-actions .category-filter-button {
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    min-height: 28px;
     border-radius: 4px;
   }
 

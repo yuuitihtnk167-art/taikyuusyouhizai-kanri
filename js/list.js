@@ -56,6 +56,7 @@ const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
 const CATEGORY_REORDER_LONG_PRESS_MS = SUMMARY_TOGGLE_LONG_PRESS_MS;
 const CATEGORY_REORDER_MOVE_CANCEL_PX = SUMMARY_TOGGLE_MOVE_CANCEL_PX;
+const CATEGORY_REORDER_TOUCH_START_PX = CATEGORY_REORDER_MOVE_CANCEL_PX;
 const CATEGORY_REORDER_MOUSE_START_PX = 4;
 const TIMELINE_MARKER_LONG_PRESS_MS = 500;
 const TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX = 48;
@@ -468,6 +469,9 @@ function beginCategoryReorder() {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.isDragging) return;
   reorder.isDragging = true;
+  reorder.dragStartX = reorder.currentX;
+  reorder.dragStartY = reorder.currentY;
+  reorder.isMovementReady = reorder.pointerType === "mouse";
   reorder.button.classList.add("dragging");
   reorder.button.setAttribute("aria-grabbed", "true");
   categoryFilter?.classList.add("reordering");
@@ -486,6 +490,8 @@ function startCategoryReorder(event) {
     button,
     startX: event.clientX,
     startY: event.clientY,
+    currentX: event.clientX,
+    currentY: event.clientY,
     isDragging: false,
     timer: null,
   };
@@ -501,6 +507,8 @@ function moveCategoryButton(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
 
+  reorder.currentX = event.clientX;
+  reorder.currentY = event.clientY;
   const movedX = Math.abs(event.clientX - reorder.startX);
   const movedY = Math.abs(event.clientY - reorder.startY);
   if (!reorder.isDragging) {
@@ -516,6 +524,13 @@ function moveCategoryButton(event) {
   }
 
   event.preventDefault();
+  if (!reorder.isMovementReady) {
+    const dragMovedX = Math.abs(event.clientX - reorder.dragStartX);
+    const dragMovedY = Math.abs(event.clientY - reorder.dragStartY);
+    if (Math.max(dragMovedX, dragMovedY) < CATEGORY_REORDER_TOUCH_START_PX) return;
+    reorder.isMovementReady = true;
+  }
+
   const targetButton = categoryFilterButton(document.elementFromPoint(event.clientX, event.clientY));
   if (!targetButton || targetButton === reorder.button || targetButton.parentElement !== categoryFilter) return;
 
