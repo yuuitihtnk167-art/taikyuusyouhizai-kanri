@@ -7,18 +7,23 @@ import {
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
   CATEGORY_OPTIONS,
+  normalizeCategoryOrder,
   getCategoryLabel,
   isPcManagementItem,
   firebaseErrorMessage,
 } from "./common.js";
-import { isLocalMode, storageGetItem, storageSetItem } from "./platform/local-db.js";
+import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
+import {
+  loadCachedCategoryOrder,
+  loadCategoryOrder,
+  saveCategoryOrder,
+} from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
-const CATEGORY_ORDER_STORAGE_KEY = "monthlyApplianceBook.categoryOrder";
 
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
@@ -56,12 +61,14 @@ const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
 const CATEGORY_REORDER_LONG_PRESS_MS = SUMMARY_TOGGLE_LONG_PRESS_MS;
 const CATEGORY_REORDER_MOVE_CANCEL_PX = SUMMARY_TOGGLE_MOVE_CANCEL_PX;
+const CATEGORY_REORDER_TOUCH_START_PX = CATEGORY_REORDER_MOVE_CANCEL_PX;
 const CATEGORY_REORDER_MOUSE_START_PX = 4;
 const TIMELINE_MARKER_LONG_PRESS_MS = 500;
 const TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX = 48;
 const TIMELINE_MARKER_AUTO_SCROLL_MAX_PX = 18;
 const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX = 72;
 const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX = 16;
+const TIMELINE_MOUSE_PAN_START_PX = 4;
 const state = {
   uid: null,
   items: [],
@@ -71,7 +78,7 @@ const state = {
   pcMonthlyCost: 0,
   pcPurchaseTotal: 0,
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
-  categoryOrder: loadCategoryOrder(),
+  categoryOrder: loadCachedCategoryOrder(),
   selectedItemId: null,
   resizeTimer: null,
   isBusy: false,
@@ -103,36 +110,6 @@ function createElement(tagName, className, textContent = "") {
   if (className) element.className = className;
   if (textContent) element.textContent = textContent;
   return element;
-}
-
-function normalizeCategoryOrder(value) {
-  const validCategories = new Set(CATEGORY_OPTIONS.map((category) => category.value));
-  const normalizedOrder = [];
-
-  for (const category of Array.isArray(value) ? value : []) {
-    if (!validCategories.has(category) || normalizedOrder.includes(category)) continue;
-    normalizedOrder.push(category);
-  }
-  for (const category of CATEGORY_OPTIONS) {
-    if (!normalizedOrder.includes(category.value)) normalizedOrder.push(category.value);
-  }
-  return normalizedOrder;
-}
-
-function loadCategoryOrder() {
-  try {
-    return normalizeCategoryOrder(JSON.parse(storageGetItem(CATEGORY_ORDER_STORAGE_KEY) ?? "null"));
-  } catch (_error) {
-    return normalizeCategoryOrder([]);
-  }
-}
-
-function saveCategoryOrder() {
-  try {
-    storageSetItem(CATEGORY_ORDER_STORAGE_KEY, JSON.stringify(state.categoryOrder));
-  } catch (_error) {
-    // Category order is best-effort when browser storage is unavailable.
-  }
 }
 
 function parseDate(value) {
@@ -468,6 +445,9 @@ function beginCategoryReorder() {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.isDragging) return;
   reorder.isDragging = true;
+  reorder.dragStartX = reorder.currentX;
+  reorder.dragStartY = reorder.currentY;
+  reorder.isMovementReady = reorder.pointerType === "mouse";
   reorder.button.classList.add("dragging");
   reorder.button.setAttribute("aria-grabbed", "true");
   categoryFilter?.classList.add("reordering");
@@ -486,11 +466,12 @@ function startCategoryReorder(event) {
     button,
     startX: event.clientX,
     startY: event.clientY,
+    currentX: event.clientX,
+    currentY: event.clientY,
     isDragging: false,
     timer: null,
   };
   state.categoryReorder = reorder;
-  button.setPointerCapture?.(event.pointerId);
 
   if (event.pointerType !== "mouse") {
     reorder.timer = window.setTimeout(beginCategoryReorder, CATEGORY_REORDER_LONG_PRESS_MS);
@@ -501,6 +482,8 @@ function moveCategoryButton(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
 
+  reorder.currentX = event.clientX;
+  reorder.currentY = event.clientY;
   const movedX = Math.abs(event.clientX - reorder.startX);
   const movedY = Math.abs(event.clientY - reorder.startY);
   if (!reorder.isDragging) {
@@ -516,6 +499,13 @@ function moveCategoryButton(event) {
   }
 
   event.preventDefault();
+  if (!reorder.isMovementReady) {
+    const dragMovedX = Math.abs(event.clientX - reorder.dragStartX);
+    const dragMovedY = Math.abs(event.clientY - reorder.dragStartY);
+    if (Math.max(dragMovedX, dragMovedY) < CATEGORY_REORDER_TOUCH_START_PX) return;
+    reorder.isMovementReady = true;
+  }
+
   const targetButton = categoryFilterButton(document.elementFromPoint(event.clientX, event.clientY));
   if (!targetButton || targetButton === reorder.button || targetButton.parentElement !== categoryFilter) return;
 
@@ -524,7 +514,7 @@ function moveCategoryButton(event) {
   categoryFilter.insertBefore(reorder.button, insertBeforeTarget ? targetButton : targetButton.nextSibling);
 }
 
-function finishCategoryReorder(event) {
+async function finishCategoryReorder(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
   const wasDragging = reorder.isDragging;
@@ -535,18 +525,30 @@ function finishCategoryReorder(event) {
     [...categoryFilter.querySelectorAll(".category-filter-button")]
       .map((button) => button.dataset.category)
   );
-  saveCategoryOrder();
   state.ignoreNextCategoryClick = true;
   window.setTimeout(() => {
     state.ignoreNextCategoryClick = false;
   }, 0);
   renderCategoryFilter();
   renderCurrentView();
+
+  authError.textContent = "";
+  try {
+    await saveCategoryOrder(state.uid, state.categoryOrder);
+  } catch (error) {
+    authError.textContent = firebaseErrorMessage(error, "分類の順番を保存できませんでした。");
+  }
 }
 
 function cancelCategoryReorder(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
+  cancelActiveCategoryReorder();
+}
+
+function cancelActiveCategoryReorder() {
+  const reorder = state.categoryReorder;
+  if (!reorder) return;
   const wasDragging = reorder.isDragging;
   clearCategoryReorder();
   if (wasDragging) renderCategoryFilter();
@@ -683,6 +685,82 @@ function centerCurrentLine(scroll, minYear, maxYear) {
   });
 }
 
+function isTimelineMousePanTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  return !target.closest(".timeline-row-label, [data-action='drag-current-line']");
+}
+
+function enableTimelineMousePanning(scroll) {
+  let pan = null;
+  let suppressNextClick = false;
+
+  const finishPan = (event) => {
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const completedPan = pan;
+    pan = null;
+    if (scroll.hasPointerCapture?.(completedPan.pointerId)) {
+      scroll.releasePointerCapture(completedPan.pointerId);
+    }
+    scroll.classList.remove("mouse-panning");
+    if (completedPan.isPanning) {
+      suppressNextClick = true;
+      window.setTimeout(() => {
+        suppressNextClick = false;
+      }, 0);
+    }
+  };
+
+  scroll.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true
+  );
+
+  scroll.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    if (!isTimelineMousePanTarget(event.target) || scroll.scrollWidth <= scroll.clientWidth) return;
+
+    pan = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scroll.scrollLeft,
+      isPanning: false,
+    };
+  });
+
+  scroll.addEventListener("pointermove", (event) => {
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    if ((event.buttons & 1) === 0) {
+      finishPan(event);
+      return;
+    }
+    const distance = event.clientX - pan.startX;
+
+    if (!pan.isPanning) {
+      if (Math.abs(distance) < TIMELINE_MOUSE_PAN_START_PX) return;
+      pan.isPanning = true;
+      scroll.classList.add("mouse-panning");
+      scroll.focus({ preventScroll: true });
+      scroll.setPointerCapture?.(event.pointerId);
+    }
+
+    event.preventDefault();
+    scroll.scrollLeft = pan.startScrollLeft - distance;
+  });
+
+  scroll.addEventListener("pointerup", finishPan);
+  scroll.addEventListener("pointercancel", finishPan);
+  scroll.addEventListener("lostpointercapture", finishPan);
+  scroll.addEventListener("pointerleave", (event) => {
+    if (pan && !pan.isPanning) finishPan(event);
+  });
+}
+
 function renderTimeline(items) {
   itemList.innerHTML = "";
   if (items.length === 0) {
@@ -699,6 +777,7 @@ function renderTimeline(items) {
   const scroll = createElement("div", "timeline-scroll");
   scroll.tabIndex = 0;
   scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
+  enableTimelineMousePanning(scroll);
 
   const grid = createElement("div", "timeline-grid");
   grid.dataset.minYear = String(minYear);
@@ -1212,9 +1291,13 @@ if (categoryFilter) {
     renderCurrentView();
   });
   categoryFilter.addEventListener("pointerdown", startCategoryReorder);
-  categoryFilter.addEventListener("pointermove", moveCategoryButton);
-  categoryFilter.addEventListener("pointerup", finishCategoryReorder);
-  categoryFilter.addEventListener("pointercancel", cancelCategoryReorder);
+  window.addEventListener("pointermove", moveCategoryButton, { passive: false });
+  window.addEventListener("pointerup", finishCategoryReorder);
+  window.addEventListener("pointercancel", cancelCategoryReorder);
+  window.addEventListener("blur", cancelActiveCategoryReorder);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelActiveCategoryReorder();
+  });
   categoryFilter.addEventListener("contextmenu", (event) => {
     if (categoryFilterButton(event.target)) event.preventDefault();
   });
@@ -1308,7 +1391,9 @@ if (restoreButton) {
 
       restoreButton.disabled = true;
       await restoreLocalBackupData(backup);
+      state.categoryOrder = loadCachedCategoryOrder();
       state.selectedItemId = null;
+      renderCategoryFilter();
       await refreshList();
     } catch (error) {
       authError.textContent = error?.message || "バックアップの復元に失敗しました。";
@@ -1406,10 +1491,18 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
+async function syncCategoryOrder() {
+  const result = await loadCategoryOrder(state.uid);
+  state.categoryOrder = normalizeCategoryOrder(result.categoryOrder);
+  renderCategoryFilter();
+  return result.syncError;
+}
+
 async function initializeLocalList() {
   syncLocalModeUi();
   state.uid = "local";
   try {
+    await syncCategoryOrder();
     await refreshList();
   } catch (error) {
     authError.textContent = error?.message || "ローカルデータの取得に失敗しました。";
@@ -1429,7 +1522,11 @@ if (isLocalMode()) {
     }
     state.uid = user.uid;
     try {
+      const categoryOrderError = await syncCategoryOrder();
       await refreshList();
+      if (categoryOrderError) {
+        authError.textContent = firebaseErrorMessage(categoryOrderError, "分類の順番をFirestoreから読み込めなかったため、このブラウザの順番を使用しています。");
+      }
     } catch (error) {
       authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
       renderTimelineError("データの取得に失敗しました。");

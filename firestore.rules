@@ -19,6 +19,22 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isValidCategoryOrder(categoryOrder) {
+      return categoryOrder is list
+        && categoryOrder.size() == 9
+        && categoryOrder.hasAll([
+          'information_device',
+          'smartphone',
+          'audio_visual',
+          'air_conditioning',
+          'living_appliance',
+          'cooking_appliance',
+          'beauty_health',
+          'car',
+          'other'
+        ]);
+    }
+
     match /allowedUsers/{email} {
       allow get: if hasEmail() && request.auth.token.email == email;
       allow list, create, update, delete: if false;
@@ -30,6 +46,17 @@ service cloud.firestore {
 
     match /users/{userId}/pcItems/{pcId} {
       allow read, create, update, delete: if isOwner(userId) && isAllowedUser();
+    }
+
+    match /users/{userId}/settings/{settingId} {
+      allow get: if settingId == 'ui' && isOwner(userId) && isAllowedUser();
+      allow create, update: if settingId == 'ui'
+        && isOwner(userId)
+        && isAllowedUser()
+        && request.resource.data.keys().hasOnly(['categoryOrder', 'updatedAt'])
+        && isValidCategoryOrder(request.resource.data.categoryOrder)
+        && request.resource.data.updatedAt == request.time;
+      allow list, delete: if false;
     }
   }
 }

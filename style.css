@@ -1062,6 +1062,18 @@ button {
   outline-offset: -2px;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .timeline-scroll {
+    cursor: grab;
+  }
+
+  .timeline-scroll.mouse-panning,
+  .timeline-scroll.mouse-panning * {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+}
+
 .timeline-grid {
   position: relative;
   min-height: 276px;
@@ -1979,11 +1991,28 @@ button {
 
   .dashboard-actions button {
     width: 82px;
-    min-height: 30px;
+    min-height: 32px;
     min-width: 82px;
     padding: 0 10px;
     border-radius: 4px;
     font-size: 0.72rem;
+  }
+
+  .dashboard-body:not([data-timeline-mode]) .dashboard-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .dashboard-body:not([data-timeline-mode]) .dashboard-actions #create-button {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 0.58rem;
+  }
+
+  .dashboard-body:not([data-timeline-mode]) .category-filter {
+    flex-wrap: nowrap;
+    gap: 2px;
   }
 
   .dashboard-actions #logout-button {
@@ -1991,10 +2020,10 @@ button {
   }
 
   .dashboard-actions .category-filter-button {
-    width: 24px;
-    min-width: 24px;
-    height: 24px;
-    min-height: 24px;
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
     border-radius: 4px;
   }
 
