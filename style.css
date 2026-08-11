@@ -910,6 +910,14 @@ button {
   gap: 8px;
 }
 
+.pc-filter-long-press-hint {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
 .dashboard-actions .category-filter-button {
   width: 38px;
   min-width: 38px;
@@ -920,12 +928,27 @@ button {
   border-radius: 5px;
   background: linear-gradient(135deg, var(--band-start), var(--band-end));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
   opacity: 0.38;
   transition:
     opacity 0.15s ease,
     outline-color 0.15s ease,
     transform 0.15s ease;
+}
+
+.dashboard-actions .category-filter-button.dragging {
+  position: relative;
+  z-index: 2;
+  cursor: grabbing;
+  opacity: 0.9;
+  transform: scale(1.08);
+}
+
+.category-filter.reordering .category-filter-button:not(.dragging) {
+  transition: transform 0.12s ease;
 }
 
 .dashboard-actions .category-filter-button:hover {
@@ -1948,6 +1971,10 @@ button {
 
   .category-filter {
     gap: 5px;
+  }
+
+  .pc-filter-long-press-hint {
+    font-size: 0.62rem;
   }
 
   .dashboard-actions button {

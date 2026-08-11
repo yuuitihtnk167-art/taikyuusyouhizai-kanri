@@ -11,13 +11,14 @@ import {
   isPcManagementItem,
   firebaseErrorMessage,
 } from "./common.js";
-import { isLocalMode } from "./platform/local-db.js";
+import { isLocalMode, storageGetItem, storageSetItem } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
+const CATEGORY_ORDER_STORAGE_KEY = "monthlyApplianceBook.categoryOrder";
 
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
@@ -53,6 +54,9 @@ const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
 const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
+const CATEGORY_REORDER_LONG_PRESS_MS = SUMMARY_TOGGLE_LONG_PRESS_MS;
+const CATEGORY_REORDER_MOVE_CANCEL_PX = SUMMARY_TOGGLE_MOVE_CANCEL_PX;
+const CATEGORY_REORDER_MOUSE_START_PX = 4;
 const TIMELINE_MARKER_LONG_PRESS_MS = 500;
 const TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX = 48;
 const TIMELINE_MARKER_AUTO_SCROLL_MAX_PX = 18;
@@ -67,10 +71,13 @@ const state = {
   pcMonthlyCost: 0,
   pcPurchaseTotal: 0,
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
+  categoryOrder: loadCategoryOrder(),
   selectedItemId: null,
   resizeTimer: null,
   isBusy: false,
   summaryToggleLongPress: null,
+  categoryReorder: null,
+  ignoreNextCategoryClick: false,
   timelineMarkerMonth: currentMonthIndex(),
   timelineMarkerDrag: null,
 };
@@ -96,6 +103,36 @@ function createElement(tagName, className, textContent = "") {
   if (className) element.className = className;
   if (textContent) element.textContent = textContent;
   return element;
+}
+
+function normalizeCategoryOrder(value) {
+  const validCategories = new Set(CATEGORY_OPTIONS.map((category) => category.value));
+  const normalizedOrder = [];
+
+  for (const category of Array.isArray(value) ? value : []) {
+    if (!validCategories.has(category) || normalizedOrder.includes(category)) continue;
+    normalizedOrder.push(category);
+  }
+  for (const category of CATEGORY_OPTIONS) {
+    if (!normalizedOrder.includes(category.value)) normalizedOrder.push(category.value);
+  }
+  return normalizedOrder;
+}
+
+function loadCategoryOrder() {
+  try {
+    return normalizeCategoryOrder(JSON.parse(storageGetItem(CATEGORY_ORDER_STORAGE_KEY) ?? "null"));
+  } catch (_error) {
+    return normalizeCategoryOrder([]);
+  }
+}
+
+function saveCategoryOrder() {
+  try {
+    storageSetItem(CATEGORY_ORDER_STORAGE_KEY, JSON.stringify(state.categoryOrder));
+  } catch (_error) {
+    // Category order is best-effort when browser storage is unavailable.
+  }
 }
 
 function parseDate(value) {
@@ -215,8 +252,8 @@ function displayApplianceType(item) {
 }
 
 function categoryOrderIndex(categoryValue) {
-  const index = CATEGORY_OPTIONS.findIndex((category) => category.value === categoryValue);
-  return index === -1 ? CATEGORY_OPTIONS.length : index;
+  const index = state.categoryOrder.indexOf(categoryValue);
+  return index === -1 ? state.categoryOrder.length : index;
 }
 
 function sortItemsByCategory(items) {
@@ -390,16 +427,129 @@ function renderCategoryFilter() {
   if (!categoryFilter) return;
 
   categoryFilter.innerHTML = "";
-  for (const category of CATEGORY_OPTIONS) {
+  for (const categoryValue of state.categoryOrder) {
+    const category = CATEGORY_OPTIONS.find((option) => option.value === categoryValue);
+    if (!category) continue;
+
     const isSelected = state.selectedCategories.has(category.value);
     const button = createElement("button", `category-filter-button category-${category.value}`);
     button.type = "button";
     button.dataset.category = category.value;
     button.setAttribute("aria-label", `${category.label}を${isSelected ? "非表示" : "表示"}`);
     button.setAttribute("aria-pressed", String(isSelected));
+    button.setAttribute("aria-grabbed", "false");
     button.title = category.label;
     categoryFilter.appendChild(button);
   }
+}
+
+function categoryFilterButton(target) {
+  if (!(target instanceof HTMLElement)) return null;
+  const button = target.closest(".category-filter-button");
+  return button instanceof HTMLButtonElement ? button : null;
+}
+
+function clearCategoryReorder() {
+  const reorder = state.categoryReorder;
+  if (!reorder) return null;
+
+  window.clearTimeout(reorder.timer);
+  state.categoryReorder = null;
+  reorder.button.classList.remove("dragging");
+  reorder.button.setAttribute("aria-grabbed", "false");
+  categoryFilter?.classList.remove("reordering");
+  if (reorder.button.hasPointerCapture?.(reorder.pointerId)) {
+    reorder.button.releasePointerCapture(reorder.pointerId);
+  }
+  return reorder;
+}
+
+function beginCategoryReorder() {
+  const reorder = state.categoryReorder;
+  if (!reorder || reorder.isDragging) return;
+  reorder.isDragging = true;
+  reorder.button.classList.add("dragging");
+  reorder.button.setAttribute("aria-grabbed", "true");
+  categoryFilter?.classList.add("reordering");
+}
+
+function startCategoryReorder(event) {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  if (state.categoryReorder) return;
+
+  const button = categoryFilterButton(event.target);
+  if (!button) return;
+
+  const reorder = {
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    button,
+    startX: event.clientX,
+    startY: event.clientY,
+    isDragging: false,
+    timer: null,
+  };
+  state.categoryReorder = reorder;
+  button.setPointerCapture?.(event.pointerId);
+
+  if (event.pointerType !== "mouse") {
+    reorder.timer = window.setTimeout(beginCategoryReorder, CATEGORY_REORDER_LONG_PRESS_MS);
+  }
+}
+
+function moveCategoryButton(event) {
+  const reorder = state.categoryReorder;
+  if (!reorder || reorder.pointerId !== event.pointerId) return;
+
+  const movedX = Math.abs(event.clientX - reorder.startX);
+  const movedY = Math.abs(event.clientY - reorder.startY);
+  if (!reorder.isDragging) {
+    if (reorder.pointerType === "mouse") {
+      if (Math.max(movedX, movedY) < CATEGORY_REORDER_MOUSE_START_PX) return;
+      beginCategoryReorder();
+    } else {
+      if (movedX > CATEGORY_REORDER_MOVE_CANCEL_PX || movedY > CATEGORY_REORDER_MOVE_CANCEL_PX) {
+        clearCategoryReorder();
+      }
+      return;
+    }
+  }
+
+  event.preventDefault();
+  const targetButton = categoryFilterButton(document.elementFromPoint(event.clientX, event.clientY));
+  if (!targetButton || targetButton === reorder.button || targetButton.parentElement !== categoryFilter) return;
+
+  const targetRect = targetButton.getBoundingClientRect();
+  const insertBeforeTarget = event.clientX < targetRect.left + targetRect.width / 2;
+  categoryFilter.insertBefore(reorder.button, insertBeforeTarget ? targetButton : targetButton.nextSibling);
+}
+
+function finishCategoryReorder(event) {
+  const reorder = state.categoryReorder;
+  if (!reorder || reorder.pointerId !== event.pointerId) return;
+  const wasDragging = reorder.isDragging;
+  clearCategoryReorder();
+  if (!wasDragging) return;
+
+  state.categoryOrder = normalizeCategoryOrder(
+    [...categoryFilter.querySelectorAll(".category-filter-button")]
+      .map((button) => button.dataset.category)
+  );
+  saveCategoryOrder();
+  state.ignoreNextCategoryClick = true;
+  window.setTimeout(() => {
+    state.ignoreNextCategoryClick = false;
+  }, 0);
+  renderCategoryFilter();
+  renderCurrentView();
+}
+
+function cancelCategoryReorder(event) {
+  const reorder = state.categoryReorder;
+  if (!reorder || reorder.pointerId !== event.pointerId) return;
+  const wasDragging = reorder.isDragging;
+  clearCategoryReorder();
+  if (wasDragging) renderCategoryFilter();
 }
 
 function renderCurrentView() {
@@ -1040,11 +1190,14 @@ settingsButton?.addEventListener("click", () => {
 
 if (categoryFilter) {
   categoryFilter.addEventListener("click", (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
+    if (state.ignoreNextCategoryClick) {
+      state.ignoreNextCategoryClick = false;
+      event.preventDefault();
+      return;
+    }
 
-    const button = target.closest(".category-filter-button");
-    if (!(button instanceof HTMLButtonElement)) return;
+    const button = categoryFilterButton(event.target);
+    if (!button) return;
 
     const category = button.dataset.category;
     if (!category) return;
@@ -1057,6 +1210,13 @@ if (categoryFilter) {
 
     renderCategoryFilter();
     renderCurrentView();
+  });
+  categoryFilter.addEventListener("pointerdown", startCategoryReorder);
+  categoryFilter.addEventListener("pointermove", moveCategoryButton);
+  categoryFilter.addEventListener("pointerup", finishCategoryReorder);
+  categoryFilter.addEventListener("pointercancel", cancelCategoryReorder);
+  categoryFilter.addEventListener("contextmenu", (event) => {
+    if (categoryFilterButton(event.target)) event.preventDefault();
   });
 }
 
