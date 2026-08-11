@@ -652,7 +652,7 @@ export function validateItem(item) {
   if (normalizeCategory(item.category) !== item.category) return "分類を選択してください。";
   if (!item.pcManagementLinked && !item.purchaseDate) return "購入日を入力してください。";
   if (!item.pcManagementLinked && (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0)) return "購入価格は0以上で入力してください。";
-  if (!item.pcManagementLinked && (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0)) return "使用年数は1以上で入力してください。";
+  if (!item.pcManagementLinked && (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0)) return "使用予定年数は1以上で入力してください。";
   if (item.endOfUseDate && calculateUsageMonths(item.purchaseDate, item.endOfUseDate) === 0) {
     return "使用終了日は購入日以降の日付を入力してください。";
   }

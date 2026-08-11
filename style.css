@@ -411,6 +411,19 @@ button {
   margin-top: 2px;
 }
 
+.auth-panel .auth-actions[hidden],
+.auth-panel .auth-status[hidden],
+.auth-panel .form-error[hidden] {
+  display: none;
+}
+
+.auth-status {
+  margin: 4px 0;
+  color: #17202a;
+  font-weight: 700;
+  text-align: center;
+}
+
 .auth-panel button {
   min-height: 50px;
   padding: 0 10px;
@@ -1790,9 +1803,13 @@ button {
 
 .help-dialog {
   width: min(720px, calc(100% - 32px));
-  max-height: min(760px, calc(100% - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: min(760px, calc(100dvh - 32px));
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.24);
   border-radius: 8px;
@@ -1807,9 +1824,7 @@ button {
 .help-dialog-card {
   display: grid;
   gap: 18px;
-  max-height: inherit;
   padding: 22px;
-  overflow: auto;
 }
 
 .help-dialog-header {
