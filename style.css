@@ -1806,10 +1806,7 @@ button {
   max-height: calc(100vh - 32px);
   max-height: min(760px, calc(100dvh - 32px));
   padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
   color: #f8fafc;
   border: 1px solid rgba(226, 232, 240, 0.24);
   border-radius: 8px;
@@ -1824,7 +1821,13 @@ button {
 .help-dialog-card {
   display: grid;
   gap: 18px;
+  max-height: calc(100vh - 32px);
+  max-height: min(760px, calc(100dvh - 32px));
   padding: 22px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .help-dialog-header {
