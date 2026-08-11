@@ -46,6 +46,7 @@ const elements = {
   summaryMonthly: document.getElementById("summary-monthly"),
   authError: document.getElementById("auth-error"),
   createButton: document.getElementById("create-button"),
+  timelineMarkerDate: document.getElementById("timeline-marker-date"),
   categoryFilter: document.getElementById("category-filter"),
   hiddenButton: document.getElementById("hidden-button"),
   settingsButton: document.getElementById("settings-button"),
@@ -262,6 +263,14 @@ function summaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
 
 function timelineMarkerMonth() {
   return Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+}
+
+function updateTimelineMarkerDate() {
+  if (!elements.timelineMarkerDate) return;
+  const monthIndex = Math.floor(timelineMarkerMonth());
+  const year = Math.floor(monthIndex / 12);
+  const month = (monthIndex % 12) + 1;
+  elements.timelineMarkerDate.textContent = `${year}年${month}月`;
 }
 
 function activeEndMonth(item) {
@@ -577,6 +586,7 @@ function renderCurrentLine(grid, minYear, maxYear) {
     currentHandle.type = "button";
     currentHandle.dataset.action = "drag-current-line";
     currentHandle.setAttribute("aria-label", "現在ラインを動かす");
+    currentHandle.title = "ダブルクリックで現在に戻す";
     currentHandle.style.left = `${currentPosition}px`;
     grid.appendChild(currentHandle);
 
@@ -589,6 +599,20 @@ function renderCurrentLine(grid, minYear, maxYear) {
     const currentLabel = createElement("div", "timeline-current-label", "現在");
     currentLabel.style.left = `${currentLabelPosition}px`;
     grid.appendChild(currentLabel);
+  }
+}
+
+function renderTimelineIntervalHandles(grid) {
+  const handleTemplate = grid.querySelector(".timeline-current-handle:not(.bottom)");
+  if (!(handleTemplate instanceof HTMLButtonElement)) return;
+
+  const rows = [...grid.querySelectorAll(".timeline-row")];
+  for (let itemNumber = 9; itemNumber < rows.length; itemNumber += 9) {
+    const row = rows[itemNumber - 1];
+    const handle = handleTemplate.cloneNode(true);
+    handle.classList.add("interval");
+    handle.style.top = `${row.offsetTop + row.offsetHeight / 2}px`;
+    grid.appendChild(handle);
   }
 }
 
@@ -823,10 +847,12 @@ function renderTimeline() {
   renderAxis(grid, minYear, maxYear, "timeline-axis-bottom");
   scroll.appendChild(grid);
   elements.itemList.appendChild(scroll);
+  renderTimelineIntervalHandles(grid);
   centerCurrentLine(scroll, minYear, maxYear);
 }
 
 function renderSummary() {
+  updateTimelineMarkerDate();
   if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
   const monthPosition = timelineMarkerMonth();
   const activeItems = summaryItems().filter(
@@ -1423,6 +1449,15 @@ function endTimelineMarkerDrag(event) {
   clearTimelineMarkerDrag();
 }
 
+function resetTimelineMarkerToCurrentMonth(event) {
+  if (!timelineMarkerDragTarget(event.target)) return;
+  event.preventDefault();
+  clearTimelineMarkerDrag();
+  state.timelineMarkerMonth = currentMonthIndex();
+  renderSummary();
+  renderTimeline();
+}
+
 function clearSummaryToggleLongPress() {
   if (!state.summaryToggleLongPress) return;
   window.clearTimeout(state.summaryToggleLongPress.timer);
@@ -1651,6 +1686,7 @@ if (elements.itemList) {
   elements.itemList.addEventListener("pointerup", endTimelineMarkerDrag);
   elements.itemList.addEventListener("pointercancel", endTimelineMarkerDrag);
   elements.itemList.addEventListener("pointerleave", endTimelineMarkerDrag);
+  elements.itemList.addEventListener("dblclick", resetTimelineMarkerToCurrentMonth);
   elements.itemList.addEventListener("pointerdown", startSummaryToggleLongPress);
   elements.itemList.addEventListener("pointerup", cancelSummaryToggleLongPress);
   elements.itemList.addEventListener("pointercancel", cancelSummaryToggleLongPress);
@@ -1717,6 +1753,7 @@ window.addEventListener("resize", () => {
 
 updateCalculationResult();
 updateEndedUseStyle();
+updateTimelineMarkerDate();
 renderCategoryFilter();
 renderLoadingTimeline();
 
