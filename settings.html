@@ -45,27 +45,6 @@
         <p id="settings-status" class="form-error"></p>
       </section>
 
-      <section class="panel settings-panel" aria-labelledby="asset-reference-settings-title">
-        <h2 id="asset-reference-settings-title">耐用年数・単価の管理</h2>
-        <div class="settings-action-card asset-reference-card">
-          <form id="asset-reference-form" class="asset-reference-form">
-            <input id="asset-reference-id" type="hidden" />
-            <label for="asset-reference-name">商品名</label>
-            <input id="asset-reference-name" type="text" autocomplete="off" required />
-            <label for="asset-reference-useful-life-years">耐用年数</label>
-            <input id="asset-reference-useful-life-years" type="number" inputmode="numeric" min="1" step="1" required />
-            <label for="asset-reference-unit-price">単価</label>
-            <input id="asset-reference-unit-price" type="number" inputmode="numeric" min="0" step="1" required />
-            <div class="settings-action-row">
-              <button id="asset-reference-save-button" type="submit" class="primary-button">追加する</button>
-              <button id="asset-reference-cancel-button" type="button" class="ghost-button" hidden>キャンセル</button>
-              <span id="asset-reference-summary" class="settings-muted-text">未登録</span>
-            </div>
-          </form>
-          <div id="asset-reference-list" class="asset-reference-list"></div>
-        </div>
-        <p id="asset-reference-status" class="form-error"></p>
-      </section>
     </main>
     <script type="module" src="js/settings.js"></script>
   </body>
