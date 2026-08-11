@@ -70,6 +70,7 @@ const elements = {
   purchasePrice: document.getElementById("purchase-price"),
   yearsOfUse: document.getElementById("years-of-use"),
   endOfUseDate: document.getElementById("end-of-use-date"),
+  memo: document.getElementById("memo"),
   hideFromTimeline: document.getElementById("hide-from-timeline"),
   itemDialog: document.getElementById("item-dialog"),
   dialogItemName: document.getElementById("dialog-item-name"),
@@ -347,6 +348,7 @@ function normalizePcPartItem(value) {
     purchasePrice: Number.isFinite(purchasePrice) ? purchasePrice : 0,
     yearsOfUse: Number(item.yearsOfUse ?? 5),
     endOfUseDate: String(item.endOfUseDate ?? ""),
+    memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),
     createdAt: toMillis(item.createdAt),
@@ -378,6 +380,7 @@ function toFirestorePayload(item) {
     purchasePrice: normalized.purchasePrice,
     yearsOfUse: normalized.yearsOfUse,
     endOfUseDate: normalized.endOfUseDate,
+    memo: normalized.memo,
     hideFromTimeline: normalized.hideFromTimeline,
     excludeFromSummary: normalized.excludeFromSummary,
     monthlyCost: calculateMonthlyCost(normalized),
@@ -997,6 +1000,7 @@ function collectPcItem() {
     purchasePrice: parseCurrencyInputValue(elements.purchasePrice.value),
     yearsOfUse: Number(elements.yearsOfUse.value),
     endOfUseDate: elements.endOfUseDate.value,
+    memo: elements.memo.value.trim(),
     hideFromTimeline: elements.hideFromTimeline.checked,
     excludeFromSummary: Boolean(existingItem?.excludeFromSummary),
     createdAt: existingItem?.createdAt ?? Date.now(),
@@ -1035,6 +1039,7 @@ function fillForm(item) {
   elements.purchasePrice.value = item.purchasePrice;
   elements.yearsOfUse.value = item.yearsOfUse;
   elements.endOfUseDate.value = item.endOfUseDate;
+  elements.memo.value = item.memo;
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
   elements.formError.textContent = "";

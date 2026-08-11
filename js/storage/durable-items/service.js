@@ -38,6 +38,7 @@ function normalizeStoredItem(item) {
     purchasePrice: Number(item.purchasePrice ?? 0),
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
+    memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),
     additionalCosts: normalizeAdditionalCosts(item.additionalCosts),
