@@ -38,6 +38,7 @@ const purchaseDateInput = document.getElementById("purchase-date");
 const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
+const memoInput = document.getElementById("memo");
 const hideFromTimelineInput = document.getElementById("hide-from-timeline");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
@@ -278,6 +279,7 @@ function fillForm(item) {
   purchasePriceInput.value = item.purchasePrice;
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
+  memoInput.value = item.memo;
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   state.excludeFromSummary = Boolean(item.excludeFromSummary);
   state.pcManagementLinked = Boolean(item.pcManagementLinked);
@@ -351,6 +353,7 @@ form.addEventListener("submit", async (event) => {
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
+    memo: memoInput.value.trim(),
     hideFromTimeline: hideFromTimelineInput.checked,
     excludeFromSummary: state.excludeFromSummary,
     pcManagementLinked: usePcManagement || (!useFormData && state.pcManagementLinked),
