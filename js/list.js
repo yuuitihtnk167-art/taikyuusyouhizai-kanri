@@ -496,7 +496,6 @@ function startCategoryReorder(event) {
     timer: null,
   };
   state.categoryReorder = reorder;
-  button.setPointerCapture?.(event.pointerId);
 
   if (event.pointerType !== "mouse") {
     reorder.timer = window.setTimeout(beginCategoryReorder, CATEGORY_REORDER_LONG_PRESS_MS);
@@ -562,6 +561,12 @@ function finishCategoryReorder(event) {
 function cancelCategoryReorder(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
+  cancelActiveCategoryReorder();
+}
+
+function cancelActiveCategoryReorder() {
+  const reorder = state.categoryReorder;
+  if (!reorder) return;
   const wasDragging = reorder.isDragging;
   clearCategoryReorder();
   if (wasDragging) renderCategoryFilter();
@@ -1227,9 +1232,13 @@ if (categoryFilter) {
     renderCurrentView();
   });
   categoryFilter.addEventListener("pointerdown", startCategoryReorder);
-  categoryFilter.addEventListener("pointermove", moveCategoryButton);
-  categoryFilter.addEventListener("pointerup", finishCategoryReorder);
-  categoryFilter.addEventListener("pointercancel", cancelCategoryReorder);
+  window.addEventListener("pointermove", moveCategoryButton, { passive: false });
+  window.addEventListener("pointerup", finishCategoryReorder);
+  window.addEventListener("pointercancel", cancelCategoryReorder);
+  window.addEventListener("blur", cancelActiveCategoryReorder);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelActiveCategoryReorder();
+  });
   categoryFilter.addEventListener("contextmenu", (event) => {
     if (categoryFilterButton(event.target)) event.preventDefault();
   });
