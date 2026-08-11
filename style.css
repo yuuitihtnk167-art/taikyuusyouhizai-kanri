@@ -1986,6 +1986,23 @@ button {
     font-size: 0.72rem;
   }
 
+  .dashboard-body:not([data-timeline-mode]) .dashboard-actions {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .dashboard-body:not([data-timeline-mode]) .dashboard-actions #create-button {
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 0.58rem;
+  }
+
+  .dashboard-body:not([data-timeline-mode]) .category-filter {
+    flex-wrap: nowrap;
+    gap: 2px;
+  }
+
   .dashboard-actions #logout-button {
     width: 82px;
   }
