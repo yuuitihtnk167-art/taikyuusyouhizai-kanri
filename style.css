@@ -106,21 +106,6 @@ select {
   height: 44px;
 }
 
-.reference-input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, auto);
-  align-items: center;
-  gap: 10px;
-}
-
-.reference-hint {
-  min-height: 1.4em;
-  color: var(--muted);
-  font-size: 0.88rem;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
 textarea {
   min-height: 104px;
   padding-top: 10px;
@@ -334,77 +319,6 @@ button {
 .settings-action-card .primary-button {
   min-width: 220px;
   padding: 0 18px;
-}
-
-.asset-reference-card {
-  align-items: stretch;
-  grid-template-columns: 1fr;
-}
-
-.asset-reference-textarea {
-  min-height: 220px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 0.9rem;
-}
-
-.asset-reference-form {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px 12px;
-}
-
-.asset-reference-form label {
-  margin-top: 0;
-}
-
-.asset-reference-form .settings-action-row {
-  grid-column: 1 / -1;
-}
-
-.asset-reference-list {
-  display: grid;
-  gap: 8px;
-}
-
-.asset-reference-item {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(90px, auto) minmax(120px, auto) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfdff;
-}
-
-.asset-reference-item strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.asset-reference-item span {
-  color: var(--muted);
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-
-.asset-reference-item-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.settings-action-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.settings-muted-text {
-  color: var(--muted);
-  font-size: 0.9rem;
 }
 
 .login-page {
@@ -787,15 +701,6 @@ button {
 @media (max-width: 520px) {
   .calculation-result {
     grid-template-columns: 1fr;
-  }
-
-  .reference-input-row {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-
-  .reference-hint {
-    white-space: normal;
   }
 
   .additional-cost-row {
@@ -2259,15 +2164,6 @@ button {
   .settings-action-card .primary-button {
     width: 100%;
     min-width: 0;
-  }
-
-  .asset-reference-form,
-  .asset-reference-item {
-    grid-template-columns: 1fr;
-  }
-
-  .asset-reference-item-actions {
-    flex-wrap: wrap;
   }
 
   .help-button {
