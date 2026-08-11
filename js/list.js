@@ -7,18 +7,23 @@ import {
   calculateMonthlyCostWithAdditionalCosts,
   formatCurrency,
   CATEGORY_OPTIONS,
+  normalizeCategoryOrder,
   getCategoryLabel,
   isPcManagementItem,
   firebaseErrorMessage,
 } from "./common.js";
-import { isLocalMode, storageGetItem, storageSetItem } from "./platform/local-db.js";
+import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
+import {
+  loadCachedCategoryOrder,
+  loadCategoryOrder,
+  saveCategoryOrder,
+} from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
-const CATEGORY_ORDER_STORAGE_KEY = "monthlyApplianceBook.categoryOrder";
 
 const authError = document.getElementById("auth-error");
 const logoutButton = document.getElementById("logout-button");
@@ -72,7 +77,7 @@ const state = {
   pcMonthlyCost: 0,
   pcPurchaseTotal: 0,
   selectedCategories: new Set(CATEGORY_OPTIONS.map((category) => category.value)),
-  categoryOrder: loadCategoryOrder(),
+  categoryOrder: loadCachedCategoryOrder(),
   selectedItemId: null,
   resizeTimer: null,
   isBusy: false,
@@ -104,36 +109,6 @@ function createElement(tagName, className, textContent = "") {
   if (className) element.className = className;
   if (textContent) element.textContent = textContent;
   return element;
-}
-
-function normalizeCategoryOrder(value) {
-  const validCategories = new Set(CATEGORY_OPTIONS.map((category) => category.value));
-  const normalizedOrder = [];
-
-  for (const category of Array.isArray(value) ? value : []) {
-    if (!validCategories.has(category) || normalizedOrder.includes(category)) continue;
-    normalizedOrder.push(category);
-  }
-  for (const category of CATEGORY_OPTIONS) {
-    if (!normalizedOrder.includes(category.value)) normalizedOrder.push(category.value);
-  }
-  return normalizedOrder;
-}
-
-function loadCategoryOrder() {
-  try {
-    return normalizeCategoryOrder(JSON.parse(storageGetItem(CATEGORY_ORDER_STORAGE_KEY) ?? "null"));
-  } catch (_error) {
-    return normalizeCategoryOrder([]);
-  }
-}
-
-function saveCategoryOrder() {
-  try {
-    storageSetItem(CATEGORY_ORDER_STORAGE_KEY, JSON.stringify(state.categoryOrder));
-  } catch (_error) {
-    // Category order is best-effort when browser storage is unavailable.
-  }
 }
 
 function parseDate(value) {
@@ -538,7 +513,7 @@ function moveCategoryButton(event) {
   categoryFilter.insertBefore(reorder.button, insertBeforeTarget ? targetButton : targetButton.nextSibling);
 }
 
-function finishCategoryReorder(event) {
+async function finishCategoryReorder(event) {
   const reorder = state.categoryReorder;
   if (!reorder || reorder.pointerId !== event.pointerId) return;
   const wasDragging = reorder.isDragging;
@@ -549,13 +524,19 @@ function finishCategoryReorder(event) {
     [...categoryFilter.querySelectorAll(".category-filter-button")]
       .map((button) => button.dataset.category)
   );
-  saveCategoryOrder();
   state.ignoreNextCategoryClick = true;
   window.setTimeout(() => {
     state.ignoreNextCategoryClick = false;
   }, 0);
   renderCategoryFilter();
   renderCurrentView();
+
+  authError.textContent = "";
+  try {
+    await saveCategoryOrder(state.uid, state.categoryOrder);
+  } catch (error) {
+    authError.textContent = firebaseErrorMessage(error, "分類の順番を保存できませんでした。");
+  }
 }
 
 function cancelCategoryReorder(event) {
@@ -1332,7 +1313,9 @@ if (restoreButton) {
 
       restoreButton.disabled = true;
       await restoreLocalBackupData(backup);
+      state.categoryOrder = loadCachedCategoryOrder();
       state.selectedItemId = null;
+      renderCategoryFilter();
       await refreshList();
     } catch (error) {
       authError.textContent = error?.message || "バックアップの復元に失敗しました。";
@@ -1430,10 +1413,18 @@ window.addEventListener("resize", () => {
   }, 120);
 });
 
+async function syncCategoryOrder() {
+  const result = await loadCategoryOrder(state.uid);
+  state.categoryOrder = normalizeCategoryOrder(result.categoryOrder);
+  renderCategoryFilter();
+  return result.syncError;
+}
+
 async function initializeLocalList() {
   syncLocalModeUi();
   state.uid = "local";
   try {
+    await syncCategoryOrder();
     await refreshList();
   } catch (error) {
     authError.textContent = error?.message || "ローカルデータの取得に失敗しました。";
@@ -1453,7 +1444,11 @@ if (isLocalMode()) {
     }
     state.uid = user.uid;
     try {
+      const categoryOrderError = await syncCategoryOrder();
       await refreshList();
+      if (categoryOrderError) {
+        authError.textContent = firebaseErrorMessage(categoryOrderError, "分類の順番をFirestoreから読み込めなかったため、このブラウザの順番を使用しています。");
+      }
     } catch (error) {
       authError.textContent = firebaseErrorMessage(error, "データ取得に失敗しました。");
       renderTimelineError("データの取得に失敗しました。");

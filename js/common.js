@@ -25,6 +25,7 @@ const PC_MANAGEMENT_DATA_VERSION = 7;
 const PC_MANAGEMENT_SCHEMA_TYPE = "pcPartLifecycle";
 const LOCAL_STORAGE_MODE_KEY = "monthlyApplianceBook.storageMode";
 export const LOCAL_WARNING_DISMISSED_KEY = "monthlyApplianceBook.localWarningDismissed";
+export const CATEGORY_ORDER_STORAGE_KEY = "monthlyApplianceBook.categoryOrder";
 const STORAGE_MODE_LOCAL = "local";
 const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
 const LOCAL_DB_VERSION = 1;
@@ -190,6 +191,28 @@ export async function replaceLocalRecords(storeName, records) {
   });
 }
 
+function normalizeStoredSettings(value) {
+  if (typeof value !== "object" || value == null || Array.isArray(value)) return null;
+  if (!Array.isArray(value.categoryOrder)) return null;
+  return { categoryOrder: normalizeCategoryOrder(value.categoryOrder) };
+}
+
+function normalizeBackupSettings(value) {
+  if (value == null) return null;
+  const settings = normalizeStoredSettings(value);
+  if (!settings) throw new Error("バックアップの分類順序設定が正しくありません。");
+  return settings;
+}
+
+function loadLocalBackupSettings() {
+  try {
+    const categoryOrder = JSON.parse(storageGetItem(CATEGORY_ORDER_STORAGE_KEY) ?? "null");
+    return { categoryOrder: normalizeCategoryOrder(categoryOrder) };
+  } catch (_error) {
+    return { categoryOrder: normalizeCategoryOrder([]) };
+  }
+}
+
 export async function createLocalBackupData() {
   const durableGoodsItems = normalizeBackupDurableGoodsItems(
     await loadLocalRecords(LOCAL_DURABLE_ITEMS_STORE)
@@ -204,6 +227,7 @@ export async function createLocalBackupData() {
     exportedAt: new Date().toISOString(),
     durableGoodsItems,
     pcItems,
+    settings: loadLocalBackupSettings(),
   };
 }
 
@@ -244,7 +268,10 @@ export async function createFirebaseLocalBackupData(uid) {
     throw new Error("Firebaseデータの取得に必要なユーザー情報がありません。");
   }
 
-  const snapshot = await getDocs(userItemsCollectionRef(uid));
+  const [snapshot, settingsSnapshot] = await Promise.all([
+    getDocs(userItemsCollectionRef(uid)),
+    getDoc(userSettingsDocRef(uid)),
+  ]);
   const durableGoodsItems = [];
   const pcItems = [];
 
@@ -264,12 +291,17 @@ export async function createFirebaseLocalBackupData(uid) {
     durableGoodsItems.push(normalizeStoredItem(record));
   });
 
+  const settings = settingsSnapshot.exists()
+    ? normalizeStoredSettings(settingsSnapshot.data()) ?? loadLocalBackupSettings()
+    : loadLocalBackupSettings();
+
   return {
     app: LOCAL_BACKUP_APP_NAME,
     version: LOCAL_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     durableGoodsItems: sortStoredItems(durableGoodsItems),
     pcItems,
+    settings,
   };
 }
 
@@ -301,18 +333,23 @@ export function parseLocalBackupText(text) {
 
   validateBackupRecordIds(backup.durableGoodsItems, "通常家電");
   validateBackupRecordIds(backup.pcItems, "パソコン管理");
+  const settings = normalizeBackupSettings(backup.settings);
   return {
     app: backup.app,
     version: backup.version,
     exportedAt: backup.exportedAt ?? null,
     durableGoodsItems: normalizeBackupDurableGoodsItems(backup.durableGoodsItems),
     pcItems: normalizeBackupPcItems(backup.pcItems),
+    ...(settings ? { settings } : {}),
   };
 }
 
 export async function restoreLocalBackupData(backup) {
   await replaceLocalRecords(LOCAL_DURABLE_ITEMS_STORE, backup.durableGoodsItems);
   await replaceLocalRecords(LOCAL_PC_ITEMS_STORE, backup.pcItems);
+  if (backup.settings?.categoryOrder) {
+    storageSetItem(CATEGORY_ORDER_STORAGE_KEY, JSON.stringify(backup.settings.categoryOrder));
+  }
 }
 
 export function onAuthChanged(callback) {
@@ -339,6 +376,20 @@ export function normalizeCategory(value) {
   const normalizedValue = String(value ?? "");
   const mappedValue = LEGACY_CATEGORY_MAP[normalizedValue] ?? normalizedValue;
   return CATEGORY_OPTIONS.some((category) => category.value === mappedValue) ? mappedValue : DEFAULT_CATEGORY;
+}
+
+export function normalizeCategoryOrder(value) {
+  const validCategories = new Set(CATEGORY_OPTIONS.map((category) => category.value));
+  const normalizedOrder = [];
+
+  for (const category of Array.isArray(value) ? value : []) {
+    if (!validCategories.has(category) || normalizedOrder.includes(category)) continue;
+    normalizedOrder.push(category);
+  }
+  for (const category of CATEGORY_OPTIONS) {
+    if (!normalizedOrder.includes(category.value)) normalizedOrder.push(category.value);
+  }
+  return normalizedOrder;
 }
 
 export function getCategoryLabel(value) {
@@ -455,6 +506,10 @@ export function createId() {
 
 function userItemsCollectionRef(uid) {
   return collection(db, "users", uid, ITEMS_COLLECTION);
+}
+
+function userSettingsDocRef(uid) {
+  return doc(db, "users", uid, "settings", "ui");
 }
 
 function userItemDocRef(uid, itemId) {
