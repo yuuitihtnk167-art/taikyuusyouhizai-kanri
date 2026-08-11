@@ -877,6 +877,35 @@ button {
   background: rgba(67, 84, 100, 0.78);
 }
 
+.timeline-marker-action {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.timeline-marker-date {
+  min-width: 84px;
+  color: #51b7ff;
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+  text-shadow: 0 0 12px rgba(81, 183, 255, 0.6);
+}
+
+.hidden-title-with-date {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.hidden-title-with-date .timeline-marker-date {
+  min-width: 0;
+  text-align: left;
+}
+
 .dashboard-actions .ghost-button {
   overflow: hidden;
   color: #f8fafc;
@@ -1190,6 +1219,10 @@ button {
 .timeline-current-handle.bottom {
   top: auto;
   bottom: 10px;
+}
+
+.timeline-current-handle.interval {
+  transform: translate(-50%, -50%);
 }
 
 .timeline-current-handle:active,
@@ -1998,21 +2031,13 @@ button {
     font-size: 0.72rem;
   }
 
-  .dashboard-body:not([data-timeline-mode]) .dashboard-actions {
-    flex-wrap: nowrap;
-    gap: 4px;
+  .timeline-marker-action {
+    gap: 5px;
   }
 
-  .dashboard-body:not([data-timeline-mode]) .dashboard-actions #create-button {
-    width: 40px;
-    min-width: 40px;
-    padding: 0;
-    font-size: 0.58rem;
-  }
-
-  .dashboard-body:not([data-timeline-mode]) .category-filter {
-    flex-wrap: nowrap;
-    gap: 2px;
+  .timeline-marker-date {
+    min-width: 68px;
+    font-size: 0.68rem;
   }
 
   .dashboard-actions #logout-button {
