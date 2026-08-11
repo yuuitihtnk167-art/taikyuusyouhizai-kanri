@@ -1085,7 +1085,7 @@ function validatePcItem(item) {
   if (!pcNameLabels[item.pcName]) return "分類（パソコン名）を選択してください。";
   if (!item.purchaseDate) return "購入日を入力してください。";
   if (!Number.isFinite(item.purchasePrice) || item.purchasePrice < 0) return "購入価格は0以上で入力してください。";
-  if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用年数は1以上で入力してください。";
+  if (!Number.isFinite(item.yearsOfUse) || item.yearsOfUse <= 0) return "使用予定年数は1以上で入力してください。";
   if (item.endOfUseDate && item.endOfUseDate < item.purchaseDate) {
     return "使用終了日は購入日以降の日付を入力してください。";
   }
@@ -1118,7 +1118,7 @@ function resetForm() {
   elements.form.reset();
   elements.id.value = "";
   elements.pcName.value = "main";
-  elements.yearsOfUse.value = "5";
+  elements.yearsOfUse.value = "10";
   elements.hideFromTimeline.checked = false;
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
@@ -1778,7 +1778,7 @@ async function initializePcManagement(user) {
     if (!state.editingId) {
       elements.submitButton.textContent = "登録する";
       elements.pcName.value = "main";
-      elements.yearsOfUse.value = elements.yearsOfUse.value || "5";
+      elements.yearsOfUse.value = elements.yearsOfUse.value || "10";
       updateEndedUseStyle();
       updateCalculationResult();
       state.isDirty = false;

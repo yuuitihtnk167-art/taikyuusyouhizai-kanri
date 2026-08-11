@@ -14,6 +14,10 @@ import {
 } from "./services/auth.js";
 
 const authError = document.getElementById("auth-error");
+const authPanel = document.querySelector(".auth-panel");
+const authTitle = document.getElementById("auth-title");
+const authStatus = document.getElementById("auth-status");
+const authActions = document.getElementById("auth-actions");
 const googleLoginButton = document.getElementById("google-login-button");
 const localModeButton = document.getElementById("local-mode-button");
 const localModeDialog = document.getElementById("local-mode-dialog");
@@ -31,18 +35,26 @@ function setButtonsDisabled(disabled) {
   setButtonDisabled(localModeButton, disabled);
 }
 
+function setGoogleLoginPending(pending) {
+  setButtonsDisabled(pending);
+  if (authPanel) authPanel.setAttribute("aria-busy", String(pending));
+  if (authTitle) authTitle.textContent = pending ? "ログインしています" : "ログイン";
+  if (authError) authError.hidden = pending;
+  if (authStatus) authStatus.hidden = !pending;
+  if (authActions) authActions.hidden = pending;
+}
+
 googleLoginButton?.addEventListener("click", async () => {
   authError.textContent = "";
+  isLoginActionPending = true;
+  setGoogleLoginPending(true);
   try {
-    isLoginActionPending = true;
-    setButtonsDisabled(true);
     await loginWithGoogle();
     window.location.href = "list.html";
   } catch (error) {
-    authError.textContent = firebaseErrorMessage(error, "Googleログインに失敗しました。");
-  } finally {
     isLoginActionPending = false;
-    setButtonsDisabled(false);
+    setGoogleLoginPending(false);
+    authError.textContent = firebaseErrorMessage(error, "Googleログインに失敗しました。");
   }
 });
 
@@ -87,12 +99,14 @@ localModeCancelButton?.addEventListener("click", () => {
 
 onAuthChanged(async (user) => {
   if (user && !isLocalMode() && !isLoginActionPending) {
+    isLoginActionPending = true;
+    setGoogleLoginPending(true);
     try {
-      setButtonsDisabled(true);
       await ensureAllowedUser(user);
     } catch (error) {
+      isLoginActionPending = false;
+      setGoogleLoginPending(false);
       authError.textContent = firebaseErrorMessage(error, "ログイン状態の確認に失敗しました。");
-      setButtonsDisabled(false);
       return;
     }
     window.location.href = "list.html";
