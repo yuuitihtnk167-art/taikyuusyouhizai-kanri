@@ -1062,6 +1062,18 @@ button {
   outline-offset: -2px;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .timeline-scroll {
+    cursor: grab;
+  }
+
+  .timeline-scroll.mouse-panning,
+  .timeline-scroll.mouse-panning * {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+}
+
 .timeline-grid {
   position: relative;
   min-height: 276px;

@@ -68,6 +68,7 @@ const TIMELINE_MARKER_AUTO_SCROLL_EDGE_PX = 48;
 const TIMELINE_MARKER_AUTO_SCROLL_MAX_PX = 18;
 const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX = 72;
 const TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX = 16;
+const TIMELINE_MOUSE_PAN_START_PX = 4;
 const state = {
   uid: null,
   items: [],
@@ -684,6 +685,82 @@ function centerCurrentLine(scroll, minYear, maxYear) {
   });
 }
 
+function isTimelineMousePanTarget(target) {
+  if (!(target instanceof HTMLElement)) return false;
+  return !target.closest(".timeline-row-label, [data-action='drag-current-line']");
+}
+
+function enableTimelineMousePanning(scroll) {
+  let pan = null;
+  let suppressNextClick = false;
+
+  const finishPan = (event) => {
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const completedPan = pan;
+    pan = null;
+    if (scroll.hasPointerCapture?.(completedPan.pointerId)) {
+      scroll.releasePointerCapture(completedPan.pointerId);
+    }
+    scroll.classList.remove("mouse-panning");
+    if (completedPan.isPanning) {
+      suppressNextClick = true;
+      window.setTimeout(() => {
+        suppressNextClick = false;
+      }, 0);
+    }
+  };
+
+  scroll.addEventListener(
+    "click",
+    (event) => {
+      if (!suppressNextClick) return;
+      suppressNextClick = false;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true
+  );
+
+  scroll.addEventListener("pointerdown", (event) => {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    if (!isTimelineMousePanTarget(event.target) || scroll.scrollWidth <= scroll.clientWidth) return;
+
+    pan = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scroll.scrollLeft,
+      isPanning: false,
+    };
+  });
+
+  scroll.addEventListener("pointermove", (event) => {
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    if ((event.buttons & 1) === 0) {
+      finishPan(event);
+      return;
+    }
+    const distance = event.clientX - pan.startX;
+
+    if (!pan.isPanning) {
+      if (Math.abs(distance) < TIMELINE_MOUSE_PAN_START_PX) return;
+      pan.isPanning = true;
+      scroll.classList.add("mouse-panning");
+      scroll.focus({ preventScroll: true });
+      scroll.setPointerCapture?.(event.pointerId);
+    }
+
+    event.preventDefault();
+    scroll.scrollLeft = pan.startScrollLeft - distance;
+  });
+
+  scroll.addEventListener("pointerup", finishPan);
+  scroll.addEventListener("pointercancel", finishPan);
+  scroll.addEventListener("lostpointercapture", finishPan);
+  scroll.addEventListener("pointerleave", (event) => {
+    if (pan && !pan.isPanning) finishPan(event);
+  });
+}
+
 function renderTimeline(items) {
   itemList.innerHTML = "";
   if (items.length === 0) {
@@ -700,6 +777,7 @@ function renderTimeline(items) {
   const scroll = createElement("div", "timeline-scroll");
   scroll.tabIndex = 0;
   scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
+  enableTimelineMousePanning(scroll);
 
   const grid = createElement("div", "timeline-grid");
   grid.dataset.minYear = String(minYear);
