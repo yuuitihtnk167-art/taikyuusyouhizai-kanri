@@ -88,7 +88,7 @@ function validateBackupData(backup) {
     throw new Error("バックアップファイルの形式が正しくありません。");
   }
   const isPcManagementBackup = backup.app === BACKUP_APP_NAME && Number(backup.version) === BACKUP_VERSION;
-  const isMonthlyAppBackup = Array.isArray(backup.durableGoodsItems) || Object.hasOwn(backup, "assetReferenceData");
+  const isMonthlyAppBackup = Array.isArray(backup.durableGoodsItems);
   if (!isPcManagementBackup && !isMonthlyAppBackup) {
     throw new Error("パソコン管理のバックアップファイルではありません。");
   }

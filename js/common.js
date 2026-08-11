@@ -30,8 +30,6 @@ const LOCAL_DB_NAME = "monthlyApplianceBookLocal";
 const LOCAL_DB_VERSION = 1;
 const LOCAL_BACKUP_APP_NAME = "月額家電簿";
 const LOCAL_BACKUP_VERSION = 1;
-const LOCAL_ASSET_REFERENCE_KEY = "monthlyApplianceBook.assetReferenceData";
-const ASSET_REFERENCE_DOC_ID = "__assetReferenceData";
 const ASSET_REFERENCE_SOURCE_TYPE = "assetReferenceData";
 export const CATEGORY_OPTIONS = [
   { value: "information_device", label: "情報機器" },
@@ -206,7 +204,6 @@ export async function createLocalBackupData() {
     exportedAt: new Date().toISOString(),
     durableGoodsItems,
     pcItems,
-    assetReferenceData: loadLocalAssetReferenceBackupData(),
   };
 }
 
@@ -242,70 +239,6 @@ function toBackupValue(value) {
   );
 }
 
-function userReferenceDocRef(uid) {
-  return doc(db, "users", uid, ITEMS_COLLECTION, ASSET_REFERENCE_DOC_ID);
-}
-
-function normalizeAssetReferenceBackupData(value) {
-  if (!value) return null;
-  if (typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("参照データのバックアップ形式が正しくありません。");
-  }
-  if (!Array.isArray(value.items)) {
-    throw new Error("参照データのバックアップに品目一覧が含まれていません。");
-  }
-  const items = value.items
-    .map((item) => {
-      const name = String(item?.name ?? item?.label ?? "").trim();
-      const usefulLifeYears = Number(String(item?.usefulLifeYears ?? "").replaceAll(",", ""));
-      const unitPrice = Number(String(item?.unitPrice ?? "").replaceAll(",", ""));
-      if (!name || !Number.isFinite(usefulLifeYears) || usefulLifeYears <= 0) return null;
-      if (!Number.isFinite(unitPrice) || unitPrice < 0) return null;
-      return {
-        id: String(item?.id ?? item?.code ?? createId()),
-        name,
-        usefulLifeYears,
-        unitPrice,
-      };
-    })
-    .filter(Boolean);
-  return {
-    source: "manual",
-    updatedAt: value.updatedAt ?? value.importedAt ?? null,
-    items,
-  };
-}
-
-function loadLocalAssetReferenceBackupData() {
-  const value = storageGetItem(LOCAL_ASSET_REFERENCE_KEY);
-  if (!value) return null;
-  try {
-    return normalizeAssetReferenceBackupData(JSON.parse(value));
-  } catch (_error) {
-    return null;
-  }
-}
-
-async function loadFirebaseAssetReferenceBackupData(uid) {
-  const snapshot = await getDoc(userReferenceDocRef(uid));
-  if (!snapshot.exists()) return null;
-  const data = snapshot.data();
-  if (data.sourceType !== ASSET_REFERENCE_SOURCE_TYPE) return null;
-  return normalizeAssetReferenceBackupData(toBackupValue(data));
-}
-
-function restoreLocalAssetReferenceBackupData(backup) {
-  if (!Object.hasOwn(backup, "assetReferenceData")) return;
-  if (!backup.assetReferenceData) {
-    storageRemoveItem(LOCAL_ASSET_REFERENCE_KEY);
-    return;
-  }
-  storageSetItem(
-    LOCAL_ASSET_REFERENCE_KEY,
-    JSON.stringify(normalizeAssetReferenceBackupData(backup.assetReferenceData))
-  );
-}
-
 export async function createFirebaseLocalBackupData(uid) {
   if (!uid) {
     throw new Error("Firebaseデータの取得に必要なユーザー情報がありません。");
@@ -337,7 +270,6 @@ export async function createFirebaseLocalBackupData(uid) {
     exportedAt: new Date().toISOString(),
     durableGoodsItems: sortStoredItems(durableGoodsItems),
     pcItems,
-    assetReferenceData: await loadFirebaseAssetReferenceBackupData(uid),
   };
 }
 
@@ -369,11 +301,10 @@ export function parseLocalBackupText(text) {
 
   validateBackupRecordIds(backup.durableGoodsItems, "通常家電");
   validateBackupRecordIds(backup.pcItems, "パソコン管理");
-  if (Object.hasOwn(backup, "assetReferenceData")) {
-    normalizeAssetReferenceBackupData(backup.assetReferenceData);
-  }
   return {
-    ...backup,
+    app: backup.app,
+    version: backup.version,
+    exportedAt: backup.exportedAt ?? null,
     durableGoodsItems: normalizeBackupDurableGoodsItems(backup.durableGoodsItems),
     pcItems: normalizeBackupPcItems(backup.pcItems),
   };
@@ -382,7 +313,6 @@ export function parseLocalBackupText(text) {
 export async function restoreLocalBackupData(backup) {
   await replaceLocalRecords(LOCAL_DURABLE_ITEMS_STORE, backup.durableGoodsItems);
   await replaceLocalRecords(LOCAL_PC_ITEMS_STORE, backup.pcItems);
-  restoreLocalAssetReferenceBackupData(backup);
 }
 
 export function onAuthChanged(callback) {
