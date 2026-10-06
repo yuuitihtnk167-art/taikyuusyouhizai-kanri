@@ -15,10 +15,37 @@
       <header class="app-header settings-header">
         <div>
           <h1>設定</h1>
-          <p class="subtitle">月額コストの計算方法を変更できます</p>
+          <p class="subtitle">家電簿・PC管理で共通の設定です</p>
         </div>
         <button id="back-button" type="button" class="ghost-button">戻る</button>
       </header>
+
+      <section class="panel settings-panel monthly-summary-panel" aria-labelledby="monthly-summary-settings-title">
+        <h2 id="monthly-summary-settings-title">月ごとの集計・家計簿入力日</h2>
+        <div>
+          <label for="monthly-summary-mode">集計方法</label>
+          <select id="monthly-summary-mode">
+            <option value="monthly">月ごとの基準日で集計</option>
+            <option value="position">青いラインの位置で集計（従来）</option>
+          </select>
+        </div>
+        <div>
+          <label for="monthly-summary-day">毎月の基準日</label>
+          <select id="monthly-summary-day" aria-describedby="monthly-summary-description"></select>
+        </div>
+        <div>
+          <label for="monthly-summary-adjustment">土日・祝日の扱い</label>
+          <select id="monthly-summary-adjustment">
+            <option value="previous">直前の平日に繰り上げる</option>
+            <option value="none">変更しない</option>
+          </select>
+        </div>
+        <output id="monthly-summary-preview" class="monthly-summary-preview" aria-label="今月の家計簿入力日"></output>
+        <p id="monthly-summary-status" role="status"></p>
+        <p id="monthly-summary-description">選択月の基準日時点の月額合計・総購入額・登録数を表示します。同じ月の中では金額は変わりません。日割り計算は行いません。基準日がない月は月末を使ってから休日を調整します。</p>
+        <p>日本の祝日・振替休日・国民の休日に対応しています。祝日データ対象外の年では、土日のみ調整した仮の日付を表示します。</p>
+        <p>この設定は家電簿とPC管理で共通です。変更すると自動保存されます。端末・ブラウザごとの設定で、同期・バックアップの対象外です。過去月も現在の設定と登録データで再計算されます。</p>
+      </section>
 
       <section class="panel settings-panel" aria-labelledby="monthly-cost-settings-title">
         <h2 id="monthly-cost-settings-title">月額コスト</h2>
@@ -26,7 +53,7 @@
           <input id="exclude-underused-monthly-cost" type="checkbox" />
           <span>
             <strong>使用年数未達の月額コストを含めない</strong>
-            <small>チェックすると、予定より早く使用終了した家電を月額合計から除外します。</small>
+            <small>チェックすると、予定より早く使用終了した家電・PCパーツを月額合計から除外します。</small>
           </span>
         </label>
       </section>
@@ -36,7 +63,7 @@
         <div class="settings-action-card">
           <div>
             <strong>ローカル保存用ファイル作成</strong>
-            <p>Firestoreに保存しているデータから、ローカル保存で復元できるファイルを作成します。</p>
+            <p>Firestoreに保存している家電・PCパーツのデータから、ローカル保存で復元できるファイルを作成します。</p>
           </div>
           <button id="firebase-local-backup-button" type="button" class="primary-button" disabled>
             ローカル保存用ファイル作成
