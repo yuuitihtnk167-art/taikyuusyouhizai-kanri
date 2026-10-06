@@ -4,7 +4,7 @@ import {
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "../js/services/monthly-summary.js";
+import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "../js/services/monthly-summary.js?v=133";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,

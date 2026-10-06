@@ -1,6 +1,6 @@
 import { getItems as getPcItems } from "../storage/pc-items/index.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./app-settings.js";
-import { dateMonthPosition } from "./monthly-summary.js";
+import { dateMonthPosition } from "./monthly-summary.js?v=133";
 
 function parseDate(value) {
   const text = String(value ?? "").trim();
