@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v132";
+const CACHE_NAME = "durable-goods-pwa-v133";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -12,18 +12,18 @@ const APP_SHELL = [
   "assets/login-hero.png",
   "js/common.js",
   "js/login.js",
-  "js/list.js",
+  "js/list.js?v=133",
   "js/form.js",
-  "js/settings.js",
+  "js/settings.js?v=133",
   "js/platform/firebase.js",
   "js/platform/local-db.js",
   "js/services/app-settings.js",
-  "js/services/monthly-summary.js",
+  "js/services/monthly-summary.js?v=133",
   "js/services/japanese-holidays.js",
-  "js/services/monthly-summary-settings.js",
+  "js/services/monthly-summary-settings.js?v=133",
   "js/services/category-order.js",
   "js/services/auth.js",
-  "js/services/pc-summary.js",
+  "js/services/pc-summary.js?v=133",
   "js/storage/durable-items/firestore.js",
   "js/storage/durable-items/index.js",
   "js/storage/durable-items/local.js",
@@ -41,7 +41,7 @@ const APP_SHELL = [
   "pc-management/pwa.js",
   "pc-management/settings.js",
   "pc-management/styles.css",
-  "pc-management/app.js",
+  "pc-management/app.js?v=133",
   "pc-management/icons/icon-192.png",
   "pc-management/icons/icon-512.png",
   "manifest.webmanifest",

@@ -8,7 +8,7 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
-import { initializeMonthlySummarySettings } from "./services/monthly-summary-settings.js";
+import { initializeMonthlySummarySettings } from "./services/monthly-summary-settings.js?v=133";
 
 initializeMonthlySummarySettings();
 

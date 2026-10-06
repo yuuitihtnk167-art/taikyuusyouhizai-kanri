@@ -1,5 +1,5 @@
 import { getMonthlySummarySettings, setMonthlySummarySettings } from "./app-settings.js";
-import { dateMonthPosition, summaryReferenceLabel } from "./monthly-summary.js";
+import { dateMonthPosition, summaryReferenceLabel } from "./monthly-summary.js?v=133";
 
 export function initializeMonthlySummarySettings() {
   const mode = document.getElementById("monthly-summary-mode");

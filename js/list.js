@@ -20,9 +20,9 @@ import {
   saveCategoryOrder,
 } from "./services/category-order.js";
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "./services/monthly-summary.js";
+import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "./services/monthly-summary.js?v=133";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
+import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=133";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
