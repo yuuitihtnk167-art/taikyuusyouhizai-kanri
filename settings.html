@@ -25,16 +25,16 @@
         <div>
           <label for="monthly-summary-mode">集計方法</label>
           <select id="monthly-summary-mode">
-            <option value="monthly">月ごとの基準日で集計</option>
+            <option value="monthly">月ごとの締め日で集計</option>
             <option value="position">青いラインの位置で集計（従来）</option>
           </select>
         </div>
         <div>
-          <label for="monthly-summary-day">毎月の基準日</label>
+          <label for="monthly-summary-day">毎月の期間開始日</label>
           <select id="monthly-summary-day" aria-describedby="monthly-summary-description"></select>
         </div>
         <div>
-          <label for="monthly-summary-adjustment">土日・祝日の扱い</label>
+          <label for="monthly-summary-adjustment">家計簿入力日が土日・祝日の場合</label>
           <select id="monthly-summary-adjustment">
             <option value="previous">直前の平日に繰り上げる</option>
             <option value="none">変更しない</option>
@@ -42,8 +42,8 @@
         </div>
         <output id="monthly-summary-preview" class="monthly-summary-preview" aria-label="今月の家計簿入力日"></output>
         <p id="monthly-summary-status" role="status"></p>
-        <p id="monthly-summary-description">選択月の基準日時点の月額合計・総購入額・登録数を表示します。同じ月の中では金額は変わりません。日割り計算は行いません。基準日がない月は月末を使ってから休日を調整します。</p>
-        <p>日本の祝日・振替休日・国民の休日に対応しています。祝日データ対象外の年では、土日のみ調整した仮の日付を表示します。</p>
+        <p id="monthly-summary-description">選択月の開始日から翌月の開始日前日までを対象期間とし、締め日時点の月額合計・総購入額・登録数を表示します。15日始まりなら、9月分は9月15日〜10月14日です。同じ月の中では金額は変わりません。日割り計算は行いません。開始日がない月は、その月の末日を開始日とします。</p>
+        <p>家計簿入力日は翌月の開始日の前日（締め日）です。土日・祝日の場合は、設定に応じて直前の平日に繰り上げます。入力日を繰り上げても集計の締め日は変わりません。祝日データ対象外の年では土日のみ調整し、仮の日付として表示します。</p>
         <p>この設定は家電簿とPC管理で共通です。変更すると自動保存されます。端末・ブラウザごとの設定で、同期・バックアップの対象外です。過去月も現在の設定と登録データで再計算されます。</p>
       </section>
 
