@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v130";
+const CACHE_NAME = "durable-goods-pwa-v132";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -19,8 +19,8 @@ const APP_SHELL = [
   "js/platform/local-db.js",
   "js/services/app-settings.js",
   "js/services/monthly-summary.js",
-  "js/services/monthly-summary-settings.js",
   "js/services/japanese-holidays.js",
+  "js/services/monthly-summary-settings.js",
   "js/services/category-order.js",
   "js/services/auth.js",
   "js/services/pc-summary.js",

@@ -22,7 +22,7 @@ export function initializeMonthlySummarySettings() {
     day.value = String(settings.day);
     adjustment.value = settings.adjustToPreviousWeekday ? "previous" : "none";
     day.disabled = adjustment.disabled = settings.mode !== "monthly";
-    preview.textContent = summaryReferenceLabel(dateMonthPosition(new Date()), settings);
+    preview.textContent = summaryReferenceLabel(dateMonthPosition(new Date()), settings, { details: true });
   }
 
   function save() {

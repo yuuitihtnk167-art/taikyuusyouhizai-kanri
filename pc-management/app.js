@@ -4,7 +4,7 @@ import {
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel } from "../js/services/monthly-summary.js";
+import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "../js/services/monthly-summary.js";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -548,7 +548,6 @@ function resolveTimelineRange(items) {
     minYear = Math.min(minYear, Math.floor(itemStartMonth(item) / 12));
     maxYear = Math.max(maxYear, Math.ceil(itemTimelineEndMonth(item) / 12));
   }
-  if (monthlySummaryReference(minYear * 12).position < minYear * 12) minYear -= 1;
   return { minYear, maxYear };
 }
 
@@ -556,7 +555,8 @@ function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const referenceMonth = timelineMarkerMonth();
+  const reference = monthlySummaryReference(state.timelineMarkerMonth);
+  const referenceMonth = reference.startDate ? dateMonthPosition(reference.startDate) : timelineMarkerMonth();
   const markerMonth = getMonthlySummarySettings().mode === "monthly"
     ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
     : referenceMonth;
