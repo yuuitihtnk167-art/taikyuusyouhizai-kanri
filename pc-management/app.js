@@ -3,7 +3,8 @@ import {
 } from "../js/common.js";
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
-import { shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
+import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
+import { monthlySummaryReference, summaryReferenceLabel } from "../js/services/monthly-summary.js";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -262,15 +263,14 @@ function summaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
 
 
 function timelineMarkerMonth() {
-  return Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+  const position = Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+  return monthlySummaryReference(position).position;
 }
 
 function updateTimelineMarkerDate() {
   if (!elements.timelineMarkerDate) return;
-  const monthIndex = Math.floor(timelineMarkerMonth());
-  const year = Math.floor(monthIndex / 12);
-  const month = (monthIndex % 12) + 1;
-  elements.timelineMarkerDate.textContent = `${year}年${month}月`;
+  elements.timelineMarkerDate.dataset.summaryMode = getMonthlySummarySettings().mode;
+  elements.timelineMarkerDate.textContent = summaryReferenceLabel(state.timelineMarkerMonth);
 }
 
 function activeEndMonth(item) {
@@ -286,6 +286,14 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
+  if (getMonthlySummarySettings().mode === "monthly") {
+    const plannedEnd = itemPlannedEndMonth(item);
+    if (!item.endOfUseDate) return plannedEnd;
+    const actualEnd = itemActualEndMonth(item);
+    return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
+      ? plannedEnd
+      : Math.min(actualEnd, plannedEnd);
+  }
   if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
     return itemPlannedEndMonth(item);
   }
@@ -540,6 +548,7 @@ function resolveTimelineRange(items) {
     minYear = Math.min(minYear, Math.floor(itemStartMonth(item) / 12));
     maxYear = Math.max(maxYear, Math.ceil(itemTimelineEndMonth(item) / 12));
   }
+  if (monthlySummaryReference(minYear * 12).position < minYear * 12) minYear -= 1;
   return { minYear, maxYear };
 }
 
@@ -547,7 +556,10 @@ function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const markerMonth = timelineMarkerMonth();
+  const referenceMonth = timelineMarkerMonth();
+  const markerMonth = getMonthlySummarySettings().mode === "monthly"
+    ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
+    : referenceMonth;
   if (markerMonth < minMonth || markerMonth > maxMonth) return null;
   return labelWidth + ((markerMonth - minMonth) / 12) * yearWidth;
 }
@@ -1253,7 +1265,8 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
   const maxMonth = maxYear * 12;
   const x = scroll.scrollLeft + clientX - rect.left;
   const monthPosition = minMonth + ((x - labelWidth) / yearWidth) * 12;
-  return Math.min(Math.max(monthPosition, minMonth), maxMonth);
+  const lastPosition = getMonthlySummarySettings().mode === "monthly" ? maxMonth - 1 : maxMonth;
+  return Math.min(Math.max(monthPosition, minMonth), lastPosition);
 }
 
 function applyTimelineMarkerDragPosition(drag) {
@@ -1647,7 +1660,7 @@ if (elements.hiddenButton) {
 
 if (elements.settingsButton) {
   elements.settingsButton.addEventListener("click", () => {
-    window.location.href = "settings.html";
+    window.location.href = "../settings.html?from=pc";
   });
 }
 

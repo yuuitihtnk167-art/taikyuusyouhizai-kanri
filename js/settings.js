@@ -8,6 +8,9 @@ import {
 } from "./common.js";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
+import { initializeMonthlySummarySettings } from "./services/monthly-summary-settings.js";
+
+initializeMonthlySummarySettings();
 
 const excludeUnderusedMonthlyCostInput = document.getElementById("exclude-underused-monthly-cost");
 const backButton = document.getElementById("back-button");
@@ -27,6 +30,15 @@ if (excludeUnderusedMonthlyCostInput instanceof HTMLInputElement) {
 }
 
 backButton?.addEventListener("click", () => {
+  const cameFromPc = new URLSearchParams(window.location.search).get("from") === "pc";
+  if (cameFromPc) {
+    const returnUrl = new URL("pc-management/index.html", window.location.href);
+    if (sessionStorage.getItem("pcManagement.standaloneApp") === "true") {
+      returnUrl.searchParams.set("standalone", "pc");
+    }
+    window.location.href = returnUrl.href;
+    return;
+  }
   window.location.href = "list.html";
 });
 

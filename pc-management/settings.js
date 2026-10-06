@@ -1,21 +1,4 @@
-import {
-  setExcludeUnderusedMonthlyCost,
-  shouldExcludeUnderusedMonthlyCost,
-} from "../js/services/app-settings.js";
-import { registerServiceWorker } from "../js/services/auth.js";
+import "./pwa.js";
 
-const excludeUnderusedMonthlyCostInput = document.getElementById("exclude-underused-monthly-cost");
-const backButton = document.getElementById("back-button");
-
-if (excludeUnderusedMonthlyCostInput instanceof HTMLInputElement) {
-  excludeUnderusedMonthlyCostInput.checked = shouldExcludeUnderusedMonthlyCost();
-  excludeUnderusedMonthlyCostInput.addEventListener("change", () => {
-    setExcludeUnderusedMonthlyCost(excludeUnderusedMonthlyCostInput.checked);
-  });
-}
-
-backButton?.addEventListener("click", () => {
-  window.location.href = "index.html";
-});
-
-registerServiceWorker();
+// Keep the old URL working for bookmarks and cached links.
+window.location.replace(new URL("../settings.html?from=pc", import.meta.url).href);
