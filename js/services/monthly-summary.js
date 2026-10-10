@@ -11,6 +11,21 @@ function periodStartDate(year, month, day) {
   return new Date(year, month, Math.min(day, lastDay));
 }
 
+function adjustedClosingDate(year, month, settings) {
+  const date = periodStartDate(year, month + 1, settings.day);
+  date.setDate(date.getDate() - 1);
+  let holidaysKnown = true;
+  if (settings.adjustToPreviousWeekday !== false) {
+    while (true) {
+      holidaysKnown = holidaysKnown && date.getFullYear() >= HOLIDAY_FIRST_YEAR && date.getFullYear() <= HOLIDAY_LAST_YEAR;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      if (date.getDay() !== 0 && date.getDay() !== 6 && !JAPANESE_HOLIDAYS.has(key)) break;
+      date.setDate(date.getDate() - 1);
+    }
+  }
+  return { date, holidaysKnown };
+}
+
 export function monthlySummaryReference(monthPosition, settings = getMonthlySummarySettings()) {
   const selectedMonth = Math.floor(monthPosition);
   const year = Math.floor(selectedMonth / 12);
@@ -19,20 +34,19 @@ export function monthlySummaryReference(monthPosition, settings = getMonthlySumm
     return { selectedMonth, position: monthPosition, date: null, startDate: null, inputDate: null, holidaysKnown: true };
   }
 
-  const startDate = periodStartDate(year, month, settings.day);
-  const date = periodStartDate(year, month + 1, settings.day);
-  date.setDate(date.getDate() - 1);
-  const inputDate = new Date(date);
-  let holidaysKnown = true;
-  if (settings.adjustToPreviousWeekday !== false) {
-    while (true) {
-      holidaysKnown = holidaysKnown && inputDate.getFullYear() >= HOLIDAY_FIRST_YEAR && inputDate.getFullYear() <= HOLIDAY_LAST_YEAR;
-      const key = `${inputDate.getFullYear()}-${String(inputDate.getMonth() + 1).padStart(2, "0")}-${String(inputDate.getDate()).padStart(2, "0")}`;
-      if (inputDate.getDay() !== 0 && inputDate.getDay() !== 6 && !JAPANESE_HOLIDAYS.has(key)) break;
-      inputDate.setDate(inputDate.getDate() - 1);
-    }
-  }
-  return { selectedMonth, position: dateMonthPosition(date), date, startDate, inputDate, holidaysKnown };
+  const closing = adjustedClosingDate(year, month, settings);
+  const previousClosing = adjustedClosingDate(year, month - 1, settings);
+  const startDate = new Date(previousClosing.date);
+  startDate.setDate(startDate.getDate() + 1);
+  return {
+    selectedMonth,
+    position: dateMonthPosition(closing.date),
+    markerPosition: dateMonthPosition(periodStartDate(year, month, settings.day)),
+    date: closing.date,
+    startDate,
+    inputDate: new Date(closing.date),
+    holidaysKnown: closing.holidaysKnown && previousClosing.holidaysKnown,
+  };
 }
 
 function monthDayLabel(date) {

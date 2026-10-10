@@ -20,9 +20,9 @@ import {
   saveCategoryOrder,
 } from "./services/category-order.js";
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "./services/monthly-summary.js?v=133";
+import { monthlySummaryReference, summaryReferenceLabel } from "./services/monthly-summary.js?v=134";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=133";
+import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=134";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -702,7 +702,7 @@ function currentLinePosition(minYear, maxYear) {
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
   const reference = monthlySummaryReference(state.timelineMarkerMonth);
-  const referenceMonth = reference.startDate ? dateMonthPosition(reference.startDate) : timelineMarkerMonth();
+  const referenceMonth = reference.startDate ? reference.markerPosition : timelineMarkerMonth();
   const markerMonth = getMonthlySummarySettings().mode === "monthly"
     ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
     : referenceMonth;
