@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { createContext, runInContext } from "node:vm";
 
 // Only storage is stubbed; the date and PC cost calculations use the real modules.
 const pcStorageUrl = new URL("../js/storage/pc-items/index.js", import.meta.url).href;
@@ -46,16 +48,16 @@ test("September closes October 14 and stays constant throughout the selected mon
   assert.match(summaryReferenceLabel(month(2026, 9), monthly, { details: true }), /対象期間：9月15日〜10月14日/);
 });
 
-test("closing dates stay on weekends and holidays even with the old adjustment setting", () => {
-  for (const [year, number, day, expected] of [[2026, 10, 15, "2026-11-14"], [2026, 1, 16, "2026-02-15"], [2025, 8, 16, "2025-09-15"]]) {
+test("closing dates move to weekdays with holiday adjustment", () => {
+  for (const [year, number, day, expected] of [[2026, 10, 15, "2026-11-13"], [2026, 1, 16, "2026-02-13"], [2025, 8, 16, "2025-09-12"]]) {
     assert.equal(dateKey(monthlySummaryReference(month(year, number), { ...monthly, day, adjustToPreviousWeekday: true }).date), expected);
   }
 });
 
 test("short months clamp each start and consecutive periods have no gap", () => {
   for (const year of [2024, 2026]) {
-    const january = monthlySummaryReference(month(year, 1), { ...monthly, day: 31 });
-    const february = monthlySummaryReference(month(year, 2), { ...monthly, day: 31 });
+    const january = monthlySummaryReference(month(year, 1), { ...monthly, day: 31, adjustToPreviousWeekday: false });
+    const february = monthlySummaryReference(month(year, 2), { ...monthly, day: 31, adjustToPreviousWeekday: false });
     const followingDate = new Date(january.date);
     followingDate.setDate(followingDate.getDate() + 1);
     assert.equal(dateKey(followingDate), dateKey(february.startDate));
@@ -65,7 +67,7 @@ test("short months clamp each start and consecutive periods have no gap", () => 
 });
 
 test("first-day periods close at month end, December carries into next year", () => {
-  assert.equal(dateKey(monthlySummaryReference(month(2026, 2), { ...monthly, day: 1 }).date), "2026-02-28");
+  assert.equal(dateKey(monthlySummaryReference(month(2026, 2), { ...monthly, day: 1 }).date), "2026-02-27");
   const december = monthlySummaryReference(month(2026, 12), monthly);
   assert.equal(december.selectedMonth, month(2026, 12));
   assert.equal(dateKey(december.date), "2027-01-14");
@@ -91,8 +93,8 @@ test("September 11 purchase contributes from August and remains in September", (
 
 test("PC integration includes purchases on the reference date but excludes later purchases", () => {
   const items = [
-    { purchaseDate: "2026-11-14", purchasePrice: 12000, yearsOfUse: 1 },
-    { purchaseDate: "2026-11-15", purchasePrice: 24000, yearsOfUse: 1 },
+    { purchaseDate: "2026-11-13", purchasePrice: 12000, yearsOfUse: 1 },
+    { purchaseDate: "2026-11-14", purchasePrice: 24000, yearsOfUse: 1 },
     { purchaseDate: "2026-01-01", purchasePrice: 12000, yearsOfUse: 1, excludeFromSummary: true },
   ];
   const position = monthlySummaryReference(month(2026, 10), monthly).position;
@@ -101,13 +103,13 @@ test("PC integration includes purchases on the reference date but excludes later
 });
 
 test("underused setting, exact end date and per-item rounding are respected", () => {
-  const items = [{ purchaseDate: "2026-01-01", endOfUseDate: "2026-11-13", purchasePrice: 12006, yearsOfUse: 1 }];
+  const items = [{ purchaseDate: "2026-01-01", endOfUseDate: "2026-11-12", purchasePrice: 12006, yearsOfUse: 1 }];
   const position = monthlySummaryReference(month(2026, 10), monthly).position;
   settingsModule.setExcludeUnderusedMonthlyCost(false);
   assert.equal(calculatePcSummaryAt(items, position, { exactDate: true }).monthlyCost, 1001);
   settingsModule.setExcludeUnderusedMonthlyCost(true);
   assert.equal(calculatePcSummaryAt(items, position, { exactDate: true }).monthlyCost, 0);
-  items[0].endOfUseDate = "2026-11-14";
+  items[0].endOfUseDate = "2026-11-13";
   assert.equal(calculatePcSummaryAt(items, position, { exactDate: true }).monthlyCost, 1001);
   values.clear();
 });
@@ -120,14 +122,14 @@ test("leap-day planned end is clamped and included on its last date", () => {
 });
 
 
-test("October input moves to Friday while calculation stays on November 14", () => {
+test("October closes on Friday and November 14 purchases start in November", () => {
   const reference = monthlySummaryReference(month(2026, 10), monthly);
-  assert.equal(dateKey(reference.date), "2026-11-14");
+  assert.equal(dateKey(reference.date), "2026-11-13");
   assert.equal(dateKey(reference.inputDate), "2026-11-13");
   assert.equal(summaryReferenceLabel(month(2026, 10), monthly), "2026年10月分\n家計簿入力日：11/13(金)");
   const items = [
-    { purchaseDate: "2026-11-14", purchasePrice: 12000, yearsOfUse: 1 },
-    { purchaseDate: "2026-11-15", purchasePrice: 24000, yearsOfUse: 1 },
+    { purchaseDate: "2026-11-13", purchasePrice: 12000, yearsOfUse: 1 },
+    { purchaseDate: "2026-11-14", purchasePrice: 24000, yearsOfUse: 1 },
   ];
   assert.deepEqual(calculatePcSummaryAt(items, reference.position, { exactDate: true }), { monthlyCost: 1000, purchaseTotal: 12000 });
 });
@@ -135,11 +137,11 @@ test("October input moves to Friday while calculation stays on November 14", () 
 test("input skips holiday chains and can keep the closing date when disabled", () => {
   const settings = { ...monthly, day: 7 };
   const reference = monthlySummaryReference(month(2026, 4), settings);
-  assert.equal(dateKey(reference.date), "2026-05-06");
+  assert.equal(dateKey(reference.date), "2026-05-01");
   assert.equal(dateKey(reference.inputDate), "2026-05-01");
   const unadjusted = monthlySummaryReference(month(2026, 4), { ...settings, adjustToPreviousWeekday: false });
   assert.equal(dateKey(unadjusted.inputDate), "2026-05-06");
-  assert.equal(reference.position, unadjusted.position);
+  assert.notEqual(reference.position, unadjusted.position);
 });
 
 test("unknown holiday years show provisional input without changing calculations", () => {
@@ -147,4 +149,67 @@ test("unknown holiday years show provisional input without changing calculations
   assert.match(summaryReferenceLabel(month(2028, 10), monthly), /（仮）/);
   assert.match(summaryReferenceLabel(month(2028, 10), monthly, { details: true }), /祝日データ対象外/);
   assert.doesNotMatch(summaryReferenceLabel(month(2028, 10), { ...monthly, adjustToPreviousWeekday: false }), /仮/);
+});
+
+
+test("adjusted consecutive periods have no gaps or overlaps", () => {
+  for (const day of [1, 7, 15, 31]) {
+    for (let number = 1; number <= 12; number += 1) {
+      const current = monthlySummaryReference(month(2026, number), { ...monthly, day });
+      const next = monthlySummaryReference(month(2026, number) + 1, { ...monthly, day });
+      const followingDate = new Date(current.date);
+      followingDate.setDate(followingDate.getDate() + 1);
+      assert.equal(dateKey(followingDate), dateKey(next.startDate));
+      assert.equal(dateKey(current.date), dateKey(current.inputDate));
+      assert.equal(Math.floor(current.markerPosition), month(2026, number));
+    }
+  }
+  const november = monthlySummaryReference(month(2026, 11), monthly);
+  assert.equal(dateKey(november.startDate), "2026-11-14");
+  const item = [{ purchaseDate: "2026-11-14", purchasePrice: 24000, yearsOfUse: 1 }];
+  assert.equal(calculatePcSummaryAt(item, monthlySummaryReference(month(2026, 10), monthly).position, { exactDate: true }).purchaseTotal, 0);
+  assert.equal(calculatePcSummaryAt(item, november.position, { exactDate: true }).purchaseTotal, 24000);
+});
+
+
+test("real PC dashboard, spec total and CSV share the adjusted selected month", () => {
+  // Exercise the real app functions without booting authentication or writing product data.
+  const source = readFileSync(new URL("../pc-management/app.js", import.meta.url), "utf8");
+  const names = ["parseDate", "toMonthIndex", "daysInMonth", "toMonthPosition", "addYearsClamped", "itemStartMonth", "itemPlannedEndMonth", "itemActualEndMonth", "summaryActiveEndMonth", "isActiveInSummaryAtTimelineMarker", "isSummaryExcluded", "timelineMarkerMonth", "summaryItems", "specListPurchaseTotal", "specListCsv", "csvValue", "renderSummary", "summaryMonthlyCost", "monthlyCostAt", "isPastPlannedEnd", "calculateMonthlyCost"];
+  const functions = names.map(name => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1);
+    return source.slice(start, source.indexOf("\n}", start) + 2);
+  }).join("\n");
+  const state = {
+    timelineMarkerMonth: month(2026, 10),
+    selectedPcNames: new Set(["main"]),
+    items: [
+      { pcName: "main", purchaseDate: "2026-11-12", purchasePrice: 12000, yearsOfUse: 1, hideFromTimeline: true, endOfUseDate: "2026-11-12" },
+      { pcName: "main", purchaseDate: "2026-11-13", purchasePrice: 24000, yearsOfUse: 1 },
+      { pcName: "main", purchaseDate: "2026-11-14", purchasePrice: 48000, yearsOfUse: 1 },
+      { pcName: "main", purchaseDate: "2026-01-01", purchasePrice: 96000, yearsOfUse: 1, excludeFromSummary: true },
+      { pcName: "sub", purchaseDate: "2026-11-13", purchasePrice: 192000, yearsOfUse: 1 },
+    ],
+  };
+  const elements = { summaryCount: {}, summaryTotal: {}, summaryMonthly: {} };
+  const context = createContext({
+    state, elements, monthlySummaryReference, getMonthlySummarySettings: () => monthly,
+    shouldExcludeUnderusedMonthlyCost: () => false, specListPcName: () => "main",
+    specListRows: () => [], pcNameLabels: { main: "メインPC" },
+    currentMonthIndex: () => month(2026, 10) + 9 / 31,
+    updateTimelineMarkerDate: () => {}, formatCurrency: value => String(value), formatMonthlyCost: value => String(value),
+    TIMELINE_MIN_YEAR: 2015,
+  });
+  runInContext(functions, context);
+  // Hand check: 12,000 + 24,000 = 36,000. The Nov 14 purchase starts next month.
+  runInContext("renderSummary()", context);
+  assert.equal(elements.summaryTotal.textContent, "36000");
+  assert.equal(runInContext("specListPurchaseTotal()", context), 36000);
+  assert.match(runInContext("specListCsv()", context), /"総購入金額","36000"/);
+  state.timelineMarkerMonth = month(2026, 11);
+  runInContext("renderSummary()", context);
+  assert.equal(elements.summaryTotal.textContent, "84000");
+  assert.equal(runInContext("specListPurchaseTotal()", context), 84000);
+  assert.match(runInContext("specListCsv()", context), /"総購入金額","84000"/);
 });

@@ -4,7 +4,7 @@ import {
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel, dateMonthPosition } from "../js/services/monthly-summary.js?v=133";
+import { monthlySummaryReference, summaryReferenceLabel } from "../js/services/monthly-summary.js?v=134";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -96,7 +96,7 @@ const state = {
   isDirty: false,
   isBusy: false,
   summaryToggleLongPress: null,
-  timelineMarkerMonth: currentMonthIndex(),
+  timelineMarkerMonth: initialTimelineMarkerMonth(),
   timelineMarkerDrag: null,
   pcFilterLongPress: null,
   ignoreNextCategoryClick: false,
@@ -472,6 +472,15 @@ function itemStartMonth(item) {
   return purchaseDate ? toMonthPosition(purchaseDate) : TIMELINE_MIN_YEAR * 12;
 }
 
+function initialTimelineMarkerMonth() {
+  if (!document.getElementById("spec-list-content")) return currentMonthIndex();
+  const value = new URLSearchParams(window.location.search).get("summaryMonth");
+  const position = value === null || value.trim() === "" ? NaN : Number(value);
+  return Number.isFinite(position) && position >= 12 && position < 9999 * 12
+    ? position
+    : currentMonthIndex();
+}
+
 function currentMonthIndex() {
   return toMonthPosition(new Date());
 }
@@ -556,7 +565,7 @@ function currentLinePosition(minYear, maxYear) {
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
   const reference = monthlySummaryReference(state.timelineMarkerMonth);
-  const referenceMonth = reference.startDate ? dateMonthPosition(reference.startDate) : timelineMarkerMonth();
+  const referenceMonth = reference.startDate ? reference.markerPosition : timelineMarkerMonth();
   const markerMonth = getMonthlySummarySettings().mode === "monthly"
     ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
     : referenceMonth;
@@ -928,8 +937,10 @@ function specListRows() {
 }
 
 function specListPurchaseTotal() {
-  return specListItems()
-    .filter((item) => isActiveInSummaryAtTimelineMarker(item, currentMonthIndex()))
+  const pcName = specListPcName();
+  const monthPosition = timelineMarkerMonth();
+  return state.items
+    .filter((item) => item.pcName === pcName && !isSummaryExcluded(item) && isActiveInSummaryAtTimelineMarker(item, monthPosition))
     .reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
 }
 
@@ -1641,7 +1652,7 @@ if (elements.categoryFilter) {
       timer: window.setTimeout(() => {
         state.pcFilterLongPress = null;
         state.ignoreNextCategoryClick = true;
-        window.location.href = `specs.html?pcName=${encodeURIComponent(pcName)}`;
+        window.location.href = `specs.html?pcName=${encodeURIComponent(pcName)}&summaryMonth=${encodeURIComponent(state.timelineMarkerMonth)}`;
       }, PC_FILTER_LONG_PRESS_MS),
     };
   });

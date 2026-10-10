@@ -30,7 +30,7 @@
           </select>
         </div>
         <div>
-          <label for="monthly-summary-day">毎月の期間開始日</label>
+          <label for="monthly-summary-day">毎月の区切り日</label>
           <select id="monthly-summary-day" aria-describedby="monthly-summary-description"></select>
         </div>
         <div>
@@ -42,8 +42,8 @@
         </div>
         <output id="monthly-summary-preview" class="monthly-summary-preview" aria-label="今月の家計簿入力日"></output>
         <p id="monthly-summary-status" role="status"></p>
-        <p id="monthly-summary-description">選択月の開始日から翌月の開始日前日までを対象期間とし、締め日時点の月額合計・総購入額・登録数を表示します。15日始まりなら、9月分は9月15日〜10月14日です。同じ月の中では金額は変わりません。日割り計算は行いません。開始日がない月は、その月の末日を開始日とします。</p>
-        <p>家計簿入力日は翌月の開始日の前日（締め日）です。土日・祝日の場合は、設定に応じて直前の平日に繰り上げます。入力日を繰り上げても集計の締め日は変わりません。祝日データ対象外の年では土日のみ調整し、仮の日付として表示します。</p>
+        <p id="monthly-summary-description">設定日の前日を締め日とし、土日・祝日は設定に応じて直前の平日に繰り上げます。前月分の調整後の締め日の翌日から、選択月分の調整後の締め日までが対象期間です。15日設定の2026年10月分は10月15日〜11月13日となり、11月14日の購入は11月分から含めます。締め日時点の月額合計・総購入額・登録数を表示します。同じ月の中では金額は変わりません。日割り計算は行いません。設定日がない月は、その月の末日を区切り日として、その前日を締め日にします。</p>
+        <p>家計簿入力日は翌月の区切り日の前日を基に、休日調整した締め日です。土日・祝日の場合は、設定に応じて直前の平日に繰り上げます。家計簿入力日・締め日・集計日は同じ日です。祝日データ対象外の年では土日のみ調整し、仮の日付として表示します。</p>
         <p>この設定は家電簿とPC管理で共通です。変更すると自動保存されます。端末・ブラウザごとの設定で、同期・バックアップの対象外です。過去月も現在の設定と登録データで再計算されます。</p>
       </section>
 
@@ -73,6 +73,6 @@
       </section>
 
     </main>
-    <script type="module" src="js/settings.js?v=133"></script>
+    <script type="module" src="js/settings.js?v=134"></script>
   </body>
 </html>
