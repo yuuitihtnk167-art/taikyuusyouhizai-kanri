@@ -1084,6 +1084,7 @@ function specListCsv() {
 }
 
 function saveSpecListCsv() {
+  renderSpecList();
   const pcName = specListPcName();
   const blob = new Blob([`\uFEFF${specListCsv()}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -1756,6 +1757,26 @@ if (elements.backButton && elements.specListContent) {
 
 if (elements.specSaveButton) {
   elements.specSaveButton.addEventListener("click", saveSpecListCsv);
+}
+
+if (elements.specListContent) {
+  let dateRefreshTimer;
+  const scheduleDateRefresh = () => {
+    window.clearTimeout(dateRefreshTimer);
+    const now = new Date();
+    const nextDay = new Date(now);
+    nextDay.setHours(24, 0, 0, 0);
+    dateRefreshTimer = window.setTimeout(refreshCurrentSpecs, nextDay.getTime() - now.getTime());
+  };
+  const refreshCurrentSpecs = () => {
+    renderSpecList();
+    scheduleDateRefresh();
+  };
+  window.addEventListener("focus", refreshCurrentSpecs);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshCurrentSpecs();
+  });
+  scheduleDateRefresh();
 }
 
 if (elements.itemDialog) {
