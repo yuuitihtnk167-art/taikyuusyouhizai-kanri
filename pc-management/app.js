@@ -895,11 +895,17 @@ function specListPcName() {
 
 function specListItems() {
   const pcName = specListPcName();
-  return sortItems(state.items).filter((item) =>
-    item.pcName === pcName &&
-    !isSummaryExcluded(item) &&
-    (!item.hideFromTimeline || !item.endOfUseDate)
-  );
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return sortItems(state.items).filter((item) => {
+    const purchaseDate = parseDate(item.purchaseDate);
+    const endOfUseDate = parseDate(item.endOfUseDate);
+    return item.pcName === pcName &&
+      !isSummaryExcluded(item) &&
+      !item.hideFromTimeline &&
+      purchaseDate !== null && purchaseDate <= today &&
+      (!item.endOfUseDate || (endOfUseDate !== null && endOfUseDate > today));
+  });
 }
 
 function specListRows() {
@@ -913,12 +919,6 @@ function specListRows() {
     endOfUseDate: formatTextValue(item.endOfUseDate),
     monthlyCost: formatMonthlyCost(calculateMonthlyCost(item)),
   }));
-}
-
-function specListPurchaseTotal() {
-  return specListItems()
-    .filter((item) => isActiveInSummaryAtTimelineMarker(item, currentMonthIndex()))
-    .reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
 }
 
 function openSpecListValueDialog(value) {
@@ -971,7 +971,7 @@ function renderSpecList() {
     const empty = createElement("div", "timeline-empty");
     empty.innerHTML = `
       <strong>表示できるパーツがありません</strong>
-      <span>月額合計から除外していないパーツが表示されます。</span>
+      <span>購入済みで現在使用中のパーツのうち、非表示・集計から除外に設定していないものが表示されます。</span>
     `;
     elements.specListContent.appendChild(empty);
     return;
@@ -1030,11 +1030,8 @@ function renderSpecList() {
     tbody.appendChild(tr);
   }
 
-  const total = createElement("p", "spec-list-total");
-  total.innerHTML = `<span>${pcLabel}の総購入金額</span><strong>${formatCurrency(specListPurchaseTotal())}</strong>`;
-
   scroll.appendChild(table);
-  elements.specListContent.append(scroll, total);
+  elements.specListContent.append(scroll);
 }
 
 function csvValue(value) {
@@ -1062,7 +1059,6 @@ function specListCsv() {
     ].map(csvValue));
   }
 
-  lines.push([], ["総購入金額", formatCurrency(specListPurchaseTotal())].map(csvValue));
   return lines.map((line) => line.join(",")).join("\r\n");
 }
 
