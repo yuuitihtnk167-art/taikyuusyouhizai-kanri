@@ -258,6 +258,19 @@ button {
   gap: 14px;
 }
 
+.monthly-summary-preview {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.monthly-summary-panel p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 .settings-toggle {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -773,6 +786,16 @@ button {
   gap: 8px;
 }
 
+.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-row,
+.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-actions {
+  flex-wrap: wrap;
+}
+
+.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-actions {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
 .dashboard-title-actions .ghost-button[hidden] {
   display: none;
 }
@@ -892,7 +915,8 @@ button {
 
 .timeline-marker-action {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   align-items: center;
   gap: 10px;
 }
@@ -903,12 +927,15 @@ button {
   font-size: 0.88rem;
   font-weight: 800;
   text-align: right;
-  white-space: nowrap;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-width: 220px;
   text-shadow: 0 0 12px rgba(81, 183, 255, 0.6);
 }
 
 .hidden-title-with-date {
   display: flex;
+  flex-wrap: wrap;
   min-width: 0;
   align-items: baseline;
   gap: 12px;

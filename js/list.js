@@ -19,9 +19,10 @@ import {
   loadCategoryOrder,
   saveCategoryOrder,
 } from "./services/category-order.js";
-import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
+import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
+import { monthlySummaryReference, summaryReferenceLabel } from "./services/monthly-summary.js?v=134";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js";
+import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=134";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -264,13 +265,15 @@ function lifecycleStatus(item) {
 }
 
 function updatePcSummaryForMonth(monthPosition = timelineMarkerMonth()) {
-  const summary = calculatePcSummaryAt(state.pcItems, monthPosition);
+  const summary = calculatePcSummaryAt(state.pcItems, monthPosition, {
+    exactDate: getMonthlySummarySettings().mode === "monthly",
+  });
   state.pcMonthlyCost = summary.monthlyCost;
   state.pcPurchaseTotal = summary.purchaseTotal;
 }
 
 function isTimelineMarkerAtCurrentMonth() {
-  return Math.floor(timelineMarkerMonth()) === currentMonthIndex();
+  return Math.floor(state.timelineMarkerMonth) === Math.floor(currentMonthIndex());
 }
 
 function updatePcLinkedCostDisplays() {
@@ -303,15 +306,14 @@ function totalPurchaseCost(item) {
 }
 
 function timelineMarkerMonth() {
-  return Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+  const position = Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
+  return monthlySummaryReference(position).position;
 }
 
 function updateTimelineMarkerDate() {
   if (!timelineMarkerDate) return;
-  const monthIndex = Math.floor(timelineMarkerMonth());
-  const year = Math.floor(monthIndex / 12);
-  const month = (monthIndex % 12) + 1;
-  timelineMarkerDate.textContent = `${year}年${month}月`;
+  timelineMarkerDate.dataset.summaryMode = getMonthlySummarySettings().mode;
+  timelineMarkerDate.textContent = summaryReferenceLabel(state.timelineMarkerMonth);
 }
 
 function activeEndMonth(item) {
@@ -327,6 +329,14 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
+  if (getMonthlySummarySettings().mode === "monthly") {
+    const plannedEnd = itemPlannedEndMonth(item);
+    if (!item.endOfUseDate) return plannedEnd;
+    const actualEnd = itemActualEndMonth(item);
+    return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
+      ? plannedEnd
+      : Math.min(actualEnd, plannedEnd);
+  }
   if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
     return itemPlannedEndMonth(item);
   }
@@ -691,7 +701,11 @@ function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const markerMonth = timelineMarkerMonth();
+  const reference = monthlySummaryReference(state.timelineMarkerMonth);
+  const referenceMonth = reference.startDate ? reference.markerPosition : timelineMarkerMonth();
+  const markerMonth = getMonthlySummarySettings().mode === "monthly"
+    ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
+    : referenceMonth;
 
   if (markerMonth < minMonth || markerMonth > maxMonth) return null;
   return labelWidth + ((markerMonth - minMonth) / 12) * yearWidth;
@@ -965,7 +979,9 @@ async function refreshList() {
     loadPcSummaryItems(state.uid),
   ]);
   state.pcItems = pcItems;
-  state.pcCurrentMonthlyCost = calculatePcSummaryAt(pcItems, currentMonthIndex()).monthlyCost;
+  state.pcCurrentMonthlyCost = calculatePcSummaryAt(pcItems, monthlySummaryReference(currentMonthIndex()).position, {
+    exactDate: getMonthlySummarySettings().mode === "monthly",
+  }).monthlyCost;
   updatePcSummaryForMonth();
   state.summaryItems = loadedItems.filter((item) => !isPcManagementItem(item));
   state.items =
@@ -1038,7 +1054,8 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
   const maxMonth = maxYear * 12;
   const x = scroll.scrollLeft + clientX - rect.left;
   const monthPosition = minMonth + ((x - labelWidth) / yearWidth) * 12;
-  return Math.min(Math.max(monthPosition, minMonth), maxMonth);
+  const lastPosition = getMonthlySummarySettings().mode === "monthly" ? maxMonth - 1 : maxMonth;
+  return Math.min(Math.max(monthPosition, minMonth), lastPosition);
 }
 
 function applyTimelineMarkerDragPosition(drag) {
