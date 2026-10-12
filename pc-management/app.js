@@ -916,11 +916,17 @@ function specListPcName() {
 
 function specListItems() {
   const pcName = specListPcName();
-  return sortItems(state.items).filter((item) =>
-    item.pcName === pcName &&
-    !isSummaryExcluded(item) &&
-    (!item.hideFromTimeline || !item.endOfUseDate)
-  );
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return sortItems(state.items).filter((item) => {
+    const purchaseDate = parseDate(item.purchaseDate);
+    const endOfUseDate = parseDate(item.endOfUseDate);
+    return item.pcName === pcName &&
+      !isSummaryExcluded(item) &&
+      !item.hideFromTimeline &&
+      purchaseDate !== null && purchaseDate <= today &&
+      (!item.endOfUseDate || (endOfUseDate !== null && endOfUseDate > today));
+  });
 }
 
 function specListRows() {
@@ -934,14 +940,6 @@ function specListRows() {
     endOfUseDate: formatTextValue(item.endOfUseDate),
     monthlyCost: formatMonthlyCost(calculateMonthlyCost(item)),
   }));
-}
-
-function specListPurchaseTotal() {
-  const pcName = specListPcName();
-  const monthPosition = timelineMarkerMonth();
-  return state.items
-    .filter((item) => item.pcName === pcName && !isSummaryExcluded(item) && isActiveInSummaryAtTimelineMarker(item, monthPosition))
-    .reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
 }
 
 function openSpecListValueDialog(value) {
@@ -994,7 +992,7 @@ function renderSpecList() {
     const empty = createElement("div", "timeline-empty");
     empty.innerHTML = `
       <strong>表示できるパーツがありません</strong>
-      <span>月額合計から除外していないパーツが表示されます。</span>
+      <span>購入済みで現在使用中のパーツのうち、非表示・集計から除外に設定していないものが表示されます。</span>
     `;
     elements.specListContent.appendChild(empty);
     return;
@@ -1053,11 +1051,8 @@ function renderSpecList() {
     tbody.appendChild(tr);
   }
 
-  const total = createElement("p", "spec-list-total");
-  total.innerHTML = `<span>${pcLabel}の総購入金額</span><strong>${formatCurrency(specListPurchaseTotal())}</strong>`;
-
   scroll.appendChild(table);
-  elements.specListContent.append(scroll, total);
+  elements.specListContent.append(scroll);
 }
 
 function csvValue(value) {
@@ -1085,11 +1080,11 @@ function specListCsv() {
     ].map(csvValue));
   }
 
-  lines.push([], ["総購入金額", formatCurrency(specListPurchaseTotal())].map(csvValue));
   return lines.map((line) => line.join(",")).join("\r\n");
 }
 
 function saveSpecListCsv() {
+  renderSpecList();
   const pcName = specListPcName();
   const blob = new Blob([`\uFEFF${specListCsv()}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -1762,6 +1757,26 @@ if (elements.backButton && elements.specListContent) {
 
 if (elements.specSaveButton) {
   elements.specSaveButton.addEventListener("click", saveSpecListCsv);
+}
+
+if (elements.specListContent) {
+  let dateRefreshTimer;
+  const scheduleDateRefresh = () => {
+    window.clearTimeout(dateRefreshTimer);
+    const now = new Date();
+    const nextDay = new Date(now);
+    nextDay.setHours(24, 0, 0, 0);
+    dateRefreshTimer = window.setTimeout(refreshCurrentSpecs, nextDay.getTime() - now.getTime());
+  };
+  const refreshCurrentSpecs = () => {
+    renderSpecList();
+    scheduleDateRefresh();
+  };
+  window.addEventListener("focus", refreshCurrentSpecs);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshCurrentSpecs();
+  });
+  scheduleDateRefresh();
 }
 
 if (elements.itemDialog) {
