@@ -6,6 +6,23 @@ export function dateMonthPosition(date) {
   return date.getFullYear() * 12 + date.getMonth() + (date.getDate() - 1) / days;
 }
 
+export function snapToDayPosition(position) {
+  const month = Math.floor(position);
+  const year = Math.floor(month / 12);
+  const days = new Date(year, month - year * 12 + 1, 0).getDate();
+  const day = Math.min(days - 1, Math.max(0, Math.floor((position - month) * days + 1e-8)));
+  return month + day / days;
+}
+
+export function accountingSummaryReference(position) {
+  return monthlySummaryReference(position, { ...getMonthlySummarySettings(), mode: "monthly" });
+}
+
+export function accountingSummaryLabel(position, amount) {
+  const settings = { ...getMonthlySummarySettings(), mode: "monthly" };
+  return `${summaryReferenceLabel(position, settings)}\n入力金額：${amount}`;
+}
+
 function periodStartDate(year, month, day) {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, lastDay));

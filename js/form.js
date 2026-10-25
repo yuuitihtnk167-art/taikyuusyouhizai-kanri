@@ -17,6 +17,8 @@ import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
 import { loadItem, saveItem } from "./storage/durable-items/service.js";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
+const FROM_HIDDEN = new URLSearchParams(window.location.search).get("from") === "hidden";
+const LIST_URL = FROM_HIDDEN ? "hidden.html" : "list.html";
 const PC_TOTAL_ITEM_NAME = "\u30d1\u30bd\u30b3\u30f3\u7dcf\u8cbb\u7528";
 const PC_TOTAL_CATEGORY = "information_device";
 const HIDDEN_TIMELINE_NOTICE_MESSAGE = "非表示でも使用年数が未達の場合は加算されます。";
@@ -292,7 +294,7 @@ populateCategorySelect();
 
 toListButton.addEventListener("click", () => {
   sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
-  window.location.href = "list.html";
+  window.location.href = LIST_URL;
 });
 
 
@@ -373,7 +375,7 @@ form.addEventListener("submit", async (event) => {
     }
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
     state.isDirty = false;
-    window.location.href = "list.html";
+    window.location.href = LIST_URL;
   } catch (error) {
     formError.textContent = firebaseErrorMessage(error, "保存に失敗しました。");
   } finally {
@@ -393,6 +395,7 @@ async function initializeForm(user) {
   }
 
   if (!state.editingId) {
+    hideFromTimelineInput.checked = FROM_HIDDEN;
     state.pcManagementLinked = false;
     updatePcReflectButton();
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);

@@ -19,8 +19,8 @@ import {
   loadCategoryOrder,
   saveCategoryOrder,
 } from "./services/category-order.js";
-import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel } from "./services/monthly-summary.js?v=134";
+import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
+import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=134";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
 import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=134";
 
@@ -75,6 +75,7 @@ const state = {
   uid: null,
   items: [],
   summaryItems: [],
+  summaryItemIds: new Set(),
   pcItems: [],
   pcCurrentMonthlyCost: 0,
   pcMonthlyCost: 0,
@@ -266,14 +267,14 @@ function lifecycleStatus(item) {
 
 function updatePcSummaryForMonth(monthPosition = timelineMarkerMonth()) {
   const summary = calculatePcSummaryAt(state.pcItems, monthPosition, {
-    exactDate: getMonthlySummarySettings().mode === "monthly",
+    exactDate: true,
   });
   state.pcMonthlyCost = summary.monthlyCost;
   state.pcPurchaseTotal = summary.purchaseTotal;
 }
 
 function isTimelineMarkerAtCurrentMonth() {
-  return Math.floor(state.timelineMarkerMonth) === Math.floor(currentMonthIndex());
+  return Math.abs(timelineMarkerMonth() - currentMonthIndex()) < 1e-8;
 }
 
 function updatePcLinkedCostDisplays() {
@@ -281,7 +282,7 @@ function updatePcLinkedCostDisplays() {
     element.textContent = `${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`;
   });
   itemList.querySelectorAll(".pc-linked-selected-cost").forEach((element) => {
-    element.textContent = `\u9078\u629e\u6708 ${formatCurrency(state.pcMonthlyCost)} /\u6708`;
+    element.textContent = `選択日 ${formatCurrency(state.pcMonthlyCost)} /\u6708`;
     element.hidden = isTimelineMarkerAtCurrentMonth();
   });
 }
@@ -307,13 +308,15 @@ function totalPurchaseCost(item) {
 
 function timelineMarkerMonth() {
   const position = Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
-  return monthlySummaryReference(position).position;
+  return snapToDayPosition(position);
 }
 
 function updateTimelineMarkerDate() {
   if (!timelineMarkerDate) return;
-  timelineMarkerDate.dataset.summaryMode = getMonthlySummarySettings().mode;
-  timelineMarkerDate.textContent = summaryReferenceLabel(state.timelineMarkerMonth);
+  const reference = accountingSummaryReference(timelineMarkerMonth());
+  const summary = calculateSummaryAt(summaryItems(), reference.position);
+  timelineMarkerDate.dataset.summaryMode = "monthly";
+  timelineMarkerDate.textContent = accountingSummaryLabel(timelineMarkerMonth(), formatCurrency(summary.monthlyCost));
 }
 
 function activeEndMonth(item) {
@@ -329,21 +332,12 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
-  if (getMonthlySummarySettings().mode === "monthly") {
-    const plannedEnd = itemPlannedEndMonth(item);
-    if (!item.endOfUseDate) return plannedEnd;
-    const actualEnd = itemActualEndMonth(item);
-    return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
-      ? plannedEnd
-      : Math.min(actualEnd, plannedEnd);
-  }
-  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
-    return itemPlannedEndMonth(item);
-  }
-  if (item.endOfUseDate) {
-    return Math.min(itemActualEndMonth(item), itemPlannedEndMonth(item));
-  }
-  return itemPlannedEndMonth(item);
+  const plannedEnd = itemPlannedEndMonth(item);
+  if (!item.endOfUseDate) return plannedEnd;
+  const actualEnd = itemActualEndMonth(item);
+  return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
+    ? plannedEnd
+    : Math.min(actualEnd, plannedEnd);
 }
 
 function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
@@ -382,6 +376,7 @@ function isSummaryExcluded(item) {
 
 function timelineLabelClass(item) {
   const classes = ["timeline-row-label"];
+  if (state.summaryItemIds.has(item.id)) classes.push("summary-included");
   if (isMonthlyCostSummaryExcluded(item)) classes.push("monthly-cost-excluded");
   if (isSummaryExcluded(item)) classes.push("summary-excluded");
   return classes.join(" ");
@@ -401,23 +396,31 @@ function syncSelectedItem(items) {
   }
 }
 
-function summarizeItems(items) {
-  updateTimelineMarkerDate();
-  if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
-
-  const monthPosition = timelineMarkerMonth();
+function calculateSummaryAt(items, monthPosition) {
   const activeItems = items.filter(
     (item) => !isSummaryExcluded(item) && isActiveInSummaryAtTimelineMarker(item, monthPosition)
   );
-  const monthlyCostTotal = activeItems.reduce(
-    (total, item) => total + Math.round(itemSummaryMonthlyCost(item, monthPosition)),
-    0
-  );
-  const purchaseTotal = activeItems.reduce((total, item) => total + totalPurchaseCost(item), 0);
+  const pcSummary = calculatePcSummaryAt(state.pcItems, monthPosition, { exactDate: true });
+  const monthlyCost = activeItems.reduce((total, item) => total + Math.round(
+    isPcManagementLinkedItem(item) ? pcSummary.monthlyCost : itemSummaryMonthlyCost(item, monthPosition)
+  ), 0);
+  const purchaseTotal = activeItems.reduce((total, item) => total + (
+    isPcManagementLinkedItem(item) ? pcSummary.purchaseTotal : totalPurchaseCost(item)
+  ), 0);
+  return { activeItems, monthlyCost, purchaseTotal };
+}
 
-  summaryMonthlyCost.textContent = `${formatCurrency(monthlyCostTotal)} /月`;
+function summarizeItems(items) {
+  updateTimelineMarkerDate();
+  if (!summaryMonthlyCost || !summaryPurchaseTotal || !summaryItemCount) return;
+  const { activeItems, monthlyCost, purchaseTotal } = calculateSummaryAt(items, timelineMarkerMonth());
+  state.summaryItemIds = new Set(activeItems.map((item) => item.id));
+  itemList.querySelectorAll(".timeline-row-label").forEach((label) => {
+    label.classList.toggle("summary-included", state.summaryItemIds.has(label.dataset.id));
+  });
+  summaryMonthlyCost.textContent = formatCurrency(monthlyCost) + " /月";
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
-  summaryItemCount.textContent = `${activeItems.length} 件`;
+  summaryItemCount.textContent = activeItems.length + " 件";
 }
 
 function renderCategoryFilter() {
@@ -656,8 +659,8 @@ function renderCurrentLine(grid, minYear, maxYear) {
     const currentHandle = createElement("button", "timeline-current-handle", "✋");
     currentHandle.type = "button";
     currentHandle.dataset.action = "drag-current-line";
-    currentHandle.setAttribute("aria-label", "現在ラインを動かす");
-    currentHandle.title = "ダブルクリックで現在に戻す";
+    currentHandle.setAttribute("aria-label", "集計する日付を動かす");
+    currentHandle.title = "ダブルクリックで今日に戻す";
     currentHandle.style.left = `${currentPosition}px`;
     grid.appendChild(currentHandle);
 
@@ -667,7 +670,7 @@ function renderCurrentLine(grid, minYear, maxYear) {
   }
 
   if (currentLabelPosition !== null) {
-    const currentLabel = createElement("div", "timeline-current-label", "現在");
+    const currentLabel = createElement("div", "timeline-current-label", "今日");
     currentLabel.style.left = `${currentLabelPosition}px`;
     grid.appendChild(currentLabel);
   }
@@ -701,11 +704,7 @@ function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const reference = monthlySummaryReference(state.timelineMarkerMonth);
-  const referenceMonth = reference.startDate ? reference.markerPosition : timelineMarkerMonth();
-  const markerMonth = getMonthlySummarySettings().mode === "monthly"
-    ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
-    : referenceMonth;
+  const markerMonth = timelineMarkerMonth();
 
   if (markerMonth < minMonth || markerMonth > maxMonth) return null;
   return labelWidth + ((markerMonth - minMonth) / 12) * yearWidth;
@@ -878,7 +877,7 @@ function renderTimeline(items) {
       const selectedCost = createElement(
         "span",
         "pc-linked-selected-cost",
-        `\u9078\u629e\u6708 ${formatCurrency(state.pcMonthlyCost)} /\u6708`
+        `選択日 ${formatCurrency(state.pcMonthlyCost)} /\u6708`
       );
       selectedCost.hidden = isTimelineMarkerAtCurrentMonth();
       linkedLabel.append(
@@ -979,8 +978,8 @@ async function refreshList() {
     loadPcSummaryItems(state.uid),
   ]);
   state.pcItems = pcItems;
-  state.pcCurrentMonthlyCost = calculatePcSummaryAt(pcItems, monthlySummaryReference(currentMonthIndex()).position, {
-    exactDate: getMonthlySummarySettings().mode === "monthly",
+  state.pcCurrentMonthlyCost = calculatePcSummaryAt(pcItems, currentMonthIndex(), {
+    exactDate: true,
   }).monthlyCost;
   updatePcSummaryForMonth();
   state.summaryItems = loadedItems.filter((item) => !isPcManagementItem(item));
@@ -1054,8 +1053,8 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
   const maxMonth = maxYear * 12;
   const x = scroll.scrollLeft + clientX - rect.left;
   const monthPosition = minMonth + ((x - labelWidth) / yearWidth) * 12;
-  const lastPosition = getMonthlySummarySettings().mode === "monthly" ? maxMonth - 1 : maxMonth;
-  return Math.min(Math.max(monthPosition, minMonth), lastPosition);
+  const lastPosition = maxMonth - 1 / 31;
+  return snapToDayPosition(Math.min(Math.max(monthPosition, minMonth), lastPosition));
 }
 
 function applyTimelineMarkerDragPosition(drag) {
@@ -1311,12 +1310,12 @@ syncLocalModeUi();
 if (createButton) {
   createButton.addEventListener("click", () => {
     sessionStorageRemoveItem(EDITING_ITEM_ID_KEY);
-    window.location.href = "form.html";
+    window.location.href = TIMELINE_MODE === "hidden" ? "form.html?from=hidden" : "form.html";
   });
 }
 
 settingsButton?.addEventListener("click", () => {
-  window.location.href = "settings.html";
+  window.location.href = TIMELINE_MODE === "hidden" ? "settings.html?from=hidden" : "settings.html";
 });
 
 if (categoryFilter) {
@@ -1492,7 +1491,7 @@ dialogEditButton.addEventListener("click", () => {
     return;
   }
   sessionStorageSetItem(EDITING_ITEM_ID_KEY, item.id);
-  window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
+  window.location.href = `form.html?id=${encodeURIComponent(item.id)}${TIMELINE_MODE === "hidden" ? "&from=hidden" : ""}`;
 });
 
 dialogDeleteButton.addEventListener("click", async () => {

@@ -30,16 +30,16 @@ if (excludeUnderusedMonthlyCostInput instanceof HTMLInputElement) {
 }
 
 backButton?.addEventListener("click", () => {
-  const cameFromPc = new URLSearchParams(window.location.search).get("from") === "pc";
-  if (cameFromPc) {
-    const returnUrl = new URL("pc-management/index.html", window.location.href);
+  const from = new URLSearchParams(window.location.search).get("from");
+  if (from === "pc" || from === "pc-hidden") {
+    const returnUrl = new URL(from === "pc-hidden" ? "pc-management/hidden.html" : "pc-management/index.html", window.location.href);
     if (sessionStorage.getItem("pcManagement.standaloneApp") === "true") {
       returnUrl.searchParams.set("standalone", "pc");
     }
     window.location.href = returnUrl.href;
     return;
   }
-  window.location.href = "list.html";
+  window.location.href = from === "hidden" ? "hidden.html" : "list.html";
 });
 
 function fileTimestamp() {

@@ -2,12 +2,11 @@ import { getMonthlySummarySettings, setMonthlySummarySettings } from "./app-sett
 import { dateMonthPosition, summaryReferenceLabel } from "./monthly-summary.js?v=134";
 
 export function initializeMonthlySummarySettings() {
-  const mode = document.getElementById("monthly-summary-mode");
   const day = document.getElementById("monthly-summary-day");
   const adjustment = document.getElementById("monthly-summary-adjustment");
   const preview = document.getElementById("monthly-summary-preview");
   const status = document.getElementById("monthly-summary-status");
-  if (!mode || !day || !adjustment || !preview || !status) return;
+  if (!day || !adjustment || !preview || !status) return;
 
   for (let value = 1; value <= 31; value += 1) {
     const option = document.createElement("option");
@@ -15,19 +14,17 @@ export function initializeMonthlySummarySettings() {
     option.textContent = `${value}日`;
     day.appendChild(option);
   }
-  let settings = getMonthlySummarySettings();
+  let settings = { ...getMonthlySummarySettings(), mode: "monthly" };
 
   function render() {
-    mode.value = settings.mode;
     day.value = String(settings.day);
     adjustment.value = settings.adjustToPreviousWeekday ? "previous" : "none";
-    day.disabled = adjustment.disabled = settings.mode !== "monthly";
     preview.textContent = summaryReferenceLabel(dateMonthPosition(new Date()), settings, { details: true });
   }
 
   function save() {
     const next = {
-      mode: mode.value,
+      mode: "monthly",
       day: Number(day.value),
       adjustToPreviousWeekday: adjustment.value === "previous",
     };
@@ -40,6 +37,6 @@ export function initializeMonthlySummarySettings() {
     }
     render();
   }
-  [mode, day, adjustment].forEach((input) => input.addEventListener("change", save));
+  [day, adjustment].forEach((input) => input.addEventListener("change", save));
   render();
 }

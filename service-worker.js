@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v135";
+const CACHE_NAME = "durable-goods-pwa-v145";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -100,9 +100,15 @@ self.addEventListener("fetch", (event) => {
         return networkResponse;
       })
       .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
+        return caches.match(event.request).then(async (cachedResponse) => {
           if (cachedResponse) return cachedResponse;
-          if (isNavigationRequest(event.request)) return caches.match(FALLBACK_URL);
+          if (isNavigationRequest(event.request)) {
+            // Serve the cached page while keeping navigation parameters in the browser URL.
+            const pageUrl = new URL(event.request.url);
+            pageUrl.search = "";
+            const cachedPage = await caches.match(pageUrl.href);
+            return cachedPage || caches.match(FALLBACK_URL);
+          }
           return Response.error();
         });
       })

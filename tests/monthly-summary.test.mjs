@@ -22,7 +22,7 @@ globalThis.localStorage = {
   setItem: (key, value) => values.set(key, value),
 };
 const settingsModule = await import("../js/services/app-settings.js");
-const { monthlySummaryReference, dateMonthPosition, summaryReferenceLabel } = await import("../js/services/monthly-summary.js");
+const { monthlySummaryReference, dateMonthPosition, summaryReferenceLabel, snapToDayPosition, accountingSummaryReference, accountingSummaryLabel } = await import("../js/services/monthly-summary.js");
 const { calculatePcSummaryAt } = await import("../js/services/pc-summary.js");
 const monthly = { mode: "monthly", day: 15, adjustToPreviousWeekday: true };
 const month = (year, number) => year * 12 + number - 1;
@@ -172,44 +172,106 @@ test("adjusted consecutive periods have no gaps or overlaps", () => {
 });
 
 
-test("real PC dashboard, spec total and CSV share the adjusted selected month", () => {
-  // Exercise the real app functions without booting authentication or writing product data.
+test("PC selected-day totals differ from the accounting input date without moving the line", () => {
   const source = readFileSync(new URL("../pc-management/app.js", import.meta.url), "utf8");
-  const names = ["parseDate", "toMonthIndex", "daysInMonth", "toMonthPosition", "addYearsClamped", "itemStartMonth", "itemPlannedEndMonth", "itemActualEndMonth", "summaryActiveEndMonth", "isActiveInSummaryAtTimelineMarker", "isSummaryExcluded", "timelineMarkerMonth", "summaryItems", "specListPurchaseTotal", "specListCsv", "csvValue", "renderSummary", "summaryMonthlyCost", "monthlyCostAt", "isPastPlannedEnd", "calculateMonthlyCost"];
+  const names = ["parseDate", "toMonthIndex", "daysInMonth", "toMonthPosition", "addYearsClamped", "itemStartMonth", "itemPlannedEndMonth", "itemActualEndMonth", "summaryActiveEndMonth", "isActiveInSummaryAtTimelineMarker", "isSummaryExcluded", "timelineMarkerMonth", "summaryItems", "calculateSummaryAt", "renderSummary", "summaryMonthlyCost", "monthlyCostAt", "isPastPlannedEnd", "calculateMonthlyCost", "currentLinePosition", "resetTimelineMarkerToCurrentMonth"];
   const functions = names.map(name => {
-    const start = source.indexOf(`function ${name}(`);
-    assert.notEqual(start, -1);
+    const start = source.indexOf("function " + name + "(");
+    assert.notEqual(start, -1, name);
     return source.slice(start, source.indexOf("\n}", start) + 2);
   }).join("\n");
+  const today = dateMonthPosition(new Date(2026, 9, 25));
   const state = {
-    timelineMarkerMonth: month(2026, 10),
+    timelineMarkerMonth: today,
     selectedPcNames: new Set(["main"]),
     items: [
-      { pcName: "main", purchaseDate: "2026-11-12", purchasePrice: 12000, yearsOfUse: 1, hideFromTimeline: true, endOfUseDate: "2026-11-12" },
-      { pcName: "main", purchaseDate: "2026-11-13", purchasePrice: 24000, yearsOfUse: 1 },
-      { pcName: "main", purchaseDate: "2026-11-14", purchasePrice: 48000, yearsOfUse: 1 },
-      { pcName: "main", purchaseDate: "2026-01-01", purchasePrice: 96000, yearsOfUse: 1, excludeFromSummary: true },
-      { pcName: "sub", purchaseDate: "2026-11-13", purchasePrice: 192000, yearsOfUse: 1 },
+      { id: "before", pcName: "main", purchaseDate: "2026-10-20", purchasePrice: 12000, yearsOfUse: 1 },
+      { id: "input-day", pcName: "main", purchaseDate: "2026-11-13", purchasePrice: 24000, yearsOfUse: 1, hideFromTimeline: true },
+      { id: "after", pcName: "main", purchaseDate: "2026-11-14", purchasePrice: 48000, yearsOfUse: 1 },
+      { id: "excluded", pcName: "main", purchaseDate: "2026-01-01", purchasePrice: 96000, yearsOfUse: 1, excludeFromSummary: true },
+      { id: "other-pc", pcName: "sub", purchaseDate: "2026-10-01", purchasePrice: 192000, yearsOfUse: 1 },
     ],
   };
   const elements = { summaryCount: {}, summaryTotal: {}, summaryMonthly: {} };
   const context = createContext({
-    state, elements, monthlySummaryReference, getMonthlySummarySettings: () => monthly,
-    shouldExcludeUnderusedMonthlyCost: () => false, specListPcName: () => "main",
-    specListRows: () => [], pcNameLabels: { main: "メインPC" },
-    currentMonthIndex: () => month(2026, 10) + 9 / 31,
-    updateTimelineMarkerDate: () => {}, formatCurrency: value => String(value), formatMonthlyCost: value => String(value),
+    state, elements, snapToDayPosition,
+    shouldExcludeUnderusedMonthlyCost: () => false,
+    currentMonthIndex: () => today,
+    updateTimelineMarkerDate: () => {}, formatCurrency: String, formatMonthlyCost: String,
+    timelineLayout: () => ({ labelWidth: 230, yearWidth: 168 }),
+    timelineMarkerDragTarget: () => true, clearTimelineMarkerDrag: () => {}, renderTimeline: () => {},
     TIMELINE_MIN_YEAR: 2015,
   });
   runInContext(functions, context);
-  // Hand check: 12,000 + 24,000 = 36,000. The Nov 14 purchase starts next month.
+  runInContext("renderSummary()", context);
+  assert.equal(elements.summaryTotal.textContent, "12000");
+  assert.equal(elements.summaryMonthly.textContent, "1000");
+  const reference = monthlySummaryReference(today, monthly);
+  context.inputPosition = reference.position;
+  assert.equal(runInContext("calculateSummaryAt(inputPosition).monthlyCost", context), 3000);
+  assert.equal(runInContext("calculateSummaryAt(inputPosition).purchaseTotal", context), 36000);
+  assert.equal(state.timelineMarkerMonth, today);
+  assert.equal(runInContext("currentLinePosition(2026, 2027)", context), 230 + (today - month(2026, 1)) * 14);
+
+  state.timelineMarkerMonth = dateMonthPosition(new Date(2026, 10, 12));
+  runInContext("renderSummary()", context);
+  assert.equal(elements.summaryTotal.textContent, "12000");
+  state.timelineMarkerMonth = reference.position;
   runInContext("renderSummary()", context);
   assert.equal(elements.summaryTotal.textContent, "36000");
-  assert.equal(runInContext("specListPurchaseTotal()", context), 36000);
-  assert.match(runInContext("specListCsv()", context), /"総購入金額","36000"/);
-  state.timelineMarkerMonth = month(2026, 11);
+  state.timelineMarkerMonth = dateMonthPosition(new Date(2026, 10, 14));
   runInContext("renderSummary()", context);
   assert.equal(elements.summaryTotal.textContent, "84000");
-  assert.equal(runInContext("specListPurchaseTotal()", context), 84000);
-  assert.match(runInContext("specListCsv()", context), /"総購入金額","84000"/);
+  context.event = { target: {}, preventDefault() {} };
+  runInContext("resetTimelineMarkerToCurrentMonth(event)", context);
+  assert.equal(state.timelineMarkerMonth, today);
+  assert.equal(elements.summaryTotal.textContent, "12000");
+});
+
+test("day snapping preserves every calendar day and input labels respect legacy saved settings", () => {
+  for (let number = 1; number <= 12; number++) {
+    const days = new Date(2026, number, 0).getDate();
+    for (let day = 1; day <= days; day++) {
+      const position = dateMonthPosition(new Date(2026, number - 1, day));
+      assert.equal(snapToDayPosition(position), position);
+      assert.equal(snapToDayPosition(position + 0.2 / days), position);
+    }
+  }
+  settingsModule.setMonthlySummarySettings({ ...monthly, mode: "position" });
+  const march = month(2026, 3);
+  assert.equal(dateKey(accountingSummaryReference(march).date), "2026-04-14");
+  assert.equal(accountingSummaryLabel(march, "¥3,000"), "2026年3月分\n家計簿入力日：4/14(火)\n入力金額：¥3,000");
+});
+
+
+test("main dashboard PC link computes input-date costs separately from selected-day costs", () => {
+  const source = readFileSync(new URL("../js/list.js", import.meta.url), "utf8");
+  const start = source.indexOf("function calculateSummaryAt(");
+  const fn = source.slice(start, source.indexOf("\n}", start) + 2);
+  const selected = dateMonthPosition(new Date(2026, 9, 25));
+  const input = monthlySummaryReference(selected, monthly).position;
+  const linked = { id: "pc-total", linked: true };
+  const appliance = { id: "appliance", purchasePrice: 12000 };
+  const state = {
+    pcMonthlyCost: 1000, pcPurchaseTotal: 12000,
+    pcItems: [
+      { purchaseDate: "2026-10-20", purchasePrice: 12000, yearsOfUse: 1 },
+      { purchaseDate: "2026-11-01", purchasePrice: 24000, yearsOfUse: 1 },
+      { purchaseDate: "2026-11-14", purchasePrice: 48000, yearsOfUse: 1 },
+    ],
+  };
+  const context = createContext({
+    state, calculatePcSummaryAt,
+    isSummaryExcluded: () => false, isActiveInSummaryAtTimelineMarker: () => true,
+    isPcManagementLinkedItem: item => item.linked === true,
+    itemSummaryMonthlyCost: item => item.purchasePrice / 12,
+    totalPurchaseCost: item => item.purchasePrice,
+    selected, input, items: [linked, appliance],
+  });
+  runInContext(fn, context);
+  assert.equal(runInContext("calculateSummaryAt(items, selected).monthlyCost", context), 2000);
+  assert.equal(runInContext("calculateSummaryAt(items, input).monthlyCost", context), 4000);
+  assert.equal(runInContext("calculateSummaryAt(items, input).purchaseTotal", context), 48000);
+  assert.equal(state.pcMonthlyCost, 1000);
+  assert.equal(state.pcPurchaseTotal, 12000);
 });
