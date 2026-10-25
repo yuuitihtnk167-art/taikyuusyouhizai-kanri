@@ -766,6 +766,8 @@ button {
 }
 
 .dashboard-app {
+  --dashboard-button-width: 132px;
+  --dashboard-button-height: 58px;
   width: min(1560px, 100%);
   padding: 18px 16px 28px;
 }
@@ -775,8 +777,8 @@ button {
   top: 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(420px, 760px) auto;
-  gap: 18px;
+  grid-template-columns: minmax(420px, 1fr) minmax(0, 1fr);
+  gap: 10px 18px;
   align-items: center;
   padding: 0 0 16px;
   background: linear-gradient(180deg, rgba(27, 36, 45, 0.98), rgba(27, 36, 45, 0.9));
@@ -791,6 +793,7 @@ button {
 }
 
 .dashboard-title {
+  grid-column: 1 / -1;
   min-width: 0;
 }
 
@@ -806,16 +809,6 @@ button {
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-}
-
-.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-row,
-.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-actions {
-  flex-wrap: wrap;
-}
-
-.dashboard-header:has([data-summary-mode="monthly"]) .dashboard-title-actions {
-  flex: 1 1 100%;
-  min-width: 0;
 }
 
 .dashboard-title-actions .ghost-button[hidden] {
@@ -838,9 +831,10 @@ button {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 96px;
-  min-width: 96px;
-  min-height: 44px;
+  width: var(--dashboard-button-width);
+  min-width: var(--dashboard-button-width);
+  height: var(--dashboard-button-height);
+  min-height: var(--dashboard-button-height);
   margin-top: 0;
   padding: 0 12px;
   line-height: 1;
@@ -865,6 +859,7 @@ button {
 }
 
 .summary-panel {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.75fr;
   min-height: 112px;
@@ -878,7 +873,7 @@ button {
   display: grid;
   align-content: center;
   gap: 10px;
-  padding: 18px 28px;
+  padding: 18px clamp(10px, 2.3cqw, 28px);
   border-left: 1px solid rgba(203, 213, 225, 0.24);
 }
 
@@ -894,14 +889,15 @@ button {
 
 .summary-item strong {
   color: #f8fafc;
-  font-size: clamp(1.55rem, 3vw, 2.4rem);
+  font-size: clamp(1rem, 5cqw, 2.4rem);
+  white-space: nowrap;
   line-height: 1;
   letter-spacing: 0;
   text-shadow: 0 0 18px rgba(255, 255, 255, 0.12);
 }
 
 .summary-item:not(.summary-item-primary) strong {
-  font-size: clamp(1.28rem, 2.1vw, 1.75rem);
+  font-size: clamp(0.9rem, 3.8cqw, 1.75rem);
 }
 
 .dashboard-actions {
@@ -913,9 +909,10 @@ button {
 }
 
 .dashboard-actions button {
-  width: 132px;
-  min-height: 58px;
-  min-width: 132px;
+  width: var(--dashboard-button-width);
+  height: var(--dashboard-button-height);
+  min-height: var(--dashboard-button-height);
+  min-width: var(--dashboard-button-width);
   padding: 0 18px;
   border-radius: 6px;
   white-space: nowrap;
@@ -936,22 +933,30 @@ button {
 }
 
 .timeline-marker-action {
-  display: flex;
-  flex: 0 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--dashboard-button-width);
+  flex: 1 1 100%;
   min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: 0 10px;
+}
+
+.timeline-marker-action #create-button {
+  grid-area: 1 / 2;
+  align-self: center;
 }
 
 .timeline-marker-date {
+  grid-area: 1 / 1;
   min-width: 84px;
   color: #51b7ff;
   font-size: 0.88rem;
   font-weight: 800;
-  text-align: right;
+  line-height: 1.4;
+  text-align: left;
   white-space: pre-line;
   overflow-wrap: anywhere;
-  max-width: 220px;
+  max-width: none;
   text-shadow: 0 0 12px rgba(81, 183, 255, 0.6);
 }
 
@@ -1088,7 +1093,12 @@ button {
 }
 
 .timeline-panel > h2 {
-  margin-top: 18px;
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+
+.timeline-panel > .form-error:empty {
+  display: none;
 }
 
 .timeline-legend {
@@ -1166,6 +1176,7 @@ button {
 }
 
 .timeline-grid {
+  --day-step-offset: 40px;
   position: relative;
   min-height: 276px;
   padding: 54px 0;
@@ -1290,6 +1301,75 @@ button {
 .timeline-current-handle:active,
 .timeline-current-handle.dragging {
   cursor: grabbing;
+}
+
+.timeline-day-step {
+  position: absolute;
+  z-index: 11;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.timeline-day-step svg {
+  width: 21px;
+  height: 28px;
+  fill: rgba(226, 232, 240, 0.14);
+  stroke: rgba(226, 232, 240, 0.7);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.timeline-day-step.next svg {
+  transform: scaleX(-1);
+}
+
+.timeline-day-step:hover,
+.timeline-day-step:active {
+  background: transparent;
+}
+
+.timeline-day-step:hover svg,
+.timeline-day-step.pressed svg {
+  fill: rgba(226, 232, 240, 0.24);
+  stroke: rgba(248, 250, 252, 0.95);
+}
+
+.timeline-day-step:focus-visible {
+  outline: 2px solid #51b7ff;
+  outline-offset: -3px;
+}
+
+.timeline-marker-date-tooltip {
+  position: fixed;
+  z-index: 100;
+  padding: 4px 8px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(226, 232, 240, 0.4);
+  border-radius: 5px;
+  background: #17212b;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 }
 
 .timeline-current-line::before,
@@ -2002,10 +2082,6 @@ button {
     justify-content: flex-start;
   }
 
-  .dashboard-body[data-timeline-mode="hidden"] .dashboard-actions {
-    justify-content: flex-end;
-  }
-
   .dashboard-title-row {
     justify-content: space-between;
   }
@@ -2017,6 +2093,8 @@ button {
 
 @media (max-width: 640px) {
   .dashboard-app {
+    --dashboard-button-width: 82px;
+    --dashboard-button-height: 32px;
     padding: 6px 6px 16px;
   }
 
@@ -2030,23 +2108,41 @@ button {
   }
 
   .dashboard-title-row {
-    flex-wrap: wrap;
     gap: 8px;
   }
 
   .dashboard-title-actions {
-    width: 100%;
     justify-content: flex-end;
     gap: 5px;
+  }
+
+  .dashboard-title:has(#backup-button:not([hidden])) .dashboard-title-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--dashboard-button-width);
+  }
+
+  .dashboard-title:has(#backup-button:not([hidden])) .dashboard-title-actions {
+    display: contents;
+  }
+
+  .dashboard-title-row #backup-button {
+    grid-area: 2 / 1;
+    justify-self: end;
+  }
+
+  .dashboard-title-row #restore-button {
+    grid-area: 2 / 2;
+  }
+
+  .dashboard-title-row #logout-button,
+  .dashboard-title-row #back-button {
+    grid-area: 1 / 2;
   }
 
   .dashboard-title-row #logout-button,
   .dashboard-title-row #back-button,
   .dashboard-title-row #backup-button,
   .dashboard-title-row #restore-button {
-    width: 96px;
-    min-width: 96px;
-    min-height: 38px;
     padding: 0 10px;
     border-radius: 4px;
     font-size: 0.72rem;
@@ -2111,8 +2207,8 @@ button {
   .timeline-marker-date {
     min-width: 68px;
     max-width: none;
-    font-size: 0.75rem;
-    line-height: 1.5;
+    font-size: clamp(0.58rem, calc(4vw - 3px), 0.75rem);
+    line-height: 1.4;
     text-align: left;
   }
 
@@ -2165,6 +2261,7 @@ button {
   }
 
   .timeline-grid {
+    --day-step-offset: 36px;
     min-height: 174px;
     padding: 30px 0;
   }
@@ -2324,7 +2421,7 @@ button {
   }
 
   .help-button {
-    min-width: 86px;
+    min-width: 0;
   }
 
   .help-dialog-card {

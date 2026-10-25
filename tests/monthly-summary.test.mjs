@@ -240,7 +240,7 @@ test("day snapping preserves every calendar day and input labels respect legacy 
   settingsModule.setMonthlySummarySettings({ ...monthly, mode: "position" });
   const march = month(2026, 3);
   assert.equal(dateKey(accountingSummaryReference(march).date), "2026-04-14");
-  assert.equal(accountingSummaryLabel(march, "¥3,000"), "2026年3月分\n家計簿入力日：4/14(火)\n入力金額：¥3,000");
+  assert.equal(accountingSummaryLabel(march, "¥3,000"), "2026年3月分\n家計簿入力日：4/14(火)　入力金額：¥3,000");
 });
 
 

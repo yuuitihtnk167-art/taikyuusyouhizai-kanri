@@ -20,7 +20,7 @@ export function accountingSummaryReference(position) {
 
 export function accountingSummaryLabel(position, amount) {
   const settings = { ...getMonthlySummarySettings(), mode: "monthly" };
-  return `${summaryReferenceLabel(position, settings)}\n入力金額：${amount}`;
+  return `${summaryReferenceLabel(position, settings)}　入力金額：${amount}`;
 }
 
 function periodStartDate(year, month, day) {
