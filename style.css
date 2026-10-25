@@ -861,7 +861,7 @@ button {
 .summary-panel {
   container-type: inline-size;
   display: grid;
-  grid-template-columns: 1.2fr 1fr 0.75fr;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 0.55fr);
   min-height: 112px;
   border: 1px solid rgba(203, 213, 225, 0.12);
   border-radius: 6px;
@@ -889,7 +889,7 @@ button {
 
 .summary-item strong {
   color: #f8fafc;
-  font-size: clamp(1rem, 5cqw, 2.4rem);
+  font-size: clamp(0.85rem, 3.5cqw, 1.75rem);
   white-space: nowrap;
   line-height: 1;
   letter-spacing: 0;
@@ -906,6 +906,107 @@ button {
   align-items: center;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.summary-graph-heading {
+  display: contents;
+}
+
+.summary-item:has(.summary-graph-heading) {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  column-gap: 8px;
+}
+
+.summary-graph-heading .summary-label {
+  grid-area: 1 / 1;
+}
+
+.summary-item:has(.summary-graph-heading) > strong {
+  grid-area: 2 / 1;
+}
+
+.summary-graph-button {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  height: var(--dashboard-button-height);
+  min-height: var(--dashboard-button-height);
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(226, 232, 240, 0.35);
+  border-radius: 4px;
+  background: rgba(25, 39, 53, 0.5);
+  color: #edf2f7;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.summary-graph-button svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.summary-graph-button[aria-expanded="true"] {
+  border-color: #51b7ff;
+  background: rgba(81, 183, 255, 0.15);
+}
+
+.timeline-purchase-graph {
+  position: relative;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.24);
+}
+
+.timeline-purchase-graph[hidden] { display: none; }
+
+.timeline-purchase-graph > svg {
+  position: absolute;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.timeline-purchase-graph-label {
+  position: sticky;
+  left: 0;
+  z-index: 9;
+  width: var(--label-width);
+  height: 100%;
+  padding: 6px 12px;
+  color: #e5edf5;
+  background: #202b36;
+  border-right: 1px solid rgba(226, 232, 240, 0.12);
+  font-size: 0.72rem;
+}
+
+.timeline-purchase-graph-value {
+  position: absolute;
+  right: 12px;
+  transform: translateY(-50%);
+  color: #c9d4df;
+  font-variant-numeric: tabular-nums;
+}
+
+.purchase-graph-guide { stroke: rgba(226, 232, 240, 0.16); stroke-width: 1; }
+.purchase-graph-path { fill: none; stroke: #82c9ee; stroke-width: 2; stroke-linejoin: round; }
+.purchase-graph-dot { fill: #edf2f7; stroke: #51b7ff; stroke-width: 2; }
+
+@media (max-width: 640px) {
+  .summary-graph-button { padding: 0; }
+  .summary-graph-button svg { width: 24px; height: 24px; }
+  .summary-item:has(.summary-graph-heading) { column-gap: 4px; }
+  .summary-graph-heading .summary-label { font-size: 0.58rem; white-space: nowrap; }
+  .timeline-purchase-graph-label { padding: 5px 4px; font-size: 0.6rem; }
+  .timeline-purchase-graph-value { right: 4px; font-size: 0.56rem; }
 }
 
 .dashboard-actions button {
@@ -2087,7 +2188,7 @@ button {
   }
 
   .summary-panel {
-    grid-template-columns: 1fr 1fr 0.8fr;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 0.55fr);
   }
 }
 
@@ -2153,7 +2254,7 @@ button {
   }
 
   .summary-panel {
-    grid-template-columns: 1.3fr 1fr 0.7fr;
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.9fr) minmax(0, 0.5fr);
     min-height: 38px;
   }
 
@@ -2175,6 +2276,11 @@ button {
   .summary-item strong,
   .summary-item:not(.summary-item-primary) strong {
     font-size: 0.78rem;
+  }
+
+  .summary-item-primary > strong,
+  .summary-item:has(.summary-graph-heading) > strong {
+    font-size: clamp(0.68rem, 3.6cqw, 0.78rem);
   }
 
   .dashboard-actions {

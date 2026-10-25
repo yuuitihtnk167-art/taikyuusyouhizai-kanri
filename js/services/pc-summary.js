@@ -60,6 +60,25 @@ export async function loadPcSummaryItems(uid) {
   return getPcItems(uid);
 }
 
+// Inclusive date intervals for the same PC purchase totals used by the dashboard.
+export function pcPurchaseIntervals(items) {
+  return items.flatMap((item) => {
+    if (item.excludeFromSummary) return [];
+    const purchase = parseDate(item.purchaseDate);
+    const plannedEnd = plannedEndMonth(item, true);
+    if (!purchase || plannedEnd === null) return [];
+    const start = dateMonthPosition(purchase);
+    const ended = parseDate(item.endOfUseDate);
+    let end = plannedEnd;
+    if (ended) {
+      const actualEnd = Math.max(start, dateMonthPosition(ended));
+      end = actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
+        ? plannedEnd : Math.min(actualEnd, plannedEnd);
+    }
+    return [{ start, end, amount: Number(item.purchasePrice ?? item.price ?? 0) || 0 }];
+  });
+}
+
 export function calculatePcSummaryAt(items, monthPosition, { exactDate = false } = {}) {
   const targetMonth = exactDate ? Number(monthPosition) : Math.floor(Number(monthPosition));
   if (!Number.isFinite(targetMonth)) return { monthlyCost: 0, purchaseTotal: 0 };

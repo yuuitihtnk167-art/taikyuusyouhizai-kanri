@@ -1,4 +1,5 @@
 import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=149";
+import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=150";
 import { createTimelineMarkerTooltip } from "../js/services/timeline-marker-tooltip.js?v=148";
 import {
   firebaseErrorMessage,
@@ -49,6 +50,7 @@ const elements = {
   summaryCount: document.getElementById("summary-count"),
   summaryTotal: document.getElementById("summary-total"),
   summaryMonthly: document.getElementById("summary-monthly"),
+  purchaseGraphButton: document.getElementById("purchase-graph-button"),
   authError: document.getElementById("auth-error"),
   createButton: document.getElementById("create-button"),
   timelineMarkerDate: document.getElementById("timeline-marker-date"),
@@ -105,8 +107,10 @@ const state = {
   timelineMarkerDrag: null,
   pcFilterLongPress: null,
   ignoreNextCategoryClick: false,
+  showPurchaseGraph: false,
 };
 
+let purchaseGraph = null;
 const markerDateTooltip = createTimelineMarkerTooltip(elements.itemList, timelineMarkerMonth, () => Boolean(state.timelineMarkerDrag?.isDragging));
 const markerDayControls = createTimelineDayControls(elements.itemList, moveTimelineMarkerByDay, markerDateTooltip);
 
@@ -763,7 +767,9 @@ function renderLoadingTimeline() {
 
 function renderTimeline() {
   if (!elements.itemList) return;
+  purchaseGraph = null;
   const items = sortItems(visibleItems());
+  if (elements.purchaseGraphButton) elements.purchaseGraphButton.disabled = items.length === 0;
   elements.itemList.innerHTML = "";
   if (items.length === 0) {
     renderEmptyTimeline();
@@ -771,7 +777,7 @@ function renderTimeline() {
   }
 
   const { minYear, maxYear } = resolveTimelineRange(items);
-  const { labelWidth, yearWidth } = timelineLayout();
+  const { labelWidth, yearWidth, isCompact } = timelineLayout();
   const timelineWidth = labelWidth + (maxYear - minYear) * yearWidth;
   const minMonth = minYear * 12;
 
@@ -789,6 +795,14 @@ function renderTimeline() {
 
   renderAxis(grid, minYear, maxYear, "timeline-axis-top");
   renderCurrentLine(grid, minYear, maxYear);
+
+  purchaseGraph = mountPurchaseGraph(grid, {
+    intervals: summaryItems().filter((item) => !isSummaryExcluded(item)).map((item) => ({
+      start: itemStartMonth(item), end: summaryActiveEndMonth(item), amount: Number(item.purchasePrice || 0),
+    })),
+    minYear, maxYear, labelWidth, yearWidth, compact: isCompact, visible: state.showPurchaseGraph,
+  });
+  purchaseGraph.update(timelineMarkerMonth(), calculateSummaryAt(timelineMarkerMonth()).purchaseTotal);
 
   const rows = createElement("div", "timeline-rows");
   for (const item of items) {
@@ -893,6 +907,7 @@ function renderSummary() {
   elements.summaryCount.textContent = activeItems.length + " 件";
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
   elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCost);
+  purchaseGraph?.update(timelineMarkerMonth(), purchaseTotal);
 }
 
 function renderCategoryFilter() {
@@ -1697,6 +1712,22 @@ if (elements.categoryFilter) {
   elements.categoryFilter.addEventListener("pointerleave", cancelPcFilterLongPress);
   elements.categoryFilter.addEventListener("pointermove", cancelMovedPcFilterLongPress);
 }
+
+elements.purchaseGraphButton?.addEventListener("click", () => {
+  state.showPurchaseGraph = !state.showPurchaseGraph;
+  elements.purchaseGraphButton.setAttribute("aria-expanded", String(state.showPurchaseGraph));
+  purchaseGraph?.setVisible(state.showPurchaseGraph);
+  const grid = elements.itemList?.querySelector(".timeline-grid");
+  if (grid) {
+    const rows = [...grid.querySelectorAll(".timeline-row")];
+    grid.querySelectorAll(".timeline-current-handle.interval").forEach((handle, index) => {
+      const row = rows[(index + 1) * 9 - 1];
+      if (row) handle.style.top = `${row.offsetTop + row.offsetHeight / 2}px`;
+    });
+    markerDayControls.sync();
+    markerDateTooltip.update();
+  }
+});
 
 if (elements.hiddenButton) {
   elements.hiddenButton.addEventListener("click", () => {

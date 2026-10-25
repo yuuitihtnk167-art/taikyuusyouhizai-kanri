@@ -23,7 +23,8 @@ globalThis.localStorage = {
 };
 const settingsModule = await import("../js/services/app-settings.js");
 const { monthlySummaryReference, dateMonthPosition, summaryReferenceLabel, snapToDayPosition, accountingSummaryReference, accountingSummaryLabel } = await import("../js/services/monthly-summary.js");
-const { calculatePcSummaryAt } = await import("../js/services/pc-summary.js");
+const { calculatePcSummaryAt, pcPurchaseIntervals } = await import("../js/services/pc-summary.js");
+const { purchaseTotalSeries } = await import("../js/services/timeline-purchase-graph.js");
 const monthly = { mode: "monthly", day: 15, adjustToPreviousWeekday: true };
 const month = (year, number) => year * 12 + number - 1;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -194,7 +195,7 @@ test("PC selected-day totals differ from the accounting input date without movin
   };
   const elements = { summaryCount: {}, summaryTotal: {}, summaryMonthly: {} };
   const context = createContext({
-    state, elements, snapToDayPosition,
+    state, elements, snapToDayPosition, purchaseGraph: null,
     shouldExcludeUnderusedMonthlyCost: () => false,
     currentMonthIndex: () => today,
     updateTimelineMarkerDate: () => {}, formatCurrency: String, formatMonthlyCost: String,
@@ -274,4 +275,50 @@ test("main dashboard PC link computes input-date costs separately from selected-
   assert.equal(runInContext("calculateSummaryAt(items, input).purchaseTotal", context), 48000);
   assert.equal(state.pcMonthlyCost, 1000);
   assert.equal(state.pcPurchaseTotal, 12000);
+});
+
+test("main purchase graph matches the summary with additional costs, hidden items, filters and linked PC purchases", () => {
+  const source = readFileSync(new URL("../js/list.js", import.meta.url), "utf8");
+  const names = ["parseDate", "toMonthIndex", "daysInMonth", "toMonthPosition", "addYearsClamped", "isPcManagementLinkedItem", "itemStartMonth", "itemPlannedEndMonth", "itemActualEndMonth", "summaryActiveEndMonth", "isActiveInSummaryAtTimelineMarker", "isSummaryExcluded", "summaryItems", "totalPurchaseCost", "purchaseGraphIntervals", "calculateSummaryAt"];
+  const functions = names.map((name) => {
+    const start = source.indexOf(`function ${name}(`);
+    assert.notEqual(start, -1, name);
+    return source.slice(start, source.indexOf("\n}", start) + 2);
+  }).join("\n");
+  const state = {
+    selectedCategories: new Set(["home", "pc"]),
+    summaryItems: [
+      { category: "home", purchaseDate: "2026-01-31", purchasePrice: 12000, additionalCosts: [{ amount: 3000 }], yearsOfUse: 1 },
+      { category: "home", purchaseDate: "2025-02-01", purchasePrice: 24000, yearsOfUse: 2, hideFromTimeline: true, endOfUseDate: "2026-05-15" },
+      { category: "home", purchaseDate: "2025-01-01", purchasePrice: 48000, yearsOfUse: 5, excludeFromSummary: true },
+      { category: "pc", pcManagementLinked: true },
+    ],
+    pcItems: [
+      { purchaseDate: "2024-02-29", price: 30000, yearsOfUse: 2 },
+      { purchaseDate: "2026-11-13", purchasePrice: 60000, yearsOfUse: 1 },
+      { purchaseDate: "2025-01-01", purchasePrice: 96000, yearsOfUse: 5, endOfUseDate: "2026-06-30", hideFromTimeline: true },
+      { purchaseDate: "2025-01-01", purchasePrice: 99999, yearsOfUse: 5, excludeFromSummary: true },
+      { purchaseDate: "", purchasePrice: 99999, yearsOfUse: 5 },
+    ],
+  };
+  const context = createContext({
+    state, pcPurchaseIntervals, calculatePcSummaryAt, TIMELINE_MIN_YEAR: 2015, TIMELINE_MAX_YEAR: 2055,
+    shouldExcludeUnderusedMonthlyCost: settingsModule.shouldExcludeUnderusedMonthlyCost,
+    calculateAdditionalCostTotal: (item) => (item.additionalCosts || []).reduce((sum, cost) => sum + cost.amount, 0),
+    itemSummaryMonthlyCost: () => 0,
+  });
+  runInContext(functions, context);
+  for (const exclude of [false, true]) {
+    settingsModule.setExcludeUnderusedMonthlyCost(exclude);
+    for (const categories of [["home", "pc"], ["home"], ["pc"], []]) {
+      state.selectedCategories = new Set(categories);
+      const points = purchaseTotalSeries(runInContext("purchaseGraphIntervals()", context), month(2026, 1), month(2027, 1));
+      for (let date = new Date(2026, 0, 1); date.getFullYear() === 2026; date.setDate(date.getDate() + 1)) {
+        context.target = dateMonthPosition(date);
+        const plotted = points.filter((p) => p.position <= context.target).at(-1).total;
+        assert.equal(plotted, runInContext("calculateSummaryAt(summaryItems(), target).purchaseTotal", context), `${dateKey(date)} excluded=${exclude} categories=${categories}`);
+      }
+    }
+  }
+  values.clear();
 });
