@@ -14,13 +14,18 @@ export function snapToDayPosition(position) {
   return month + day / days;
 }
 
-export function accountingSummaryReference(position) {
-  return monthlySummaryReference(position, { ...getMonthlySummarySettings(), mode: "monthly" });
+export function accountingSummaryReference(position, settings = getMonthlySummarySettings()) {
+  const monthlySettings = { ...settings, mode: "monthly" };
+  const selectedDay = snapToDayPosition(position);
+  let month = Math.floor(selectedDay);
+  // Keep the input day's period until the following day, including holiday shifts.
+  while (monthlySummaryReference(month - 1, monthlySettings).position >= selectedDay) month -= 1;
+  while (monthlySummaryReference(month, monthlySettings).position < selectedDay) month += 1;
+  return monthlySummaryReference(month, monthlySettings);
 }
 
 export function accountingSummaryLabel(position, amount) {
-  const settings = { ...getMonthlySummarySettings(), mode: "monthly" };
-  return `${summaryReferenceLabel(position, settings)}　入力金額：${amount}`;
+  return `${formatSummaryReferenceLabel(accountingSummaryReference(position))}　入力金額：${amount}`;
 }
 
 function periodStartDate(year, month, day) {
@@ -79,6 +84,10 @@ function weekdayDateLabel(date) {
 
 export function summaryReferenceLabel(monthPosition, settings = getMonthlySummarySettings(), { details = false } = {}) {
   const reference = monthlySummaryReference(monthPosition, settings);
+  return formatSummaryReferenceLabel(reference, { details });
+}
+
+function formatSummaryReferenceLabel(reference, { details = false } = {}) {
   const year = Math.floor(reference.selectedMonth / 12);
   const month = reference.selectedMonth - year * 12 + 1;
   if (!reference.date) return `${year}年${month}月`;

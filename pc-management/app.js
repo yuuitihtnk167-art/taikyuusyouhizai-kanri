@@ -1,4 +1,4 @@
-import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=157";
+import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=158";
 import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=150";
 import { createTimelineGraphViewport } from "../js/services/timeline-graph-viewport.js?v=155";
 import { HOLIDAY_UPDATE_KEY } from "../js/services/holiday-update.js?v=157";
@@ -9,7 +9,7 @@ import {
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
 import { shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
-import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "../js/services/monthly-summary.js?v=157";
+import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "../js/services/monthly-summary.js?v=158";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
