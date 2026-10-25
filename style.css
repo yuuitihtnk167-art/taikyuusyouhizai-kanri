@@ -1193,7 +1193,7 @@ button {
 
 .timeline-panel {
   padding: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .timeline-panel > h2,
@@ -1276,6 +1276,9 @@ button {
 }
 
 .timeline-graph-header-scroll {
+  position: sticky;
+  z-index: 19;
+  background: #1b242d;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -1284,8 +1287,8 @@ button {
 .timeline-graph-header-scroll::-webkit-scrollbar { display: none; }
 
 .timeline-band-scroll {
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overflow-y: hidden;
+  overscroll-behavior-y: auto;
 }
 
 .timeline-graph-header-grid.timeline-grid {

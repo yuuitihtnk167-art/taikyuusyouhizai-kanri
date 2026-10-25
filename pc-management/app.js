@@ -1,6 +1,6 @@
 import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=158";
-import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=150";
-import { createTimelineGraphViewport } from "../js/services/timeline-graph-viewport.js?v=155";
+import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=161";
+import { createTimelineGraphViewport } from "../js/services/timeline-graph-viewport.js?v=160";
 import { HOLIDAY_UPDATE_KEY } from "../js/services/holiday-update.js?v=157";
 import { createTimelineMarkerTooltip } from "../js/services/timeline-marker-tooltip.js?v=154";
 import {
@@ -706,11 +706,14 @@ function enableTimelineMousePanning(scroll) {
 
   scroll.addEventListener("pointerdown", (event) => {
     if (event.pointerType !== "mouse" || event.button !== 0) return;
-    if (!isTimelineMousePanTarget(event.target) || scroll.scrollWidth <= scroll.clientWidth) return;
+    const panVertically = !scroll.classList.contains("timeline-graph-header-scroll");
+    if (!isTimelineMousePanTarget(event.target) || (!panVertically && scroll.scrollWidth <= scroll.clientWidth)) return;
 
     pan = {
       pointerId: event.pointerId,
       startX: event.clientX,
+      lastY: event.clientY,
+      panVertically,
       startScrollLeft: scroll.scrollLeft,
       isPanning: false,
     };
@@ -723,9 +726,10 @@ function enableTimelineMousePanning(scroll) {
       return;
     }
     const distance = event.clientX - pan.startX;
+    const verticalDistance = pan.lastY - event.clientY;
 
     if (!pan.isPanning) {
-      if (Math.abs(distance) < TIMELINE_MOUSE_PAN_START_PX) return;
+      if (Math.max(Math.abs(distance), pan.panVertically ? Math.abs(verticalDistance) : 0) < TIMELINE_MOUSE_PAN_START_PX) return;
       pan.isPanning = true;
       scroll.classList.add("mouse-panning");
       scroll.focus({ preventScroll: true });
@@ -734,6 +738,8 @@ function enableTimelineMousePanning(scroll) {
 
     event.preventDefault();
     scroll.scrollLeft = pan.startScrollLeft - distance;
+    if (pan.panVertically && verticalDistance) window.scrollBy(0, verticalDistance);
+    pan.lastY = event.clientY;
   });
 
   scroll.addEventListener("pointerup", finishPan);
@@ -1372,9 +1378,9 @@ function timelineMarkerVerticalAutoScrollSpeed(drag) {
   const edge = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX;
   const maxSpeed = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX;
   if (drag.scroll.classList.contains("timeline-graph-header-scroll")) return 0;
-  const bandRect = drag.scroll.classList.contains("timeline-band-scroll") ? drag.scroll.getBoundingClientRect() : null;
-  const topDistance = drag.clientY - (bandRect?.top ?? 0);
-  const bottomDistance = (bandRect?.bottom ?? window.innerHeight) - drag.clientY;
+  const graphHeader = drag.scroll.classList.contains("timeline-band-scroll") ? drag.scroll.previousElementSibling : null;
+  const topDistance = drag.clientY - (graphHeader?.getBoundingClientRect().bottom ?? 0);
+  const bottomDistance = window.innerHeight - drag.clientY;
 
   if (topDistance < edge) {
     return -Math.ceil(((edge - Math.max(topDistance, 0)) / edge) * maxSpeed);
@@ -1408,16 +1414,14 @@ function startTimelineMarkerAutoScroll(drag) {
     }
 
     const beforeScrollLeft = drag.scroll.scrollLeft;
-    const scrollBands = drag.scroll.classList.contains("timeline-band-scroll");
-    const beforeScrollY = scrollBands ? drag.scroll.scrollTop : window.scrollY;
+    const beforeScrollY = window.scrollY;
     const maxScrollLeft = Math.max(drag.scroll.scrollWidth - drag.scroll.clientWidth, 0);
     drag.scroll.scrollLeft = Math.min(Math.max(beforeScrollLeft + horizontalSpeed, 0), maxScrollLeft);
     if (verticalSpeed !== 0) {
-      if (scrollBands) drag.scroll.scrollTop += verticalSpeed;
-      else window.scrollBy(0, verticalSpeed);
+      window.scrollBy(0, verticalSpeed);
     }
 
-    if (drag.scroll.scrollLeft === beforeScrollLeft && (scrollBands ? drag.scroll.scrollTop : window.scrollY) === beforeScrollY) {
+    if (drag.scroll.scrollLeft === beforeScrollLeft && window.scrollY === beforeScrollY) {
       stopTimelineMarkerAutoScroll(drag);
       return;
     }
