@@ -1,3 +1,5 @@
+import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=149";
+import { createTimelineMarkerTooltip } from "./services/timeline-marker-tooltip.js?v=148";
 import {
   createLocalBackupData,
   parseLocalBackupText,
@@ -91,6 +93,9 @@ const state = {
   timelineMarkerMonth: currentMonthIndex(),
   timelineMarkerDrag: null,
 };
+
+const markerDateTooltip = createTimelineMarkerTooltip(itemList, timelineMarkerMonth, () => Boolean(state.timelineMarkerDrag?.isDragging));
+const markerDayControls = createTimelineDayControls(itemList, moveTimelineMarkerByDay, markerDateTooltip);
 
 function sessionStorageSetItem(key, value) {
   try {
@@ -725,7 +730,7 @@ function centerCurrentLine(scroll, minYear, maxYear) {
 
 function isTimelineMousePanTarget(target) {
   if (!(target instanceof HTMLElement)) return false;
-  return !target.closest(".timeline-row-label, [data-action='drag-current-line']");
+  return !target.closest(".timeline-row-label, [data-action='drag-current-line'], [data-action='step-day']");
 }
 
 function enableTimelineMousePanning(scroll) {
@@ -929,6 +934,7 @@ function renderTimeline(items) {
   scroll.appendChild(grid);
   itemList.appendChild(scroll);
   renderTimelineIntervalHandles(grid);
+  markerDayControls.sync();
 
   const updateLinkedLabelPosition = () => {
     const visibleLeft = scroll.scrollLeft + labelWidth;
@@ -1069,6 +1075,37 @@ function applyTimelineMarkerDragPosition(drag) {
   }
   summarizeItems(summaryItems());
   updatePcLinkedCostDisplays();
+  markerDayControls.sync();
+  markerDateTooltip.update();
+}
+
+function moveTimelineMarkerByDay(delta, handle) {
+  const grid = handle.closest(".timeline-grid");
+  if (!grid) return false;
+  const minYear = Number(grid.dataset.minYear);
+  const maxYear = Number(grid.dataset.maxYear);
+  const previous = timelineMarkerMonth();
+  state.timelineMarkerMonth = shiftTimelineDay(previous, delta, minYear, maxYear);
+  const position = currentLinePosition(minYear, maxYear);
+  grid.querySelector(".timeline-current-line").style.left = position + "px";
+  grid.querySelectorAll(".timeline-current-handle").forEach((currentHandle) => {
+    currentHandle.style.left = position + "px";
+  });
+  updatePcSummaryForMonth();
+  summarizeItems(summaryItems());
+  updatePcLinkedCostDisplays();
+  markerDayControls.sync();
+  const scroll = grid.closest(".timeline-scroll");
+  if (scroll) {
+    const { labelWidth } = timelineLayout();
+    if (position < scroll.scrollLeft + labelWidth + 70) {
+      scroll.scrollLeft = Math.max(0, position - labelWidth - 70);
+    } else if (position > scroll.scrollLeft + scroll.clientWidth - 70) {
+      scroll.scrollLeft = position - scroll.clientWidth + 70;
+    }
+  }
+  markerDateTooltip.show(handle);
+  return state.timelineMarkerMonth !== previous;
 }
 
 function timelineMarkerAutoScrollSpeed(drag) {
@@ -1175,9 +1212,11 @@ function clearTimelineMarkerDrag() {
     }
   }
   state.timelineMarkerDrag = null;
+  markerDateTooltip.hide();
 }
 
 function beginTimelineMarkerDrag(event, drag) {
+  markerDateTooltip.show(drag.handle);
   drag.isDragging = true;
   drag.line.classList.add("dragging");
   drag.handles.forEach((handle) => handle.classList.add("dragging"));
