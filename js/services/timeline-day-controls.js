@@ -1,4 +1,4 @@
-import { dateMonthPosition } from "./monthly-summary.js?v=157";
+import { dateMonthPosition } from "./monthly-summary.js?v=158";
 
 export function shiftTimelineDay(position, delta, minYear, maxYear) {
   const monthIndex = Math.floor(position);

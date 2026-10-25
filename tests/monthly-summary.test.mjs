@@ -29,6 +29,74 @@ const monthly = { mode: "monthly", day: 15, adjustToPreviousWeekday: true };
 const month = (year, number) => year * 12 + number - 1;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
+test("accounting labels keep the input day and switch on the next day in either drag direction", () => {
+  values.clear();
+  for (const [day, number, inputDate] of [
+    [31, 10, "11/13(金)"], [1, 10, "11/13(金)"],
+    [13, 10, "11/13(金)"], [14, 11, "12/14(月)"],
+    [13, 10, "11/13(金)"], [1, 10, "11/13(金)"],
+  ]) {
+    const date = new Date(2026, day === 31 ? 9 : 10, day);
+    const position = dateMonthPosition(date);
+    assert.equal(accountingSummaryReference(position).selectedMonth, month(2026, number));
+    assert.equal(accountingSummaryLabel(position, "¥1,000"), `2026年${number}月分\n家計簿入力日：${inputDate}　入力金額：¥1,000`);
+  }
+});
+
+test("accounting date selection follows adjusted periods across years, leap days and short months", () => {
+  for (const day of [1, 7, 15, 31]) {
+    for (const adjustToPreviousWeekday of [false, true]) {
+      const settings = { ...monthly, day, adjustToPreviousWeekday };
+      for (const year of [2024, 2026, 2027]) {
+        for (let date = new Date(year, 0, 1); date.getFullYear() === year; date.setDate(date.getDate() + 1)) {
+          const position = dateMonthPosition(date);
+          const reference = accountingSummaryReference(position, settings);
+          assert.ok(dateMonthPosition(reference.startDate) <= position, `${dateKey(date)} day=${day}`);
+          assert.ok(position <= reference.position, `${dateKey(date)} day=${day}`);
+          assert.equal(accountingSummaryReference(reference.position, settings).selectedMonth, reference.selectedMonth);
+          const nextDay = new Date(reference.date);
+          nextDay.setDate(nextDay.getDate() + 1);
+          assert.equal(accountingSummaryReference(dateMonthPosition(nextDay), settings).selectedMonth, reference.selectedMonth + 1);
+        }
+      }
+    }
+  }
+});
+
+test("both dashboards switch the input label and amount together after the input day", () => {
+  values.clear();
+  const items = [
+    { purchaseDate: "2026-10-20", purchasePrice: 12000, yearsOfUse: 1 },
+    { purchaseDate: "2026-11-14", purchasePrice: 24000, yearsOfUse: 1 },
+  ];
+  for (const path of ["../js/list.js", "../pc-management/app.js"]) {
+    const source = readFileSync(new URL(path, import.meta.url), "utf8");
+    const start = source.indexOf("function updateTimelineMarkerDate(");
+    const fn = source.slice(start, source.indexOf("\n}", start) + 2);
+    const output = { dataset: {}, textContent: "" };
+    let selected;
+    const context = createContext({
+      timelineMarkerDate: output, elements: { timelineMarkerDate: output },
+      timelineMarkerMonth: () => selected,
+      accountingSummaryReference, accountingSummaryLabel,
+      summaryItems: () => items,
+      calculateSummaryAt: (...args) => calculatePcSummaryAt(items, args.at(-1), { exactDate: true }),
+      formatCurrency: amount => `¥${amount.toLocaleString("en-US")}`,
+    });
+    runInContext(fn, context);
+    for (const [day, expected] of [
+      [1, "2026年10月分\n家計簿入力日：11/13(金)　入力金額：¥1,000"],
+      [13, "2026年10月分\n家計簿入力日：11/13(金)　入力金額：¥1,000"],
+      [14, "2026年11月分\n家計簿入力日：12/14(月)　入力金額：¥3,000"],
+      [13, "2026年10月分\n家計簿入力日：11/13(金)　入力金額：¥1,000"],
+    ]) {
+      selected = dateMonthPosition(new Date(2026, 10, day));
+      runInContext("updateTimelineMarkerDate()", context);
+      assert.equal(output.textContent, expected, path);
+    }
+  }
+});
+
 test("defaults preserve the start day and holiday adjustment", () => {
   assert.deepEqual(settingsModule.getMonthlySummarySettings(), monthly);
   assert.deepEqual(settingsModule.normalizeMonthlySummarySettings({ day: 32, mode: "bad" }), monthly);
@@ -246,8 +314,9 @@ test("day snapping preserves every calendar day and input labels respect legacy 
   }
   settingsModule.setMonthlySummarySettings({ ...monthly, mode: "position" });
   const march = month(2026, 3);
-  assert.equal(dateKey(accountingSummaryReference(march).date), "2026-04-14");
-  assert.equal(accountingSummaryLabel(march, "¥3,000"), "2026年3月分\n家計簿入力日：4/14(火)　入力金額：¥3,000");
+  assert.equal(dateKey(accountingSummaryReference(march).date), "2026-03-13");
+  assert.equal(accountingSummaryLabel(march, "¥3,000"), "2026年2月分\n家計簿入力日：3/13(金)　入力金額：¥3,000");
+  values.clear();
 });
 
 

@@ -1,5 +1,5 @@
 import { getMonthlySummarySettings, setMonthlySummarySettings } from "./app-settings.js";
-import { dateMonthPosition, summaryReferenceLabel } from "./monthly-summary.js?v=157";
+import { accountingSummaryReference, dateMonthPosition, summaryReferenceLabel } from "./monthly-summary.js?v=158";
 import { getHolidayUpdate, updateHolidayData } from "./holiday-update.js?v=157";
 
 export function initializeMonthlySummarySettings() {
@@ -20,7 +20,8 @@ export function initializeMonthlySummarySettings() {
   function render() {
     day.value = String(settings.day);
     adjustment.value = settings.adjustToPreviousWeekday ? "previous" : "none";
-    preview.textContent = summaryReferenceLabel(dateMonthPosition(new Date()), settings, { details: true });
+    const reference = accountingSummaryReference(dateMonthPosition(new Date()), settings);
+    preview.textContent = summaryReferenceLabel(reference.selectedMonth, settings, { details: true });
   }
 
   function save() {

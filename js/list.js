@@ -1,4 +1,4 @@
-import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=157";
+import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=158";
 import { mountPurchaseGraph } from "./services/timeline-purchase-graph.js?v=150";
 import { createTimelineGraphViewport } from "./services/timeline-graph-viewport.js?v=155";
 import { HOLIDAY_UPDATE_KEY } from "./services/holiday-update.js?v=157";
@@ -25,9 +25,9 @@ import {
   saveCategoryOrder,
 } from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
-import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=157";
+import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=158";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=157";
+import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=158";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
