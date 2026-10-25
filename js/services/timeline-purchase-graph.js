@@ -44,7 +44,7 @@ function svgElement(tag, attributes = {}, text = "") {
 export function mountPurchaseGraph(grid, { intervals, minYear, maxYear, labelWidth, yearWidth, compact, visible }) {
   const points = purchaseTotalSeries(intervals, minYear * 12, maxYear * 12);
   const width = (maxYear - minYear) * yearWidth;
-  const height = compact ? 128 : 168;
+  const height = compact ? 192 : 252;
   const top = 34;
   const bottom = height - 18;
   const peak = Math.max(1, ...points.map((point) => point.total));

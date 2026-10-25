@@ -1,24 +1,19 @@
-// A shared horizontal axis with a fixed graph header and a vertically scrolling band area.
+// A sticky graph header with a shared horizontal axis; bands stay in the page flow.
 export function createTimelineGraphViewport(scroll, grid, { enablePanning, syncControls }) {
   const axis = grid.querySelector(".timeline-axis-top");
   const graph = grid.querySelector(".timeline-purchase-graph");
   const handle = grid.querySelector(".timeline-current-handle:not(.bottom):not(.interval)");
   const today = grid.querySelector(".timeline-current-label");
   const line = grid.querySelector(".timeline-current-line");
+  const dashboardHeader = document.querySelector(".dashboard-header");
   let header = null;
   let headerGrid = null;
 
   function align() {
     if (!header) return;
     header.style.width = `${scroll.clientWidth}px`;
+    header.style.top = `${dashboardHeader?.getBoundingClientRect().height ?? 0}px`;
     if (header.scrollLeft !== scroll.scrollLeft) header.scrollLeft = scroll.scrollLeft;
-  }
-
-  function sizeBands() {
-    if (!header) return;
-    const room = window.innerHeight - scroll.getBoundingClientRect().top - 72;
-    scroll.style.maxHeight = `${Math.max(148, Math.min(480, room))}px`;
-    align();
   }
 
   function setVisible(visible) {
@@ -41,21 +36,19 @@ export function createTimelineGraphViewport(scroll, grid, { enablePanning, syncC
       scroll.before(header);
       scroll.classList.add("timeline-band-scroll");
       grid.classList.add("timeline-band-grid");
-      scroll.setAttribute("aria-label", "ライフサイクル帯。上下・左右にスクロールできます。");
+      scroll.setAttribute("aria-label", "ライフサイクル帯。上下はページ全体、左右は年表をスクロールできます。");
       enablePanning(header);
       header.addEventListener("scroll", () => {
         if (scroll.scrollLeft !== header.scrollLeft) scroll.scrollLeft = header.scrollLeft;
       }, { passive: true });
       scroll.scrollLeft = left;
-      sizeBands();
+      align();
     } else {
       grid.prepend(axis, graph);
       if (handle) grid.appendChild(handle);
       if (today) grid.appendChild(today);
       scroll.classList.remove("timeline-band-scroll");
       grid.classList.remove("timeline-band-grid");
-      scroll.style.maxHeight = "";
-      scroll.scrollTop = 0;
       scroll.setAttribute("aria-label", "ライフサイクル年表。横にスクロールできます。");
       // Move the existing arrow buttons with their handle, without recreating listeners.
       syncControls();
@@ -73,16 +66,17 @@ export function createTimelineGraphViewport(scroll, grid, { enablePanning, syncC
   }
 
   scroll.addEventListener("scroll", align, { passive: true });
-  window.addEventListener("resize", sizeBands);
+  window.addEventListener("resize", align);
   const resizeObserver = new ResizeObserver(align);
   resizeObserver.observe(scroll);
+  if (dashboardHeader) resizeObserver.observe(dashboardHeader);
   return {
     setVisible,
     destroy() {
       setVisible(false);
       resizeObserver.disconnect();
       scroll.removeEventListener("scroll", align);
-      window.removeEventListener("resize", sizeBands);
+      window.removeEventListener("resize", align);
     },
   };
 }
