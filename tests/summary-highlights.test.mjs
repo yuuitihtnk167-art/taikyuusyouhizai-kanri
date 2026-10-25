@@ -36,7 +36,7 @@ for (const [path, renderName] of [
     const itemList = { querySelectorAll: () => labels };
     const count = {}, total = {}, monthly = {};
     const context = createContext({
-      state, itemList,
+      state, itemList, purchaseGraph: null,
       elements: { itemList, summaryCount: count, summaryTotal: total, summaryMonthly: monthly },
       summaryItemCount: count, summaryPurchaseTotal: total, summaryMonthlyCost: monthly,
       timelineMarkerMonth: () => state.timelineMarkerMonth,

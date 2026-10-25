@@ -1,4 +1,5 @@
 import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=149";
+import { mountPurchaseGraph } from "./services/timeline-purchase-graph.js?v=150";
 import { createTimelineMarkerTooltip } from "./services/timeline-marker-tooltip.js?v=148";
 import {
   createLocalBackupData,
@@ -24,7 +25,7 @@ import {
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=134";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems } from "./services/pc-summary.js?v=134";
+import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=151";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -43,6 +44,7 @@ const helpCloseButton = document.getElementById("help-close-button");
 
 const summaryMonthlyCost = document.getElementById("summary-monthly-cost");
 const summaryPurchaseTotal = document.getElementById("summary-purchase-total");
+const purchaseGraphButton = document.getElementById("purchase-graph-button");
 const summaryItemCount = document.getElementById("summary-item-count");
 
 const itemNameDialog = document.getElementById("item-name-dialog");
@@ -92,8 +94,10 @@ const state = {
   ignoreNextCategoryClick: false,
   timelineMarkerMonth: currentMonthIndex(),
   timelineMarkerDrag: null,
+  showPurchaseGraph: false,
 };
 
+let purchaseGraph = null;
 const markerDateTooltip = createTimelineMarkerTooltip(itemList, timelineMarkerMonth, () => Boolean(state.timelineMarkerDrag?.isDragging));
 const markerDayControls = createTimelineDayControls(itemList, moveTimelineMarkerByDay, markerDateTooltip);
 
@@ -426,6 +430,21 @@ function summarizeItems(items) {
   summaryMonthlyCost.textContent = formatCurrency(monthlyCost) + " /月";
   summaryPurchaseTotal.textContent = formatCurrency(purchaseTotal);
   summaryItemCount.textContent = activeItems.length + " 件";
+  purchaseGraph?.update(timelineMarkerMonth(), purchaseTotal);
+}
+
+function purchaseGraphIntervals() {
+  const pcIntervals = pcPurchaseIntervals(state.pcItems);
+  return summaryItems().filter((item) => !isSummaryExcluded(item)).flatMap((item) => {
+    const start = itemStartMonth(item);
+    const end = summaryActiveEndMonth(item);
+    if (isPcManagementLinkedItem(item)) {
+      return pcIntervals.map((part) => ({
+        start: Math.max(start, part.start), end: Math.min(end, part.end), amount: part.amount,
+      }));
+    }
+    return [{ start, end, amount: totalPurchaseCost(item) }];
+  });
 }
 
 function renderCategoryFilter() {
@@ -805,6 +824,8 @@ function enableTimelineMousePanning(scroll) {
 }
 
 function renderTimeline(items) {
+  purchaseGraph = null;
+  if (purchaseGraphButton) purchaseGraphButton.disabled = items.length === 0;
   itemList.innerHTML = "";
   if (items.length === 0) {
     renderEmptyTimeline();
@@ -813,7 +834,7 @@ function renderTimeline(items) {
 
   const sortedItems = sortItemsByCategory(items);
   const { minYear, maxYear } = resolveTimelineRange(sortedItems);
-  const { labelWidth, yearWidth } = timelineLayout();
+  const { labelWidth, yearWidth, isCompact } = timelineLayout();
   const timelineWidth = labelWidth + (maxYear - minYear) * yearWidth;
   const minMonth = minYear * 12;
 
@@ -831,6 +852,12 @@ function renderTimeline(items) {
 
   renderAxis(grid, minYear, maxYear, "timeline-axis-top");
   renderCurrentLine(grid, minYear, maxYear);
+
+  purchaseGraph = mountPurchaseGraph(grid, {
+    intervals: purchaseGraphIntervals(), minYear, maxYear, labelWidth, yearWidth,
+    compact: isCompact, visible: state.showPurchaseGraph,
+  });
+  purchaseGraph.update(timelineMarkerMonth(), calculateSummaryAt(summaryItems(), timelineMarkerMonth()).purchaseTotal);
 
   const rows = createElement("div", "timeline-rows");
   for (const item of sortedItems) {
@@ -1559,6 +1586,22 @@ dialogCloseButton.addEventListener("click", () => {
 
 itemNameDialog.addEventListener("click", (event) => {
   if (event.target === itemNameDialog) itemNameDialog.close();
+});
+
+purchaseGraphButton?.addEventListener("click", () => {
+  state.showPurchaseGraph = !state.showPurchaseGraph;
+  purchaseGraphButton.setAttribute("aria-expanded", String(state.showPurchaseGraph));
+  purchaseGraph?.setVisible(state.showPurchaseGraph);
+  const grid = itemList.querySelector(".timeline-grid");
+  if (grid) {
+    const rows = [...grid.querySelectorAll(".timeline-row")];
+    grid.querySelectorAll(".timeline-current-handle.interval").forEach((handle, index) => {
+      const row = rows[(index + 1) * 9 - 1];
+      if (row) handle.style.top = `${row.offsetTop + row.offsetHeight / 2}px`;
+    });
+    markerDayControls.sync();
+    markerDateTooltip.update();
+  }
 });
 
 if (helpButton && helpDialog && helpCloseButton) {
