@@ -3,8 +3,8 @@ import {
 } from "../js/common.js";
 import { isLocalMode } from "../js/platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "../js/services/auth.js";
-import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
-import { monthlySummaryReference, summaryReferenceLabel } from "../js/services/monthly-summary.js?v=134";
+import { shouldExcludeUnderusedMonthlyCost } from "../js/services/app-settings.js";
+import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "../js/services/monthly-summary.js?v=134";
 import {
   deleteItem as deletePcItem,
   getItems as getPcItems,
@@ -23,6 +23,8 @@ const DESKTOP_LABEL_WIDTH = 230;
 const MOBILE_YEAR_WIDTH = 28;
 const MOBILE_LABEL_WIDTH = 72;
 const TIMELINE_MODE = document.body.dataset.timelineMode || "visible";
+const FROM_HIDDEN = new URLSearchParams(window.location.search).get("from") === "hidden";
+const LIST_URL = FROM_HIDDEN ? "hidden.html" : "index.html";
 const SUMMARY_TOGGLE_LONG_PRESS_MS = 600;
 const SUMMARY_TOGGLE_MOVE_CANCEL_PX = 10;
 const TIMELINE_MARKER_LONG_PRESS_MS = 500;
@@ -89,6 +91,7 @@ const elements = {
 const state = {
   uid: null,
   items: [],
+  summaryItemIds: new Set(),
   selectedPcNames: new Set(pcNameOptions.map((option) => option.value)),
   selectedItemId: null,
   editingId: new URLSearchParams(window.location.search).get("id"),
@@ -264,13 +267,15 @@ function summaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
 
 function timelineMarkerMonth() {
   const position = Number.isFinite(state.timelineMarkerMonth) ? state.timelineMarkerMonth : currentMonthIndex();
-  return monthlySummaryReference(position).position;
+  return snapToDayPosition(position);
 }
 
 function updateTimelineMarkerDate() {
   if (!elements.timelineMarkerDate) return;
-  elements.timelineMarkerDate.dataset.summaryMode = getMonthlySummarySettings().mode;
-  elements.timelineMarkerDate.textContent = summaryReferenceLabel(state.timelineMarkerMonth);
+  const reference = accountingSummaryReference(timelineMarkerMonth());
+  const summary = calculateSummaryAt(reference.position);
+  elements.timelineMarkerDate.dataset.summaryMode = "monthly";
+  elements.timelineMarkerDate.textContent = accountingSummaryLabel(timelineMarkerMonth(), formatCurrency(summary.monthlyCost));
 }
 
 function activeEndMonth(item) {
@@ -286,21 +291,12 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
-  if (getMonthlySummarySettings().mode === "monthly") {
-    const plannedEnd = itemPlannedEndMonth(item);
-    if (!item.endOfUseDate) return plannedEnd;
-    const actualEnd = itemActualEndMonth(item);
-    return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
-      ? plannedEnd
-      : Math.min(actualEnd, plannedEnd);
-  }
-  if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
-    return itemPlannedEndMonth(item);
-  }
-  if (item.endOfUseDate) {
-    return Math.min(itemActualEndMonth(item), itemPlannedEndMonth(item));
-  }
-  return itemPlannedEndMonth(item);
+  const plannedEnd = itemPlannedEndMonth(item);
+  if (!item.endOfUseDate) return plannedEnd;
+  const actualEnd = itemActualEndMonth(item);
+  return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
+    ? plannedEnd
+    : Math.min(actualEnd, plannedEnd);
 }
 
 function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
@@ -343,6 +339,7 @@ function isSummaryExcluded(item) {
 
 function timelineLabelClass(item) {
   const classes = ["timeline-row-label"];
+  if (state.summaryItemIds.has(item.id)) classes.push("summary-included");
   if (isMonthlyCostSummaryExcluded(item)) classes.push("monthly-cost-excluded");
   if (isSummaryExcluded(item)) classes.push("summary-excluded");
   return classes.join(" ");
@@ -564,11 +561,8 @@ function currentLinePosition(minYear, maxYear) {
   const { labelWidth, yearWidth } = timelineLayout();
   const minMonth = minYear * 12;
   const maxMonth = maxYear * 12;
-  const reference = monthlySummaryReference(state.timelineMarkerMonth);
-  const referenceMonth = reference.startDate ? reference.markerPosition : timelineMarkerMonth();
-  const markerMonth = getMonthlySummarySettings().mode === "monthly"
-    ? Math.min(Math.max(referenceMonth, minMonth), maxMonth)
-    : referenceMonth;
+  const markerMonth = timelineMarkerMonth();
+
   if (markerMonth < minMonth || markerMonth > maxMonth) return null;
   return labelWidth + ((markerMonth - minMonth) / 12) * yearWidth;
 }
@@ -606,8 +600,8 @@ function renderCurrentLine(grid, minYear, maxYear) {
     const currentHandle = createElement("button", "timeline-current-handle", "✋");
     currentHandle.type = "button";
     currentHandle.dataset.action = "drag-current-line";
-    currentHandle.setAttribute("aria-label", "現在ラインを動かす");
-    currentHandle.title = "ダブルクリックで現在に戻す";
+    currentHandle.setAttribute("aria-label", "集計する日付を動かす");
+    currentHandle.title = "ダブルクリックで今日に戻す";
     currentHandle.style.left = `${currentPosition}px`;
     grid.appendChild(currentHandle);
 
@@ -617,7 +611,7 @@ function renderCurrentLine(grid, minYear, maxYear) {
   }
 
   if (currentLabelPosition !== null) {
-    const currentLabel = createElement("div", "timeline-current-label", "現在");
+    const currentLabel = createElement("div", "timeline-current-label", "今日");
     currentLabel.style.left = `${currentLabelPosition}px`;
     grid.appendChild(currentLabel);
   }
@@ -872,18 +866,26 @@ function renderTimeline() {
   centerCurrentLine(scroll, minYear, maxYear);
 }
 
-function renderSummary() {
-  updateTimelineMarkerDate();
-  if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
-  const monthPosition = timelineMarkerMonth();
+function calculateSummaryAt(monthPosition) {
   const activeItems = summaryItems().filter(
     (item) => !isSummaryExcluded(item) && isActiveInSummaryAtTimelineMarker(item, monthPosition)
   );
   const purchaseTotal = activeItems.reduce((total, item) => total + Number(item.purchasePrice || 0), 0);
-  const monthlyCostTotal = activeItems.reduce((total, item) => total + Math.round(summaryMonthlyCost(item, monthPosition)), 0);
-  elements.summaryCount.textContent = `${activeItems.length} 件`;
+  const monthlyCost = activeItems.reduce((total, item) => total + Math.round(summaryMonthlyCost(item, monthPosition)), 0);
+  return { activeItems, monthlyCost, purchaseTotal };
+}
+
+function renderSummary() {
+  updateTimelineMarkerDate();
+  if (!elements.summaryCount || !elements.summaryTotal || !elements.summaryMonthly) return;
+  const { activeItems, monthlyCost, purchaseTotal } = calculateSummaryAt(timelineMarkerMonth());
+  state.summaryItemIds = new Set(activeItems.map((item) => item.id));
+  elements.itemList?.querySelectorAll(".timeline-row-label").forEach((label) => {
+    label.classList.toggle("summary-included", state.summaryItemIds.has(label.dataset.id));
+  });
+  elements.summaryCount.textContent = activeItems.length + " 件";
   elements.summaryTotal.textContent = formatCurrency(purchaseTotal);
-  elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCostTotal);
+  elements.summaryMonthly.textContent = formatMonthlyCost(monthlyCost);
 }
 
 function renderCategoryFilter() {
@@ -1137,7 +1139,7 @@ function resetForm() {
   elements.id.value = "";
   elements.pcName.value = "main";
   elements.yearsOfUse.value = "10";
-  elements.hideFromTimeline.checked = false;
+  elements.hideFromTimeline.checked = FROM_HIDDEN;
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
   state.isDirty = false;
@@ -1271,8 +1273,8 @@ function timelineMonthFromClientX(clientX, scroll, minYear, maxYear) {
   const maxMonth = maxYear * 12;
   const x = scroll.scrollLeft + clientX - rect.left;
   const monthPosition = minMonth + ((x - labelWidth) / yearWidth) * 12;
-  const lastPosition = getMonthlySummarySettings().mode === "monthly" ? maxMonth - 1 : maxMonth;
-  return Math.min(Math.max(monthPosition, minMonth), lastPosition);
+  const lastPosition = maxMonth - 1 / 31;
+  return snapToDayPosition(Math.min(Math.max(monthPosition, minMonth), lastPosition));
 }
 
 function applyTimelineMarkerDragPosition(drag) {
@@ -1582,7 +1584,7 @@ if (elements.form) {
         await showHiddenTimelineNoticeDialog();
       }
       state.isDirty = false;
-      window.location.href = "index.html";
+      window.location.href = LIST_URL;
     } catch (error) {
       elements.formError.textContent = firebaseErrorMessage(error, "パーツ情報の保存に失敗しました。");
     } finally {
@@ -1592,13 +1594,13 @@ if (elements.form) {
   });
 
   elements.toListButton.addEventListener("click", () => {
-    window.location.href = "index.html";
+    window.location.href = LIST_URL;
   });
 }
 
 if (elements.createButton) {
   elements.createButton.addEventListener("click", () => {
-    window.location.href = "form.html";
+    window.location.href = TIMELINE_MODE === "hidden" ? "form.html?from=hidden" : "form.html";
   });
 }
 
@@ -1666,7 +1668,7 @@ if (elements.hiddenButton) {
 
 if (elements.settingsButton) {
   elements.settingsButton.addEventListener("click", () => {
-    window.location.href = "../settings.html?from=pc";
+    window.location.href = TIMELINE_MODE === "hidden" ? "../settings.html?from=pc-hidden" : "../settings.html?from=pc";
   });
 }
 
@@ -1717,7 +1719,7 @@ if (elements.dialogEditButton) {
   elements.dialogEditButton.addEventListener("click", () => {
     const item = selectedItem();
     if (!item) return;
-    window.location.href = `form.html?id=${encodeURIComponent(item.id)}`;
+    window.location.href = `form.html?id=${encodeURIComponent(item.id)}${TIMELINE_MODE === "hidden" ? "&from=hidden" : ""}`;
   });
 }
 
@@ -1815,6 +1817,7 @@ async function initializePcManagement(user) {
     }
 
     if (!state.editingId) {
+      elements.hideFromTimeline.checked = FROM_HIDDEN;
       elements.submitButton.textContent = "登録する";
       elements.pcName.value = "main";
       elements.yearsOfUse.value = elements.yearsOfUse.value || "10";
