@@ -1,6 +1,8 @@
-import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=149";
+import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=157";
 import { mountPurchaseGraph } from "./services/timeline-purchase-graph.js?v=150";
-import { createTimelineMarkerTooltip } from "./services/timeline-marker-tooltip.js?v=148";
+import { createTimelineGraphViewport } from "./services/timeline-graph-viewport.js?v=155";
+import { HOLIDAY_UPDATE_KEY } from "./services/holiday-update.js?v=157";
+import { createTimelineMarkerTooltip } from "./services/timeline-marker-tooltip.js?v=154";
 import {
   createLocalBackupData,
   parseLocalBackupText,
@@ -23,9 +25,9 @@ import {
   saveCategoryOrder,
 } from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
-import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=134";
+import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=157";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=151";
+import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=157";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 
@@ -98,6 +100,10 @@ const state = {
 };
 
 let purchaseGraph = null;
+let graphViewport = null;
+window.addEventListener("storage", (event) => {
+  if (event.key === HOLIDAY_UPDATE_KEY || event.key === null) updateTimelineMarkerDate();
+});
 const markerDateTooltip = createTimelineMarkerTooltip(itemList, timelineMarkerMonth, () => Boolean(state.timelineMarkerDrag?.isDragging));
 const markerDayControls = createTimelineDayControls(itemList, moveTimelineMarkerByDay, markerDateTooltip);
 
@@ -824,6 +830,8 @@ function enableTimelineMousePanning(scroll) {
 }
 
 function renderTimeline(items) {
+  graphViewport?.destroy();
+  graphViewport = null;
   purchaseGraph = null;
   if (purchaseGraphButton) purchaseGraphButton.disabled = items.length === 0;
   itemList.innerHTML = "";
@@ -962,6 +970,10 @@ function renderTimeline(items) {
   itemList.appendChild(scroll);
   renderTimelineIntervalHandles(grid);
   markerDayControls.sync();
+  graphViewport = createTimelineGraphViewport(scroll, grid, {
+    enablePanning: enableTimelineMousePanning, syncControls: () => markerDayControls.sync(),
+  });
+  graphViewport.setVisible(state.showPurchaseGraph);
 
   const updateLinkedLabelPosition = () => {
     const visibleLeft = scroll.scrollLeft + labelWidth;
@@ -1095,7 +1107,7 @@ function applyTimelineMarkerDragPosition(drag) {
   updatePcSummaryForMonth();
   const position = currentLinePosition(drag.minYear, drag.maxYear);
   if (position !== null) {
-    drag.line.style.left = `${position}px`;
+    itemList.querySelectorAll(".timeline-current-line").forEach((line) => { line.style.left = `${position}px`; });
     drag.handles.forEach((handle) => {
       handle.style.left = `${position}px`;
     });
@@ -1114,8 +1126,8 @@ function moveTimelineMarkerByDay(delta, handle) {
   const previous = timelineMarkerMonth();
   state.timelineMarkerMonth = shiftTimelineDay(previous, delta, minYear, maxYear);
   const position = currentLinePosition(minYear, maxYear);
-  grid.querySelector(".timeline-current-line").style.left = position + "px";
-  grid.querySelectorAll(".timeline-current-handle").forEach((currentHandle) => {
+  itemList.querySelectorAll(".timeline-current-line").forEach((line) => { line.style.left = position + "px"; });
+  itemList.querySelectorAll(".timeline-current-handle").forEach((currentHandle) => {
     currentHandle.style.left = position + "px";
   });
   updatePcSummaryForMonth();
@@ -1154,8 +1166,10 @@ function timelineMarkerAutoScrollSpeed(drag) {
 function timelineMarkerVerticalAutoScrollSpeed(drag) {
   const edge = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_EDGE_PX;
   const maxSpeed = TIMELINE_MARKER_VERTICAL_AUTO_SCROLL_MAX_PX;
-  const topDistance = drag.clientY;
-  const bottomDistance = window.innerHeight - drag.clientY;
+  if (drag.scroll.classList.contains("timeline-graph-header-scroll")) return 0;
+  const bandRect = drag.scroll.classList.contains("timeline-band-scroll") ? drag.scroll.getBoundingClientRect() : null;
+  const topDistance = drag.clientY - (bandRect?.top ?? 0);
+  const bottomDistance = (bandRect?.bottom ?? window.innerHeight) - drag.clientY;
 
   if (topDistance < edge) {
     return -Math.ceil(((edge - Math.max(topDistance, 0)) / edge) * maxSpeed);
@@ -1189,14 +1203,16 @@ function startTimelineMarkerAutoScroll(drag) {
     }
 
     const beforeScrollLeft = drag.scroll.scrollLeft;
-    const beforeScrollY = window.scrollY;
+    const scrollBands = drag.scroll.classList.contains("timeline-band-scroll");
+    const beforeScrollY = scrollBands ? drag.scroll.scrollTop : window.scrollY;
     const maxScrollLeft = Math.max(drag.scroll.scrollWidth - drag.scroll.clientWidth, 0);
     drag.scroll.scrollLeft = Math.min(Math.max(beforeScrollLeft + horizontalSpeed, 0), maxScrollLeft);
     if (verticalSpeed !== 0) {
-      window.scrollBy(0, verticalSpeed);
+      if (scrollBands) drag.scroll.scrollTop += verticalSpeed;
+      else window.scrollBy(0, verticalSpeed);
     }
 
-    if (drag.scroll.scrollLeft === beforeScrollLeft && window.scrollY === beforeScrollY) {
+    if (drag.scroll.scrollLeft === beforeScrollLeft && (scrollBands ? drag.scroll.scrollTop : window.scrollY) === beforeScrollY) {
       stopTimelineMarkerAutoScroll(drag);
       return;
     }
@@ -1266,7 +1282,7 @@ function startTimelineMarkerDrag(event) {
 
   const drag = {
     handle,
-    handles: [...grid.querySelectorAll(".timeline-current-handle")],
+    handles: [...itemList.querySelectorAll(".timeline-current-handle")],
     line,
     scroll,
     pointerId: event.pointerId,
@@ -1592,16 +1608,8 @@ purchaseGraphButton?.addEventListener("click", () => {
   state.showPurchaseGraph = !state.showPurchaseGraph;
   purchaseGraphButton.setAttribute("aria-expanded", String(state.showPurchaseGraph));
   purchaseGraph?.setVisible(state.showPurchaseGraph);
-  const grid = itemList.querySelector(".timeline-grid");
-  if (grid) {
-    const rows = [...grid.querySelectorAll(".timeline-row")];
-    grid.querySelectorAll(".timeline-current-handle.interval").forEach((handle, index) => {
-      const row = rows[(index + 1) * 9 - 1];
-      if (row) handle.style.top = `${row.offsetTop + row.offsetHeight / 2}px`;
-    });
-    markerDayControls.sync();
-    markerDateTooltip.update();
-  }
+  graphViewport?.setVisible(state.showPurchaseGraph);
+  markerDateTooltip.update();
 });
 
 if (helpButton && helpDialog && helpCloseButton) {

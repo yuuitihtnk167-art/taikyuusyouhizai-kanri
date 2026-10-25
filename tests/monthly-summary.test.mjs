@@ -145,10 +145,16 @@ test("input skips holiday chains and can keep the closing date when disabled", (
   assert.notEqual(reference.position, unadjusted.position);
 });
 
-test("unknown holiday years show provisional input without changing calculations", () => {
+test("future holidays are calculated automatically and remain provisional", () => {
   assert.equal(monthlySummaryReference(month(2028, 10), monthly).holidaysKnown, false);
-  assert.match(summaryReferenceLabel(month(2028, 10), monthly), /（仮）/);
-  assert.match(summaryReferenceLabel(month(2028, 10), monthly, { details: true }), /祝日データ対象外/);
+  assert.doesNotMatch(summaryReferenceLabel(month(2028, 10), monthly), /仮/);
+  assert.doesNotMatch(summaryReferenceLabel(month(2028, 10), monthly, { details: true }), /仮/);
+  assert.match(summaryReferenceLabel(month(2028, 10), monthly, { details: true }), /現行ルールで計算/);
+  assert.equal(dateKey(monthlySummaryReference(month(2028, 4), { ...monthly, day: 7 }).date), "2028-05-02");
+  assert.equal(dateKey(monthlySummaryReference(month(2028, 8), { ...monthly, day: 23 }).date), "2028-09-21");
+  const unsupported = monthlySummaryReference(month(2100, 10), monthly);
+  assert.equal(unsupported.holidaysSupported, false);
+  assert.match(summaryReferenceLabel(month(2100, 10), monthly, { details: true }), /土日のみ/);
   assert.doesNotMatch(summaryReferenceLabel(month(2028, 10), { ...monthly, adjustToPreviousWeekday: false }), /仮/);
 });
 

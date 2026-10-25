@@ -1,4 +1,4 @@
-import { dateMonthPosition } from "./monthly-summary.js?v=134";
+import { dateMonthPosition } from "./monthly-summary.js?v=157";
 
 export function shiftTimelineDay(position, delta, minYear, maxYear) {
   const monthIndex = Math.floor(position);
@@ -63,6 +63,7 @@ export function createTimelineDayControls(container, move, tooltip) {
       }
       const y = handle.offsetTop + (handle.classList.contains("interval") ? 0 : handle.offsetHeight / 2);
       pair.forEach((button, index) => {
+        if (button.parentElement !== handle.parentElement) handle.parentElement.appendChild(button);
         button.style.left = `calc(${handle.style.left} ${index ? "+" : "-"} var(--day-step-offset))`;
         button.style.top = `${y}px`;
       });
