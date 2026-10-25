@@ -293,6 +293,17 @@ button {
   line-height: 1.6;
 }
 
+.holiday-update-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.holiday-update-section h3 { margin: 0; font-size: 1rem; }
+.holiday-update-section button { width: auto; justify-self: start; margin-top: 0; }
+.holiday-update-section a { overflow-wrap: anywhere; }
+
 .settings-toggle {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1263,6 +1274,37 @@ button {
   outline: 2px solid rgba(59, 163, 255, 0.58);
   outline-offset: -2px;
 }
+
+.timeline-graph-header-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.timeline-graph-header-scroll::-webkit-scrollbar { display: none; }
+
+.timeline-band-scroll {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.timeline-graph-header-grid.timeline-grid {
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.timeline-graph-header-grid.timeline-grid::before { bottom: 0; }
+.timeline-graph-header-grid .timeline-current-line { bottom: 0; }
+.timeline-graph-header-grid .timeline-current-line::after { display: none; }
+
+.timeline-band-grid.timeline-grid {
+  min-height: 0;
+  padding-top: 0;
+}
+
+.timeline-band-grid.timeline-grid::before { top: 0; }
+.timeline-band-grid .timeline-current-line { top: 0; }
+.timeline-band-grid .timeline-current-line::before { display: none; }
 
 @media (hover: hover) and (pointer: fine) {
   .timeline-scroll {

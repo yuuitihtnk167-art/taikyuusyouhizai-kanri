@@ -1,5 +1,5 @@
 import { getMonthlySummarySettings } from "./app-settings.js";
-import { HOLIDAY_FIRST_YEAR, HOLIDAY_LAST_YEAR, JAPANESE_HOLIDAYS } from "./japanese-holidays.js";
+import { japaneseHolidayStatus } from "./japanese-holiday-calendar.js?v=157";
 
 export function dateMonthPosition(date) {
   const days = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -32,15 +32,17 @@ function adjustedClosingDate(year, month, settings) {
   const date = periodStartDate(year, month + 1, settings.day);
   date.setDate(date.getDate() - 1);
   let holidaysKnown = true;
+  let holidaysSupported = true;
   if (settings.adjustToPreviousWeekday !== false) {
     while (true) {
-      holidaysKnown = holidaysKnown && date.getFullYear() >= HOLIDAY_FIRST_YEAR && date.getFullYear() <= HOLIDAY_LAST_YEAR;
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      if (date.getDay() !== 0 && date.getDay() !== 6 && !JAPANESE_HOLIDAYS.has(key)) break;
+      const holiday = japaneseHolidayStatus(date);
+      holidaysKnown = holidaysKnown && holiday.confirmed;
+      holidaysSupported = holidaysSupported && holiday.supported;
+      if (date.getDay() !== 0 && date.getDay() !== 6 && !holiday.isHoliday) break;
       date.setDate(date.getDate() - 1);
     }
   }
-  return { date, holidaysKnown };
+  return { date, holidaysKnown, holidaysSupported };
 }
 
 export function monthlySummaryReference(monthPosition, settings = getMonthlySummarySettings()) {
@@ -63,6 +65,7 @@ export function monthlySummaryReference(monthPosition, settings = getMonthlySumm
     startDate,
     inputDate: new Date(closing.date),
     holidaysKnown: closing.holidaysKnown && previousClosing.holidaysKnown,
+    holidaysSupported: closing.holidaysSupported && previousClosing.holidaysSupported,
   };
 }
 
@@ -80,10 +83,11 @@ export function summaryReferenceLabel(monthPosition, settings = getMonthlySummar
   const month = reference.selectedMonth - year * 12 + 1;
   if (!reference.date) return `${year}年${month}月`;
   const inputDate = reference.inputDate;
-  const provisional = reference.holidaysKnown ? "" : "（仮）";
-  const inputLabel = `${inputDate.getMonth() + 1}/${inputDate.getDate()}(${"日月火水木金土"[inputDate.getDay()]})${provisional}`;
+  const inputLabel = `${inputDate.getMonth() + 1}/${inputDate.getDate()}(${"日月火水木金土"[inputDate.getDay()]})`;
   const title = `${year}年${month}月分`;
   if (!details) return `${title}\n家計簿入力日：${inputLabel}`;
-  const warning = reference.holidaysKnown ? "" : "\n※祝日データ対象外：土日のみ調整（仮）";
+  const warning = reference.holidaysKnown ? "" : reference.holidaysSupported
+    ? "\n※将来の祝日は現行ルールで計算しています。"
+    : "\n※祝日データ対象外：土日のみ調整";
   return `${title}\n対象期間：${monthDayLabel(reference.startDate)}〜${monthDayLabel(reference.date)}\n締め日：${weekdayDateLabel(reference.date)}\n家計簿入力日：${inputLabel}${warning}`;
 }

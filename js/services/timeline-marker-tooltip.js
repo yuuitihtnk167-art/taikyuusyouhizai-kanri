@@ -4,7 +4,7 @@ export function timelineMarkerDateLabel(position) {
   const month = monthIndex - year * 12;
   const days = new Date(year, month + 1, 0).getDate();
   const day = Math.round((position - monthIndex) * days) + 1;
-  return `${month + 1}/${day}`;
+  return `${year}/${month + 1}/${day}`;
 }
 
 export function createTimelineMarkerTooltip(container, getPosition, isDragging) {
