@@ -1,3 +1,4 @@
+import { durableCostItem, durableCostSchedule, durableSaleSchedule, durableMonthlyCostAt } from "../js/services/durable-cost.js";
 // Run: node --test tests/monthly-summary.test.mjs
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
@@ -462,7 +463,7 @@ test("main purchase graph matches the summary with additional costs, hidden item
     ],
   };
   const context = createContext({
-    state, pcPurchaseIntervals, calculatePcSummaryAt, TIMELINE_MIN_YEAR: 2015, TIMELINE_MAX_YEAR: 2055,
+    state, durableCostItem, pcPurchaseIntervals, calculatePcSummaryAt, TIMELINE_MIN_YEAR: 2015, TIMELINE_MAX_YEAR: 2055,
     shouldExcludeUnderusedMonthlyCost: settingsModule.shouldExcludeUnderusedMonthlyCost,
     calculateAdditionalCostTotal: (item) => (item.additionalCosts || []).reduce((sum, cost) => sum + cost.amount, 0),
     itemSummaryMonthlyCost: () => 0,

@@ -1,7 +1,7 @@
 import { normalizePcSale, pcSaleSchedule, pcSaleItemWithRecord } from "../js/services/pc-sale.js?v=164";
 
 // Confirm/cancel only edit the form draft. The existing Update button saves it.
-export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange }) {
+export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, itemLabel = "パーツ" }) {
   const controls = form.querySelector("#pc-sale-controls");
   const result = form.querySelector("#pc-sale-result");
   const find = (name) => form.querySelector(`[data-sale="${name}"]`);
@@ -81,7 +81,7 @@ export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange }) {
     validationError() {
       if (editing) return "売却内容の「決定」または「キャンセル」を押してから更新してください。";
       if (record && !pcSaleSchedule({ ...getItem(), sale: record })) return "購入日・使用予定年数と売却内容を確認してください。";
-      if (record && (!getItem().endOfUseDate || getItem().endOfUseDate > record.date)) return "売却したパーツの使用終了日は、売却日以前にしてください。";
+      if (record && (!getItem().endOfUseDate || getItem().endOfUseDate > record.date)) return `売却した${itemLabel}の使用終了日は、売却日以前にしてください。`;
       return null;
     },
   };

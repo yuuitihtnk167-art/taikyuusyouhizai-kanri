@@ -5,7 +5,7 @@ import {
 import {
   createFirebaseLocalBackupData,
   firebaseErrorMessage,
-} from "./common.js";
+} from "./common.js?v=165";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
 import { initializeMonthlySummarySettings } from "./services/monthly-summary-settings.js?v=158";
