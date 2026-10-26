@@ -1,4 +1,7 @@
 import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=158";
+import { normalizePcSale, pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale } from "../js/services/pc-sale.js?v=164";
+import { createPcSaleForm } from "./sale-form.js?v=164";
+import { pcPurchaseIntervals } from "../js/services/pc-summary.js?v=164";
 import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=161";
 import { createTimelineGraphViewport } from "../js/services/timeline-graph-viewport.js?v=160";
 import { HOLIDAY_UPDATE_KEY } from "../js/services/holiday-update.js?v=157";
@@ -72,6 +75,8 @@ const elements = {
   itemList: document.getElementById("item-list"),
   calculationTotal: document.getElementById("calculation-total"),
   calculationMonthlyCost: document.getElementById("calculation-monthly-cost"),
+  calculationAdjustment: document.getElementById("calculation-adjustment"),
+  calculationAdjustmentNote: document.getElementById("calculation-adjustment-note"),
   id: document.getElementById("pc-id"),
   partName: document.getElementById("part-name"),
   modelNumber: document.getElementById("model-number"),
@@ -114,6 +119,7 @@ const state = {
 
 let purchaseGraph = null;
 let graphViewport = null;
+let saleForm = null;
 window.addEventListener("storage", (event) => {
   if (event.key === HOLIDAY_UPDATE_KEY || event.key === null) updateTimelineMarkerDate();
 });
@@ -224,7 +230,8 @@ function calculateMonthlyCost(item) {
   const purchasePrice = Number(item.purchasePrice ?? 0);
   const yearsOfUse = Number(item.yearsOfUse ?? 0);
   if (!Number.isFinite(purchasePrice) || !Number.isFinite(yearsOfUse) || yearsOfUse <= 0) return 0;
-  return purchasePrice / (yearsOfUse * 12);
+  const monthly = purchasePrice / (yearsOfUse * 12);
+  return item.monthlyCostRounding === "truncate-final" ? Math.trunc(monthly) : monthly;
 }
 
 
@@ -267,9 +274,15 @@ function showHiddenTimelineNoticeDialog() {
 }
 
 function monthlyCostAt(item, monthPosition = currentMonthIndex()) {
+  if (item.sale) {
+    const saleCost = pcSaleMonthlyCostAt(item, dateFromMonthPosition(monthPosition));
+    if (saleCost !== null) return saleCost;
+  }
   if (!parseDate(item.purchaseDate)) {
     return calculateMonthlyCost(item);
   }
+  const adjustedCost = pcCostMonthlyCostAt(item, dateFromMonthPosition(monthPosition));
+  if (adjustedCost !== null) return adjustedCost;
   if (isPastPlannedEnd(item, monthPosition)) {
     return 0;
   }
@@ -295,6 +308,10 @@ function updateTimelineMarkerDate() {
 }
 
 function activeEndMonth(item) {
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) return toMonthPosition(schedule.end);
+  }
   if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
     return itemPlannedEndMonth(item);
   }
@@ -307,7 +324,13 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
-  const plannedEnd = itemPlannedEndMonth(item);
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) return toMonthPosition(schedule.end);
+  }
+  const cost = item.monthlyCostRounding === "truncate-final" && pcCostSchedule(item);
+  const lastDay = cost && new Date(cost.end.getFullYear(), cost.end.getMonth(), cost.end.getDate() - 1);
+  const plannedEnd = cost ? toMonthPosition(lastDay) : itemPlannedEndMonth(item);
   if (!item.endOfUseDate) return plannedEnd;
   const actualEnd = itemActualEndMonth(item);
   return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
@@ -316,6 +339,12 @@ function summaryActiveEndMonth(item) {
 }
 
 function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) return monthPosition < toMonthPosition(schedule.sold)
+      ? isActiveInSummaryAtTimelineMarker(pcItemBeforeSale(item), monthPosition)
+      : monthPosition < toMonthPosition(schedule.end);
+  }
   return itemStartMonth(item) <= monthPosition && monthPosition <= summaryActiveEndMonth(item);
 }
 
@@ -324,6 +353,10 @@ function isPastPlannedEnd(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function isMonthlyCostExcluded(item) {
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) return currentMonthIndex() >= toMonthPosition(schedule.end);
+  }
   return isActualUseEnded(item) && itemPlannedEndMonth(item) <= currentMonthIndex();
 }
 
@@ -340,6 +373,7 @@ function isUnderusedEndedItem(item) {
 }
 
 function isMonthlyCostSummaryExcluded(item) {
+  if (item.sale && pcSaleSchedule(item)) return isMonthlyCostExcluded(item);
   if (isMonthlyCostExcluded(item)) {
     return true;
   }
@@ -379,6 +413,8 @@ function normalizePcPartItem(value) {
     purchasePrice: Number.isFinite(purchasePrice) ? purchasePrice : 0,
     yearsOfUse: Number(item.yearsOfUse ?? 5),
     endOfUseDate: String(item.endOfUseDate ?? ""),
+    sale: normalizePcSale(item.sale),
+    monthlyCostRounding: item.monthlyCostRounding === "truncate-final" ? "truncate-final" : null,
     memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),
@@ -411,6 +447,8 @@ function toFirestorePayload(item) {
     purchasePrice: normalized.purchasePrice,
     yearsOfUse: normalized.yearsOfUse,
     endOfUseDate: normalized.endOfUseDate,
+    sale: normalized.sale,
+    monthlyCostRounding: normalized.monthlyCostRounding,
     memo: normalized.memo,
     hideFromTimeline: normalized.hideFromTimeline,
     excludeFromSummary: normalized.excludeFromSummary,
@@ -517,6 +555,10 @@ function itemEndMonth(item) {
 }
 
 function itemUnusedPeriodEndMonth(item) {
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) return toMonthPosition(schedule.end);
+  }
   if (!item.endOfUseDate) return itemEndMonth(item);
   return itemPlannedEndMonth(item);
 }
@@ -811,9 +853,7 @@ function renderTimeline() {
   renderCurrentLine(grid, minYear, maxYear);
 
   purchaseGraph = mountPurchaseGraph(grid, {
-    intervals: summaryItems().filter((item) => !isSummaryExcluded(item)).map((item) => ({
-      start: itemStartMonth(item), end: summaryActiveEndMonth(item), amount: Number(item.purchasePrice || 0),
-    })),
+    intervals: pcPurchaseIntervals(summaryItems()),
     minYear, maxYear, labelWidth, yearWidth, compact: isCompact, visible: state.showPurchaseGraph,
   });
   purchaseGraph.update(timelineMarkerMonth(), calculateSummaryAt(timelineMarkerMonth()).purchaseTotal);
@@ -858,7 +898,7 @@ function renderTimeline() {
 
     band.append(
       createElement("span", "band-name", item.partName || "商品名未入力"),
-      createElement("span", "band-cost", formatMonthlyCost(calculateMonthlyCost(item)))
+      createElement("span", "band-cost", formatMonthlyCost(item.sale ? monthlyCostAt(item) : calculateMonthlyCost(item)))
     );
 
     if (isOverused) {
@@ -877,6 +917,13 @@ function renderTimeline() {
       postEndBand.dataset.id = item.id;
       postEndBand.setAttribute("aria-pressed", String(isSelected));
       postEndBand.setAttribute("aria-label", `${item.partName || "パーツ"}の使わなかった期間`);
+      if (item.sale) {
+        const schedule = pcSaleSchedule(item);
+        if (schedule) {
+          postEndBand.setAttribute("aria-label", `${item.partName || "パーツ"}の売却後月額 ${formatMonthlyCost(schedule.monthly)}`);
+          postEndBand.textContent = formatMonthlyCost(schedule.monthly);
+        }
+      }
       postEndBand.style.left = `${unusedPeriodLeft}px`;
       postEndBand.style.width = `${Math.max(unusedPeriodWidth, 2)}px`;
       row.appendChild(postEndBand);
@@ -967,7 +1014,8 @@ function specListItems() {
       !isSummaryExcluded(item) &&
       !item.hideFromTimeline &&
       purchaseDate !== null && purchaseDate <= today &&
-      (!item.endOfUseDate || (endOfUseDate !== null && endOfUseDate > today));
+      (!item.endOfUseDate || (endOfUseDate !== null && endOfUseDate > today)) &&
+      (!item.sale || parseDate(item.sale.date) > today);
   });
 }
 
@@ -1164,6 +1212,8 @@ function collectPcItem() {
     purchasePrice: parseCurrencyInputValue(elements.purchasePrice.value),
     yearsOfUse: Number(elements.yearsOfUse.value),
     endOfUseDate: elements.endOfUseDate.value,
+    sale: saleForm?.getSale() ?? null,
+    monthlyCostRounding: formCostItem().monthlyCostRounding,
     memo: elements.memo.value.trim(),
     hideFromTimeline: elements.hideFromTimeline.checked,
     excludeFromSummary: Boolean(existingItem?.excludeFromSummary),
@@ -1183,6 +1233,7 @@ function resetForm() {
   elements.submitButton.textContent = "登録する";
   elements.formError.textContent = "";
   state.isDirty = false;
+  saleForm?.setItem(null);
   updateCalculationResult();
 }
 
@@ -1207,21 +1258,43 @@ function fillForm(item) {
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
   elements.formError.textContent = "";
+  saleForm?.setItem(item);
   updateEndedUseStyle();
   updateCalculationResult();
+}
+
+function formCostItem() {
+  const existing = state.items.find((item) => item.id === state.editingId);
+  return {
+    purchaseDate: elements.purchaseDate.value,
+    purchasePrice: parseCurrencyInputValue(elements.purchasePrice.value),
+    yearsOfUse: Number(elements.yearsOfUse.value),
+    endOfUseDate: elements.endOfUseDate.value,
+    monthlyCostRounding: state.editingId ? existing?.monthlyCostRounding ?? null : "truncate-final",
+  };
 }
 
 function updateCalculationResult() {
   if (!elements.calculationMonthlyCost) return;
   const purchasePrice = parseCurrencyInputValue(elements.purchasePrice.value);
-  const monthlyCost = calculateMonthlyCost({
-    purchasePrice,
-    yearsOfUse: Number(elements.yearsOfUse.value),
-  });
+  const item = formCostItem();
+  const monthlyCost = calculateMonthlyCost(item);
+  const schedule = pcCostSchedule(item);
   if (elements.calculationTotal) {
     elements.calculationTotal.textContent = formatCurrency(purchasePrice);
   }
   elements.calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
+  if (elements.calculationAdjustment) {
+    elements.calculationAdjustment.textContent = schedule ? formatCurrency(schedule.adjustment) : "—";
+    const sold = saleForm?.getSale();
+    const saleSchedule = sold && pcSaleSchedule({ ...item, sale: sold });
+    elements.calculationAdjustmentNote.textContent = saleSchedule
+      ? saleSchedule.expired ? "売却前の最終月に調整済み" : "売却後の残額に引継ぎ（重複加算なし）"
+      : schedule
+      ? `${schedule.adjustment < 0 ? "最終月に差引" : "最終月に加算"}（最終月 ${formatMonthlyCost(schedule.finalMonthly)}）`
+      : "最終月に調整";
+  }
+  saleForm?.refresh();
 }
 
 async function refreshItems() {
@@ -1242,7 +1315,7 @@ function openItemDialog(item) {
   if (!item || !elements.itemDialog) return;
   elements.dialogItemName.textContent = item.partName || "商品名未入力";
   elements.dialogItemMeta.textContent =
-    `${pcNameLabels[item.pcName] || "メインPC"} / 型番: ${item.modelNumber || "未入力"} / ${formatMonthlyCost(calculateMonthlyCost(item))}`;
+    `${pcNameLabels[item.pcName] || "メインPC"} / 型番: ${item.modelNumber || "未入力"} / ${formatMonthlyCost(item.sale ? monthlyCostAt(item) : calculateMonthlyCost(item))}${item.sale ? " / 売却済み" : ""}`;
   elements.itemDialog.showModal();
 }
 
@@ -1642,6 +1715,11 @@ if (elements.form) {
       return;
     }
 
+    const saleError = saleForm?.validationError();
+    if (saleError) {
+      elements.formError.textContent = saleError;
+      return;
+    }
     const item = collectPcItem();
     const validation = validatePcItem(item);
     if (validation) {
@@ -1873,6 +1951,14 @@ window.addEventListener("resize", () => {
   state.resizeTimer = window.setTimeout(renderTimeline, 120);
 });
 
+if (elements.form) {
+  saleForm = createPcSaleForm({
+    form: elements.form,
+    getItem: formCostItem,
+    setEndOfUseDate: (value) => { elements.endOfUseDate.value = value; updateEndedUseStyle(); },
+    onChange: () => { state.isDirty = true; updateCalculationResult(); },
+  });
+}
 updateCalculationResult();
 updateEndedUseStyle();
 updateTimelineMarkerDate();

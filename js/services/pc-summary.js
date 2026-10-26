@@ -1,6 +1,7 @@
 import { getItems as getPcItems } from "../storage/pc-items/index.js";
-import { shouldExcludeUnderusedMonthlyCost } from "./app-settings.js";
-import { dateMonthPosition } from "./monthly-summary.js?v=158";
+import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./app-settings.js";
+import { dateMonthPosition, monthlySummaryReference } from "./monthly-summary.js?v=158";
+import { pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale } from "./pc-sale.js?v=164";
 
 function parseDate(value) {
   const text = String(value ?? "").trim();
@@ -20,6 +21,13 @@ function monthIndex(date) {
 }
 
 function plannedEndMonth(item, exactDate) {
+  if (item.monthlyCostRounding === "truncate-final") {
+    const schedule = pcCostSchedule(item);
+    if (schedule) {
+      const lastDay = new Date(schedule.end.getFullYear(), schedule.end.getMonth(), schedule.end.getDate() - 1);
+      return exactDate ? dateMonthPosition(lastDay) : schedule.finalPeriod;
+    }
+  }
   const start = parseDate(item.purchaseDate);
   const years = Math.max(Number(item.yearsOfUse) || 1, 1);
   if (!start) return null;
@@ -39,6 +47,18 @@ function monthlyCost(item) {
 
 function isActiveAtMonth(item, targetMonth, exactDate) {
   if (item.excludeFromSummary) return false;
+  if (item.sale) {
+    const schedule = pcSaleSchedule(item);
+    if (schedule) {
+      const sold = exactDate ? dateMonthPosition(schedule.sold) : schedule.firstPeriod;
+      const end = exactDate ? dateMonthPosition(schedule.end) : schedule.finalPeriod + 1;
+      return targetMonth < sold ? isActiveAtMonth(pcItemBeforeSale(item), targetMonth, exactDate) : targetMonth < end;
+    }
+  }
+  if (!exactDate && item.monthlyCostRounding === "truncate-final") {
+    const schedule = pcCostSchedule(item);
+    if (schedule) return schedule.firstPeriod <= targetMonth && targetMonth <= schedule.finalPeriod;
+  }
   const start = parseDate(item.purchaseDate);
   const plannedEnd = plannedEndMonth(item, exactDate);
   if (!start || plannedEnd === null) return false;
@@ -64,6 +84,17 @@ export async function loadPcSummaryItems(uid) {
 export function pcPurchaseIntervals(items) {
   return items.flatMap((item) => {
     if (item.excludeFromSummary) return [];
+    if (item.sale) {
+      const schedule = pcSaleSchedule(item);
+      if (schedule) {
+        const lastDay = new Date(schedule.end);
+        lastDay.setDate(lastDay.getDate() - 1);
+        const beforeSale = new Date(schedule.sold);
+        beforeSale.setDate(beforeSale.getDate() - 1);
+        const previous = pcPurchaseIntervals([pcItemBeforeSale(item)]).map((interval) => ({ ...interval, end: Math.min(interval.end, dateMonthPosition(beforeSale)) })).filter((interval) => interval.start <= interval.end);
+        return [...previous, { start: dateMonthPosition(schedule.sold), end: dateMonthPosition(lastDay), amount: Number(item.purchasePrice ?? item.price ?? 0) || 0 }];
+      }
+    }
     const purchase = parseDate(item.purchaseDate);
     const plannedEnd = plannedEndMonth(item, true);
     if (!purchase || plannedEnd === null) return [];
@@ -84,8 +115,19 @@ export function calculatePcSummaryAt(items, monthPosition, { exactDate = false }
   if (!Number.isFinite(targetMonth)) return { monthlyCost: 0, purchaseTotal: 0 };
 
   return items.reduce((summary, item) => {
+    if (!exactDate && item.sale) {
+      const reference = monthlySummaryReference(targetMonth, { ...getMonthlySummarySettings(), mode: "monthly" });
+      const contribution = calculatePcSummaryAt([item], reference.position, { exactDate: true });
+      summary.monthlyCost += contribution.monthlyCost;
+      summary.purchaseTotal += contribution.purchaseTotal;
+      return summary;
+    }
     if (!isActiveAtMonth(item, targetMonth, exactDate)) return summary;
-    summary.monthlyCost += Math.round(monthlyCost(item));
+    const saleCost = item.sale ? pcSaleMonthlyCostAt(item, dateFromMonthPosition(targetMonth)) : null;
+    const schedule = !exactDate && pcCostSchedule(item);
+    const normalCost = exactDate ? pcCostMonthlyCostAt(item, dateFromMonthPosition(targetMonth))
+      : schedule ? (targetMonth === schedule.finalPeriod ? schedule.finalMonthly : schedule.monthly) : null;
+    summary.monthlyCost += saleCost ?? normalCost ?? Math.round(monthlyCost(item));
     summary.purchaseTotal += Number(item.purchasePrice ?? item.price ?? 0) || 0;
     return summary;
   }, { monthlyCost: 0, purchaseTotal: 0 });
