@@ -27,7 +27,7 @@ import {
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=158";
 import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
-import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=158";
+import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=164";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 

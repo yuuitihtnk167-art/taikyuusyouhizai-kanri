@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
+import { pcCostMonthlyCostAt, dateFromMonthPosition } from "../js/services/pc-sale.js";
 import { nextDayPosition, purchaseTotalSeries } from "../js/services/timeline-purchase-graph.js";
 
 const position = (year, month, day) => year * 12 + month - 1 + (day - 1) / new Date(year, month, 0).getDate();
@@ -44,7 +45,7 @@ test("the plotted PC total agrees with the actual summary on every calendar day,
     { pcName: "sub", purchaseDate: "2025-02-01", purchasePrice: 60000, yearsOfUse: 3 },
   ] };
   let excludeUnderused = false;
-  const context = createContext({ state, TIMELINE_MIN_YEAR: 2015, shouldExcludeUnderusedMonthlyCost: () => excludeUnderused, currentMonthIndex: () => position(2026, 10, 25) });
+  const context = createContext({ state, pcCostMonthlyCostAt, dateFromMonthPosition, TIMELINE_MIN_YEAR: 2015, shouldExcludeUnderusedMonthlyCost: () => excludeUnderused, currentMonthIndex: () => position(2026, 10, 25) });
   runInContext(functions, context);
   for (const flag of [false, true]) {
     excludeUnderused = flag;

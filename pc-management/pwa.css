@@ -13,3 +13,30 @@
 .pc-management-title-actions .ghost-button[hidden] {
   display: none;
 }
+
+.pc-sale-controls, .pc-sale-result {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.pc-sale-actions { display: flex; gap: 8px; }
+.pc-sale-actions button { flex: 1; min-width: 0; }
+.pc-sale-actions [hidden], #pc-sale-controls[hidden], #pc-sale-result[hidden] { display: none; }
+.pc-sale-remove { color: var(--danger); }
+.pc-sale-entry { margin-top: 12px; }
+.pc-sale-note { margin: 8px 0; color: var(--muted); font-size: .86rem; }
+.pc-sale-formula { white-space: pre-line; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.pc-sale-result dl { margin: 0; }
+.pc-sale-result dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 6px 0; }
+.pc-sale-result dt { color: var(--muted); }
+.pc-sale-result dd { margin: 0 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pc-cost-result { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pc-cost-result small { color: var(--muted); overflow-wrap: anywhere; }
+.pc-sale-result dl > .pc-sale-cost-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pc-sale-cost-pair > div { display: grid; gap: 4px; }
+.pc-sale-cost-pair dd { margin: 0; }
+@media (max-width: 640px) {
+  .pc-cost-result { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pc-cost-result > div:first-child { grid-column: 1 / -1; }
+}

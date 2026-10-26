@@ -4,6 +4,7 @@ import { registerHooks } from "node:module";
 import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { createContext, runInContext } from "node:vm";
+import { pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale } from "../js/services/pc-sale.js";
 
 // Only storage is stubbed; the date and PC cost calculations use the real modules.
 const pcStorageUrl = new URL("../js/storage/pc-items/index.js", import.meta.url).href;
@@ -28,6 +29,90 @@ const { purchaseTotalSeries } = await import("../js/services/timeline-purchase-g
 const monthly = { mode: "monthly", day: 15, adjustToPreviousWeekday: true };
 const month = (year, number) => year * 12 + number - 1;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+test("480 real closing-date ledgers reconcile purchase and sale costs across period settings", () => {
+  let cases = 0;
+  try {
+    for (const settings of [
+      { mode: "monthly", day: 15, adjustToPreviousWeekday: true },
+      { mode: "monthly", day: 1, adjustToPreviousWeekday: false },
+      { mode: "monthly", day: 31, adjustToPreviousWeekday: true },
+    ]) {
+      values.clear();
+      values.set("monthlyApplianceBook.monthlySummarySettings", JSON.stringify(settings));
+      for (const purchaseDate of ["2022-10-26", "2024-08-13", "2024-01-31", "2024-02-29"]) {
+        for (const yearsOfUse of [2, 10]) for (const monthlyCostRounding of [null, "truncate-final"]) {
+          const sales = [null, ...["2026-10-14", "2026-10-15", "2026-10-26"].flatMap(date => [0, 30000, 400001].map(amount => ({ date, amount, months: 24 })))];
+          for (const sale of sales) {
+            const item = { purchaseDate, yearsOfUse, monthlyCostRounding, purchasePrice: 100000, sale, endOfUseDate: sale?.date ?? "" };
+            const end = (sale ? pcSaleSchedule(item) : pcCostSchedule(item)).end;
+            const start = Number(purchaseDate.slice(0, 4)) * 12 - 2;
+            const last = end.getFullYear() * 12 + end.getMonth() + 2;
+            let total = 0, periodTotal = 0;
+            // Exercise the real dashboard at every accounting closing date, not anniversaries.
+            for (let month = start; month <= last; month++) {
+              const reference = monthlySummaryReference(month, settings);
+              total += calculatePcSummaryAt([item], reference.position, { exactDate: true }).monthlyCost;
+              if (sale || monthlyCostRounding) periodTotal += calculatePcSummaryAt([item], month).monthlyCost;
+            }
+            assert.equal(total, item.purchasePrice - (sale?.amount ?? 0), JSON.stringify({ settings, purchaseDate, yearsOfUse, monthlyCostRounding, sale }));
+            if (sale || monthlyCostRounding) assert.equal(periodTotal, total, "month-level and exact closing-date totals must agree");
+            cases++;
+          }
+        }
+      }
+    }
+    assert.equal(cases, 480);
+  } finally { values.clear(); }
+});
+
+test("sale balances reflect actual prior charges when the underused-parts setting excludes them", () => {
+  try {
+    for (const exclude of [false, true]) for (const monthlyCostRounding of [null, "truncate-final"]) {
+      values.clear();
+      values.set("monthlyApplianceBook.excludeUnderusedMonthlyCost", String(exclude));
+      for (const originalEnd of ["2026-09-01", "2026-12-01"]) for (const sold of ["2026-10-14", "2026-10-15"]) {
+        const item = { purchaseDate: "2022-10-26", yearsOfUse: 10, purchasePrice: 100050, monthlyCostRounding, endOfUseDate: originalEnd < sold ? originalEnd : sold, sale: { date: sold, amount: 30000, previousEndOfUseDate: originalEnd } };
+        const schedule = pcSaleSchedule(item);
+        let total = 0;
+        for (let month = 2022 * 12; month < schedule.end.getFullYear() * 12 + 12; month++) {
+          total += calculatePcSummaryAt([item], monthlySummaryReference(month, monthly).position, { exactDate: true }).monthlyCost;
+        }
+        assert.equal(total, 70050, JSON.stringify({ exclude, monthlyCostRounding, originalEnd, sold }));
+      }
+    }
+  } finally { values.clear(); }
+});
+
+test("PC sale costs match both dashboards and purchase graphs, including expiry gaps and negative totals", () => {
+  const source = readFileSync(new URL("../pc-management/app.js", import.meta.url), "utf8");
+  const names = ["parseDate", "toMonthIndex", "daysInMonth", "toMonthPosition", "addYearsClamped", "itemStartMonth", "itemPlannedEndMonth", "itemActualEndMonth", "summaryActiveEndMonth", "isActiveInSummaryAtTimelineMarker", "isSummaryExcluded", "summaryItems", "calculateSummaryAt", "summaryMonthlyCost", "monthlyCostAt", "isPastPlannedEnd", "calculateMonthlyCost", "timelineMarkerMonth"];
+  const functions = names.map(name => { const start = source.indexOf(`function ${name}(`); return source.slice(start, source.indexOf("\n}", start) + 2); }).join("\n");
+  for (const pcName of ["main", "sub"]) {
+    for (const amount of [30000, 400001]) for (const monthlyCostRounding of [null, "truncate-final"]) {
+      const item = { id: "sold", pcName, monthlyCostRounding, purchaseDate: "2022-10-26", purchasePrice: 120000, yearsOfUse: 10, endOfUseDate: "2026-10-26", sale: { date: "2026-10-26", amount, previousEndOfUseDate: "" } };
+      const state = { items: [item], selectedPcNames: new Set([pcName]) };
+      const context = createContext({ state, pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale, snapToDayPosition, shouldExcludeUnderusedMonthlyCost: () => true, currentMonthIndex: () => 2026 * 12 + 9, TIMELINE_MIN_YEAR: 2015 });
+      runInContext(functions, context);
+      for (const [key, expected] of [["2026-10-25", 1000], ["2026-10-26", amount === 30000 ? 583 : -4555], ["2032-09-26", amount === 30000 ? 607 : -4596], ["2032-10-26", 0]]) {
+        const position = dateMonthPosition(new Date(`${key}T00:00:00`));
+        const linked = calculatePcSummaryAt([item], position, { exactDate: true });
+        context.target = position;
+        assert.equal(linked.monthlyCost, expected, `${pcName} ${key}`);
+        assert.equal(runInContext("calculateSummaryAt(target).monthlyCost", context), expected);
+        const graph = pcPurchaseIntervals([item]).filter(interval => interval.start <= position && position <= interval.end).reduce((total, interval) => total + interval.amount, 0);
+        assert.equal(linked.purchaseTotal, graph);
+      }
+      item.sale.date = "2034-01-15"; item.endOfUseDate = item.sale.date; item.sale.months = 12;
+      const gap = dateMonthPosition(new Date(2033, 0, 1)); context.target = gap;
+      assert.equal(calculatePcSummaryAt([item], gap, { exactDate: true }).monthlyCost, 0);
+      assert.equal(runInContext("calculateSummaryAt(target).monthlyCost", context), 0);
+      assert.equal(pcPurchaseIntervals([item]).some(interval => interval.start <= gap && gap <= interval.end), false);
+      item.excludeFromSummary = true;
+      assert.equal(calculatePcSummaryAt([item], dateMonthPosition(new Date(2034, 0, 15)), { exactDate: true }).monthlyCost, 0);
+    }
+  }
+});
 
 test("accounting labels keep the input day and switch on the next day in either drag direction", () => {
   values.clear();
@@ -269,7 +354,7 @@ test("PC selected-day totals differ from the accounting input date without movin
   };
   const elements = { summaryCount: {}, summaryTotal: {}, summaryMonthly: {} };
   const context = createContext({
-    state, elements, snapToDayPosition, purchaseGraph: null,
+    state, elements, snapToDayPosition, purchaseGraph: null, pcCostMonthlyCostAt, dateFromMonthPosition,
     shouldExcludeUnderusedMonthlyCost: () => false,
     currentMonthIndex: () => today,
     updateTimelineMarkerDate: () => {}, formatCurrency: String, formatMonthlyCost: String,
