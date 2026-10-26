@@ -11,10 +11,13 @@ import {
   formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
-} from "./common.js";
+} from "./common.js?v=165";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
-import { loadItem, saveItem } from "./storage/durable-items/service.js";
+import { loadItem, saveItem } from "./storage/durable-items/service.js?v=165";
+
+import { createPcSaleForm } from "../pc-management/sale-form.js?v=165";
+import { pcCostSchedule, pcSaleSchedule } from "./services/pc-sale.js?v=164";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 const FROM_HIDDEN = new URLSearchParams(window.location.search).get("from") === "hidden";
@@ -116,6 +119,7 @@ const state = {
   assetReferenceItemCode: "",
   excludeFromSummary: false,
   pcManagementLinked: false,
+  monthlyCostRounding: null,
   isDirty: false,
   isBusy: false,
 };
@@ -165,14 +169,39 @@ function calculateAdditionalCostInputTotal() {
   }, 0);
 }
 
-function updateCalculationResult() {
-  const purchasePrice = parseCurrencyInputValue(purchasePriceInput.value);
-  const yearsOfUse = Number(yearsOfUseInput.value);
-  const total = purchasePrice + calculateAdditionalCostInputTotal();
-  const monthlyCost = Number.isFinite(yearsOfUse) && yearsOfUse > 0 ? total / (yearsOfUse * 12) : 0;
+function formCostItem() {
+  return {
+    purchaseDate: purchaseDateInput.value,
+    purchasePrice: parseCurrencyInputValue(purchasePriceInput.value) + calculateAdditionalCostInputTotal(),
+    yearsOfUse: Number(yearsOfUseInput.value),
+    endOfUseDate: endOfUseDateInput.value,
+    monthlyCostRounding: state.editingId ? state.monthlyCostRounding : "truncate-final",
+  };
+}
 
-  calculationTotal.textContent = formatCurrency(total);
-  calculationMonthlyCost.textContent = formatMonthlyCost(monthlyCost);
+const saleForm = createPcSaleForm({
+  form,
+  itemLabel: "商品",
+  getItem: formCostItem,
+  setEndOfUseDate: value => { endOfUseDateInput.value = value; updateEndedUseStyle(); },
+  onChange: () => { state.isDirty = true; updateCalculationResult(); },
+});
+
+function updateCalculationResult() {
+  const item = formCostItem();
+  const schedule = pcCostSchedule(item);
+  const rawMonthly = item.yearsOfUse > 0 ? item.purchasePrice / (item.yearsOfUse * 12) : 0;
+  calculationTotal.textContent = formatCurrency(item.purchasePrice);
+  calculationMonthlyCost.textContent = formatMonthlyCost(schedule?.monthly ?? rawMonthly);
+  const adjustment = document.getElementById("calculation-adjustment");
+  adjustment.parentElement.hidden = state.pcManagementLinked;
+  adjustment.textContent = schedule ? formatCurrency(schedule.adjustment) : "—";
+  const sale = saleForm.getSale();
+  const sold = sale && pcSaleSchedule({ ...item, sale });
+  document.getElementById("calculation-adjustment-note").textContent = sold
+    ? sold.expired ? "売却前の最終月に調整済み" : "売却後の残額に引継ぎ（重複加算なし）"
+    : schedule ? `${schedule.adjustment < 0 ? "最終月に差引" : "最終月に加算"}（最終月 ${formatMonthlyCost(schedule.finalMonthly)}）` : "最終月に調整";
+  saleForm.refresh();
 }
 
 function createAdditionalCostRow(cost = {}) {
@@ -285,6 +314,8 @@ function fillForm(item) {
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   state.excludeFromSummary = Boolean(item.excludeFromSummary);
   state.pcManagementLinked = Boolean(item.pcManagementLinked);
+  state.monthlyCostRounding = item.monthlyCostRounding ?? null;
+  saleForm.setItem(state.pcManagementLinked ? null : item);
   updatePcReflectButton();
   updateEndedUseStyle();
   renderAdditionalCosts(item.additionalCosts);
@@ -343,6 +374,12 @@ form.addEventListener("submit", async (event) => {
   const usePcManagement = event.submitter === pcReflectButton;
   const useFormData = event.submitter === useFormDataButton;
 
+  const saleError = saleForm.validationError();
+  if (saleError) { formError.textContent = saleError; return; }
+  if (usePcManagement && saleForm.getSale()) {
+    formError.textContent = "PC管理を反映する前に、売却記録を削除して更新してください。";
+    return;
+  }
   const item = {
     id: idInput.value || createId(),
     isUpdate: Boolean(state.editingId),
@@ -355,6 +392,8 @@ form.addEventListener("submit", async (event) => {
     purchasePrice: Number(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
+    sale: saleForm.getSale(),
+    monthlyCostRounding: formCostItem().monthlyCostRounding,
     memo: memoInput.value.trim(),
     hideFromTimeline: hideFromTimelineInput.checked,
     excludeFromSummary: state.excludeFromSummary,

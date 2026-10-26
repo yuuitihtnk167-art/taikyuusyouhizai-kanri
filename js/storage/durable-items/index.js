@@ -1,5 +1,5 @@
 import * as local from "./local.js";
-import * as firestore from "./firestore.js";
+import * as firestore from "./firestore.js?v=165";
 import { isLocalMode } from "../../platform/local-db.js";
 
 function activeStorage() {

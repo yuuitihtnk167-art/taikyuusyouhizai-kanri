@@ -1,12 +1,13 @@
+import { normalizePcSale } from "../../services/pc-sale.js?v=164";
 import {
   CATEGORY_OPTIONS,
   DEFAULT_CATEGORY,
   createId,
   isPcManagementItem,
   normalizeAdditionalCosts,
-} from "../../common.js";
+} from "../../common.js?v=165";
 import { isLocalMode } from "../../platform/local-db.js";
-import * as storage from "./index.js";
+import * as storage from "./index.js?v=165";
 
 const LEGACY_CATEGORY_MAP = {
   home_appliance: "living_appliance",
@@ -38,6 +39,8 @@ function normalizeStoredItem(item) {
     purchasePrice: Number(item.purchasePrice ?? 0),
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
+    sale: normalizePcSale(item.sale),
+    monthlyCostRounding: item.monthlyCostRounding === "truncate-final" ? "truncate-final" : null,
     memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),

@@ -1,3 +1,5 @@
+import { durableCostItem, durableCostSchedule, durableSaleSchedule, durableMonthlyCostAt } from "./services/durable-cost.js?v=165";
+import { dateFromMonthPosition, pcItemBeforeSale } from "./services/pc-sale.js?v=164";
 import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=158";
 import { mountPurchaseGraph } from "./services/timeline-purchase-graph.js?v=161";
 import { createTimelineGraphViewport } from "./services/timeline-graph-viewport.js?v=160";
@@ -16,7 +18,7 @@ import {
   getCategoryLabel,
   isPcManagementItem,
   firebaseErrorMessage,
-} from "./common.js";
+} from "./common.js?v=165";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
 import {
@@ -26,7 +28,7 @@ import {
 } from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=158";
-import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js";
+import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js?v=165";
 import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=164";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
@@ -202,6 +204,8 @@ function itemEndMonth(item) {
 }
 
 function itemUnusedPeriodEndMonth(item) {
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) return toMonthPosition(sale.end);
   if (!item.endOfUseDate) return itemEndMonth(item);
   return itemPlannedEndMonth(item);
 }
@@ -295,20 +299,25 @@ function isTimelineMarkerAtCurrentMonth() {
 function updatePcLinkedCostDisplays() {
   itemList.querySelectorAll(".pc-linked-current-cost").forEach((element) => {
     element.textContent = `${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`;
+    element.hidden = state.pcCurrentMonthlyCost < 0;
   });
   itemList.querySelectorAll(".pc-linked-selected-cost").forEach((element) => {
     element.textContent = `選択日 ${formatCurrency(state.pcMonthlyCost)} /\u6708`;
-    element.hidden = isTimelineMarkerAtCurrentMonth();
+    element.hidden = state.pcMonthlyCost < 0 || isTimelineMarkerAtCurrentMonth();
   });
 }
 
 function timelineMonthlyCost(item) {
   if (isPcManagementLinkedItem(item)) return state.pcMonthlyCost;
+  const adjusted = item.sale ? durableMonthlyCostAt(item, new Date()) : durableCostSchedule(item)?.monthly;
+  if (adjusted != null) return adjusted;
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
 
 function itemSummaryMonthlyCost(item, monthPosition = timelineMarkerMonth()) {
   if (isPcManagementLinkedItem(item)) return state.pcMonthlyCost;
+  const adjusted = durableMonthlyCostAt(item, dateFromMonthPosition(monthPosition));
+  if (adjusted !== null) return adjusted;
   return itemPlannedEndMonth(item) < monthPosition ? 0 : timelineMonthlyCost(item);
 }
 
@@ -335,6 +344,8 @@ function updateTimelineMarkerDate() {
 }
 
 function activeEndMonth(item) {
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) return toMonthPosition(sale.end);
   if (isUnderusedEndedItem(item) && !shouldExcludeUnderusedMonthlyCost()) {
     return itemPlannedEndMonth(item);
   }
@@ -347,7 +358,11 @@ function isActiveAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
 }
 
 function summaryActiveEndMonth(item) {
-  const plannedEnd = itemPlannedEndMonth(item);
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) return toMonthPosition(sale.end);
+  const cost = !isPcManagementLinkedItem(item) && item.monthlyCostRounding === "truncate-final" && durableCostSchedule(item);
+  const lastDay = cost && new Date(cost.end.getFullYear(), cost.end.getMonth(), cost.end.getDate() - 1);
+  const plannedEnd = cost ? toMonthPosition(lastDay) : itemPlannedEndMonth(item);
   if (!item.endOfUseDate) return plannedEnd;
   const actualEnd = itemActualEndMonth(item);
   return actualEnd < plannedEnd && !shouldExcludeUnderusedMonthlyCost()
@@ -356,10 +371,16 @@ function summaryActiveEndMonth(item) {
 }
 
 function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) return monthPosition < toMonthPosition(sale.sold)
+    ? isActiveInSummaryAtTimelineMarker(pcItemBeforeSale(item), monthPosition)
+    : monthPosition < toMonthPosition(sale.end);
   return itemStartMonth(item) <= monthPosition && monthPosition <= summaryActiveEndMonth(item);
 }
 
 function isMonthlyCostExcluded(item) {
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) return currentMonthIndex() >= toMonthPosition(sale.end);
   return isActualUseEnded(item) && itemPlannedEndMonth(item) <= currentMonthIndex();
 }
 
@@ -376,6 +397,7 @@ function isUnderusedEndedItem(item) {
 }
 
 function isMonthlyCostSummaryExcluded(item) {
+  if (item.sale && durableSaleSchedule(item)) return isMonthlyCostExcluded(item);
   if (isMonthlyCostExcluded(item)) {
     return true;
   }
@@ -449,7 +471,7 @@ function purchaseGraphIntervals() {
         start: Math.max(start, part.start), end: Math.min(end, part.end), amount: part.amount,
       }));
     }
-    return [{ start, end, amount: totalPurchaseCost(item) }];
+    return pcPurchaseIntervals([durableCostItem(item)]);
   });
 }
 
@@ -916,6 +938,7 @@ function renderTimeline(items) {
 
     const purchaseText = createElement("span", "band-name", item.name || "商品名未入力");
     const costText = createElement("span", "band-cost", `${formatCurrency(timelineMonthlyCost(item))} /月`);
+    costText.hidden = timelineMonthlyCost(item) < 0;
     band.append(purchaseText, costText);
 
     if (isLinkedToPcManagement) {
@@ -925,12 +948,13 @@ function renderTimeline(items) {
         "pc-linked-selected-cost",
         `選択日 ${formatCurrency(state.pcMonthlyCost)} /\u6708`
       );
-      selectedCost.hidden = isTimelineMarkerAtCurrentMonth();
+      selectedCost.hidden = state.pcMonthlyCost < 0 || isTimelineMarkerAtCurrentMonth();
       linkedLabel.append(
         createElement("span", "pc-linked-reflection", "PC\u7ba1\u7406\u3092\u53cd\u6620"),
         createElement("span", "pc-linked-current-cost", `${formatCurrency(state.pcCurrentMonthlyCost)} /\u6708`),
         selectedCost
       );
+      linkedLabel.querySelector(".pc-linked-current-cost").hidden = state.pcCurrentMonthlyCost < 0;
       row.appendChild(linkedLabel);
     }
 
@@ -947,6 +971,11 @@ function renderTimeline(items) {
       postEndBand.dataset.id = item.id;
       postEndBand.setAttribute("aria-pressed", String(isSelected));
       postEndBand.setAttribute("aria-label", `${item.name}の使えなかった期間`);
+      const sale = item.sale && durableSaleSchedule(item);
+      if (sale) {
+        postEndBand.setAttribute("aria-label", `${item.name}の売却後の配分期間`);
+        if (sale.monthly >= 0) postEndBand.textContent = `${formatCurrency(sale.monthly)} /月`;
+      }
       postEndBand.style.left = `${unusedPeriodLeft}px`;
       postEndBand.style.width = `${Math.max(unusedPeriodWidth, 2)}px`;
       row.appendChild(postEndBand);

@@ -1,3 +1,4 @@
+import { normalizePcSale } from "./services/pc-sale.js?v=164";
 import {
   collection,
   getDocs,
@@ -530,6 +531,8 @@ function normalizeStoredItem(item) {
     purchasePrice: Number(item.purchasePrice ?? 0),
     yearsOfUse: Number(item.yearsOfUse ?? 0),
     endOfUseDate: item.endOfUseDate ?? "",
+    sale: normalizePcSale(item.sale),
+    monthlyCostRounding: item.monthlyCostRounding === "truncate-final" ? "truncate-final" : null,
     memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),
@@ -604,6 +607,8 @@ export async function saveItem(uid, item) {
       purchasePrice: item.purchasePrice,
       yearsOfUse: item.yearsOfUse,
       endOfUseDate: item.endOfUseDate,
+      sale: normalizePcSale(item.sale),
+      monthlyCostRounding: item.monthlyCostRounding ?? null,
       memo: String(item.memo ?? ""),
       hideFromTimeline: Boolean(item.hideFromTimeline),
       excludeFromSummary: Boolean(item.excludeFromSummary),
@@ -625,6 +630,8 @@ export async function saveItem(uid, item) {
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
+    sale: normalizePcSale(item.sale),
+    monthlyCostRounding: item.monthlyCostRounding ?? null,
     memo: String(item.memo ?? ""),
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),

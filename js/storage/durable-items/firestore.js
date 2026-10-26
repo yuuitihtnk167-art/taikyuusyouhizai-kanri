@@ -53,6 +53,8 @@ export async function saveItem(uid, item, options = {}) {
     purchasePrice: item.purchasePrice,
     yearsOfUse: item.yearsOfUse,
     endOfUseDate: item.endOfUseDate,
+    sale: item.sale ?? null,
+    monthlyCostRounding: item.monthlyCostRounding ?? null,
     memo: item.memo,
     hideFromTimeline: Boolean(item.hideFromTimeline),
     excludeFromSummary: Boolean(item.excludeFromSummary),

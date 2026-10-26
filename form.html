@@ -9,6 +9,7 @@
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="stylesheet" href="style.css?v=130" />
+    <link rel="stylesheet" href="pc-management/pwa.css?v=164" />
   </head>
   <body>
     <main class="app">
@@ -48,7 +49,32 @@
             <div id="additional-cost-list" class="additional-cost-list"></div>
           </section>
 
-          <section class="calculation-result" aria-label="計算結果">
+          <section id="pc-sale-controls" class="pc-sale-controls" aria-label="売却の操作" hidden>
+            <div class="pc-sale-actions">
+              <button type="button" class="ghost-button" data-sale="open" aria-expanded="false">売却</button>
+              <button type="button" class="ghost-button pc-sale-remove" data-sale="remove" hidden>売却記録を削除</button>
+            </div>
+            <div class="pc-sale-entry" data-sale="entry" hidden>
+              <label for="pc-sale-date">売却日</label>
+              <input id="pc-sale-date" data-sale="date" type="date" />
+              <label for="pc-sale-price">売却価格・手取り（円）</label>
+              <input id="pc-sale-price" data-sale="amount" type="number" min="0" step="1" inputmode="numeric" />
+              <p class="pc-sale-note">手数料・送料を引いて受け取った金額を入力してください。</p>
+              <div data-sale="months-field" hidden>
+                <label for="pc-sale-months">予定期間終了後の分割月数</label>
+                <input id="pc-sale-months" data-sale="months" type="number" min="1" max="1200" step="1" value="12" />
+              </div>
+              <p data-sale="error" class="form-error" role="alert"></p>
+              <div class="pc-sale-actions">
+                <button type="button" class="ghost-button" data-sale="cancel">キャンセル</button>
+                <button type="button" class="primary-button" data-sale="confirm" disabled>決定</button>
+              </div>
+            </div>
+            <p class="pc-sale-note">売却内容の決定・変更・削除は、下の「更新する」で保存されます。</p>
+          </section>
+
+          <p class="pc-sale-note">月額コストは購入価格と追加費用の合計から計算します。</p>
+          <section class="calculation-result pc-cost-result" aria-label="計算結果">
             <div>
               <span>合計</span>
               <strong id="calculation-total">¥0</strong>
@@ -56,6 +82,27 @@
             <div>
               <span>月額コスト</span>
               <strong id="calculation-monthly-cost">¥0 /月</strong>
+            </div>
+            <div>
+              <span>調整分</span>
+              <strong id="calculation-adjustment">—</strong>
+              <small id="calculation-adjustment-note">最終月に加算</small>
+            </div>
+          </section>
+
+          <section id="pc-sale-result" class="pc-sale-result" aria-label="売却後の計算結果" aria-live="polite" hidden>
+            <p data-sale="formula" class="pc-sale-formula" hidden></p>
+            <div data-sale="summary" hidden>
+              <dl>
+                <div><dt>売却価格（手取り）</dt><dd data-sale="sale-price"></dd></div>
+                <div><dt data-sale="balance-label">売却後の残金</dt><dd data-sale="balance"></dd></div>
+                <div class="pc-sale-cost-pair">
+                  <div><dt>売却後の月額コスト</dt><dd data-sale="after"></dd></div>
+                  <div><dt>調整分</dt><dd data-sale="adjustment"></dd></div>
+                </div>
+                <div><dt>適用期間</dt><dd data-sale="period"></dd></div>
+              </dl>
+              <p data-sale="rounding" class="pc-sale-note"></p>
             </div>
           </section>
 
@@ -75,6 +122,6 @@
         </form>
       </section>
     </main>
-    <script type="module" src="js/form.js"></script>
+    <script type="module" src="js/form.js?v=165"></script>
   </body>
 </html>

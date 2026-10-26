@@ -1,6 +1,6 @@
 import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=158";
 import { normalizePcSale, pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale } from "../js/services/pc-sale.js?v=164";
-import { createPcSaleForm } from "./sale-form.js?v=164";
+import { createPcSaleForm } from "./sale-form.js?v=165";
 import { pcPurchaseIntervals } from "../js/services/pc-summary.js?v=164";
 import { mountPurchaseGraph } from "../js/services/timeline-purchase-graph.js?v=161";
 import { createTimelineGraphViewport } from "../js/services/timeline-graph-viewport.js?v=160";
@@ -898,7 +898,7 @@ function renderTimeline() {
 
     band.append(
       createElement("span", "band-name", item.partName || "商品名未入力"),
-      createElement("span", "band-cost", formatMonthlyCost(item.sale ? monthlyCostAt(item) : calculateMonthlyCost(item)))
+      createElement("span", "band-cost", (item.sale ? monthlyCostAt(item) : calculateMonthlyCost(item)) < 0 ? "" : formatMonthlyCost(item.sale ? monthlyCostAt(item) : calculateMonthlyCost(item)))
     );
 
     if (isOverused) {
@@ -920,8 +920,8 @@ function renderTimeline() {
       if (item.sale) {
         const schedule = pcSaleSchedule(item);
         if (schedule) {
-          postEndBand.setAttribute("aria-label", `${item.partName || "パーツ"}の売却後月額 ${formatMonthlyCost(schedule.monthly)}`);
-          postEndBand.textContent = formatMonthlyCost(schedule.monthly);
+          postEndBand.setAttribute("aria-label", `${item.partName || "パーツ"}の売却後の配分期間`);
+          postEndBand.textContent = schedule.monthly < 0 ? "" : formatMonthlyCost(schedule.monthly);
         }
       }
       postEndBand.style.left = `${unusedPeriodLeft}px`;
