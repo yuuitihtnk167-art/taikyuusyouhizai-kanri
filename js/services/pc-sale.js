@@ -2,7 +2,7 @@ import { accountingSummaryReference, monthlySummaryReference, dateMonthPosition 
 import { getMonthlySummarySettings, shouldExcludeUnderusedMonthlyCost } from "./app-settings.js";
 
 // All installments use the same accounting periods as the dashboard, including holidays.
-function periodAt(date) {
+export function periodAt(date) {
   return accountingSummaryReference(dateMonthPosition(date)).selectedMonth;
 }
 
@@ -14,6 +14,10 @@ function followingDay(date) {
   const result = new Date(date);
   result.setDate(result.getDate() + 1);
   return result;
+}
+
+export function endOfPeriod(period) {
+  return followingDay(closingDate(period));
 }
 
 function lastPeriodOnOrBefore(date) {
@@ -65,7 +69,7 @@ export function pcCostMonthlyCostAt(item, date) {
   return periodAt(date) >= schedule.finalPeriod ? schedule.finalMonthly : schedule.monthly;
 }
 
-export function pcSaleSchedule(item) {
+export function pcSaleSchedule(item, additionalSchedules = []) {
   const sale = normalizePcSale(item.sale);
   const purchased = saleDate(item.purchaseDate);
   const sold = sale && saleDate(sale.date);
@@ -74,17 +78,24 @@ export function pcSaleSchedule(item) {
   if (!sale || !purchased || sold < purchased || !Number.isSafeInteger(price) || price < 0 || !Number.isInteger(plannedMonths) || plannedMonths < 1 || plannedMonths > 1200) return null;
   const cost = pcCostSchedule(item);
   const firstPeriod = periodAt(sold);
-  const expired = firstPeriod > cost.finalPeriod;
-  const months = expired ? sale.months : cost.finalPeriod - firstPeriod + 1;
-  let paidThrough = Math.min(firstPeriod - 1, cost.finalPeriod);
+  if (additionalSchedules.some(schedule => schedule.start > sold)) return null;
+  const lastPeriod = Math.max(cost.finalPeriod, ...additionalSchedules.map(schedule => schedule.finalPeriod));
+  const expired = firstPeriod > lastPeriod;
+  const months = expired ? sale.months : lastPeriod - firstPeriod + 1;
+  let paidThrough = firstPeriod - 1;
   const beforeSale = pcItemBeforeSale(item);
   const ended = saleDate(beforeSale.endOfUseDate);
   if (ended && shouldExcludeUnderusedMonthlyCost()) paidThrough = Math.min(paidThrough, lastPeriodOnOrBefore(ended));
-  const elapsed = Math.max(0, paidThrough - cost.firstPeriod + 1);
+  const elapsed = Math.max(0, Math.min(paidThrough, cost.finalPeriod) - cost.firstPeriod + 1);
   const beforeMonthly = cost.monthly;
   // An expired plan has already included its final adjustment; never charge it twice.
-  const accounted = paidThrough >= cost.finalPeriod ? price : beforeMonthly * elapsed;
-  const remaining = price - accounted;
+  const baseAccounted = paidThrough >= cost.finalPeriod ? price : beforeMonthly * elapsed;
+  const accounted = additionalSchedules.reduce((total, schedule) => {
+    if (paidThrough >= schedule.finalPeriod) return total + schedule.price;
+    return total + schedule.monthly * Math.max(0, paidThrough - schedule.firstPeriod + 1);
+  }, baseAccounted);
+  const totalPrice = additionalSchedules.reduce((total, schedule) => total + schedule.price, price);
+  const remaining = totalPrice - accounted;
   const balance = remaining - sale.amount;
   const monthly = Math.trunc(balance / months);
   const adjustment = balance - monthly * months;
@@ -94,8 +105,7 @@ export function pcSaleSchedule(item) {
   return { sale, purchased, sold, end, firstPeriod, finalPeriod, expired, elapsed, months, beforeMonthly, accounted, remaining, balance, monthly, adjustment, finalMonthly };
 }
 
-export function pcSaleMonthlyCostAt(item, date) {
-  const schedule = pcSaleSchedule(item);
+export function pcSaleMonthlyCostAt(item, date, schedule = pcSaleSchedule(item)) {
   if (!schedule || date < schedule.sold) return null;
   if (date >= schedule.end) return 0;
   return periodAt(date) === schedule.finalPeriod ? schedule.finalMonthly : schedule.monthly;

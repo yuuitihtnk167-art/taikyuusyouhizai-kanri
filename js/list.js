@@ -1,4 +1,4 @@
-import { durableCostItem, durableCostSchedule, durableSaleSchedule, durableMonthlyCostAt } from "./services/durable-cost.js?v=165";
+import { durableAdditionalCostSchedules, durableCostItem, durableCostSchedule, durableSaleSchedule, durableMonthlyCostAt } from "./services/durable-cost.js?v=166";
 import { dateFromMonthPosition, pcItemBeforeSale } from "./services/pc-sale.js?v=164";
 import { createTimelineDayControls, shiftTimelineDay } from "./services/timeline-day-controls.js?v=158";
 import { mountPurchaseGraph } from "./services/timeline-purchase-graph.js?v=161";
@@ -18,7 +18,7 @@ import {
   getCategoryLabel,
   isPcManagementItem,
   firebaseErrorMessage,
-} from "./common.js?v=165";
+} from "./common.js?v=166";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, logout, registerServiceWorker } from "./services/auth.js";
 import {
@@ -28,7 +28,7 @@ import {
 } from "./services/category-order.js";
 import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { accountingSummaryReference, accountingSummaryLabel, snapToDayPosition } from "./services/monthly-summary.js?v=158";
-import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js?v=165";
+import { loadItems, removeItem, saveItem } from "./storage/durable-items/service.js?v=166";
 import { calculatePcSummaryAt, loadPcSummaryItems, pcPurchaseIntervals } from "./services/pc-summary.js?v=164";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
@@ -309,7 +309,8 @@ function updatePcLinkedCostDisplays() {
 
 function timelineMonthlyCost(item) {
   if (isPcManagementLinkedItem(item)) return state.pcMonthlyCost;
-  const adjusted = item.sale ? durableMonthlyCostAt(item, new Date()) : durableCostSchedule(item)?.monthly;
+  const adjusted = item.sale || item.additionalCosts?.some(cost => cost.expenseDate)
+    ? durableMonthlyCostAt(item, new Date()) : durableCostSchedule(item)?.monthly;
   if (adjusted != null) return adjusted;
   return isPcManagementItem(item) ? calculateMonthlyCost(item) : calculateMonthlyCostWithAdditionalCosts(item);
 }
@@ -325,9 +326,13 @@ function displayedMonthlyCost(item) {
   return Math.round(itemSummaryMonthlyCost(item));
 }
 
-function totalPurchaseCost(item) {
+function totalPurchaseCost(item, monthPosition) {
   if (isPcManagementLinkedItem(item)) return state.pcPurchaseTotal;
-  return Number(item.purchasePrice || 0) + calculateAdditionalCostTotal(item);
+  const additionalCosts = item.additionalCosts?.filter(cost => {
+    const date = parseDate(cost.expenseDate);
+    return !date || toMonthPosition(date) <= monthPosition;
+  });
+  return Number(item.purchasePrice || 0) + calculateAdditionalCostTotal({ ...item, additionalCosts });
 }
 
 function timelineMarkerMonth() {
@@ -371,11 +376,41 @@ function summaryActiveEndMonth(item) {
 }
 
 function isActiveInSummaryAtTimelineMarker(item, monthPosition = timelineMarkerMonth()) {
+  if (!isPcManagementLinkedItem(item) && item.additionalCosts?.some(cost => cost.expenseDate)) {
+    return datedCostActiveIntervals(item).some(({ start, end }) => start <= monthPosition && monthPosition <= end);
+  }
   const sale = item.sale && durableSaleSchedule(item);
   if (sale) return monthPosition < toMonthPosition(sale.sold)
     ? isActiveInSummaryAtTimelineMarker(pcItemBeforeSale(item), monthPosition)
     : monthPosition < toMonthPosition(sale.end);
   return itemStartMonth(item) <= monthPosition && monthPosition <= summaryActiveEndMonth(item);
+}
+
+function datedCostActiveIntervals(item) {
+  const lastDay = date => toMonthPosition(new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1));
+  const sale = item.sale && durableSaleSchedule(item);
+  if (sale) {
+    const beforeSale = datedCostActiveIntervals(pcItemBeforeSale(item))
+      .map(interval => ({ ...interval, end: Math.min(interval.end, lastDay(sale.sold)) }))
+      .filter(({ start, end }) => start <= end);
+    return [...beforeSale, { start: toMonthPosition(sale.sold), end: lastDay(sale.end) }];
+  }
+
+  const actualEnd = item.endOfUseDate && shouldExcludeUnderusedMonthlyCost() ? itemActualEndMonth(item) : Infinity;
+  const intervals = [
+    { start: itemStartMonth(item), end: summaryActiveEndMonth(item) },
+    ...durableAdditionalCostSchedules(item).map(cost => ({
+      start: toMonthPosition(cost.start),
+      end: Math.min(lastDay(cost.end), actualEnd),
+    })),
+  ];
+  const merged = [];
+  for (const interval of intervals.filter(({ start, end }) => start <= end).sort((a, b) => a.start - b.start)) {
+    const previous = merged.at(-1);
+    if (previous && interval.start <= previous.end) previous.end = Math.max(previous.end, interval.end);
+    else merged.push(interval);
+  }
+  return merged;
 }
 
 function isMonthlyCostExcluded(item) {
@@ -397,6 +432,9 @@ function isUnderusedEndedItem(item) {
 }
 
 function isMonthlyCostSummaryExcluded(item) {
+  if (!isPcManagementLinkedItem(item) && item.additionalCosts?.some(cost => cost.expenseDate)) {
+    return !isActiveInSummaryAtTimelineMarker(item, currentMonthIndex());
+  }
   if (item.sale && durableSaleSchedule(item)) return isMonthlyCostExcluded(item);
   if (isMonthlyCostExcluded(item)) {
     return true;
@@ -442,7 +480,7 @@ function calculateSummaryAt(items, monthPosition) {
     isPcManagementLinkedItem(item) ? pcSummary.monthlyCost : itemSummaryMonthlyCost(item, monthPosition)
   ), 0);
   const purchaseTotal = activeItems.reduce((total, item) => total + (
-    isPcManagementLinkedItem(item) ? pcSummary.purchaseTotal : totalPurchaseCost(item)
+    isPcManagementLinkedItem(item) ? pcSummary.purchaseTotal : totalPurchaseCost(item, monthPosition)
   ), 0);
   return { activeItems, monthlyCost, purchaseTotal };
 }
@@ -470,6 +508,16 @@ function purchaseGraphIntervals() {
       return pcIntervals.map((part) => ({
         start: Math.max(start, part.start), end: Math.min(end, part.end), amount: part.amount,
       }));
+    }
+    if (item.additionalCosts?.some(cost => cost.expenseDate)) {
+      return datedCostActiveIntervals(item).flatMap(({ start, end }) => [
+        { start, end, amount: durableCostItem(item).purchasePrice },
+        ...item.additionalCosts.flatMap(cost => {
+          const date = parseDate(cost.expenseDate);
+          const costStart = date && Math.max(start, toMonthPosition(date));
+          return costStart !== null && costStart <= end ? [{ start: costStart, end, amount: Number(cost.amount) }] : [];
+        }),
+      ]);
     }
     return pcPurchaseIntervals([durableCostItem(item)]);
   });

@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="style.css?v=130" />
+    <link rel="stylesheet" href="style.css?v=166" />
     <link rel="stylesheet" href="pc-management/pwa.css?v=164" />
   </head>
   <body>
@@ -73,14 +73,14 @@
             <p class="pc-sale-note">売却内容の決定・変更・削除は、下の「更新する」で保存されます。</p>
           </section>
 
-          <p class="pc-sale-note">月額コストは購入価格と追加費用の合計から計算します。</p>
+          <p class="pc-sale-note">追加費用は支出月から使用予定の最終月まで月割りします。使用予定期間を過ぎた支出は、追加費用ごとに使用予定期間を入力してください。</p>
           <section class="calculation-result pc-cost-result" aria-label="計算結果">
             <div>
               <span>合計</span>
               <strong id="calculation-total">¥0</strong>
             </div>
             <div>
-              <span>月額コスト</span>
+              <span id="calculation-monthly-label">月額コスト</span>
               <strong id="calculation-monthly-cost">¥0 /月</strong>
             </div>
             <div>
@@ -122,6 +122,6 @@
         </form>
       </section>
     </main>
-    <script type="module" src="js/form.js?v=165"></script>
+    <script type="module" src="js/form.js?v=166"></script>
   </body>
 </html>
