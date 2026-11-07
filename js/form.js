@@ -2,6 +2,7 @@ import {
   validateItem,
   createId,
   normalizeAdditionalCosts,
+  calculateAdditionalCostTotal,
   normalizeCategory,
   CATEGORY_OPTIONS,
   DEFAULT_CATEGORY,
@@ -11,13 +12,17 @@ import {
   formatCurrency,
   pcManagementModelDisplayText,
   pcPartMemoDisplayText,
-} from "./common.js?v=165";
+} from "./common.js?v=166";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
-import { loadItem, saveItem } from "./storage/durable-items/service.js?v=165";
+import { loadItem, saveItem } from "./storage/durable-items/service.js?v=166";
 
-import { createPcSaleForm } from "../pc-management/sale-form.js?v=165";
-import { pcCostSchedule, pcSaleSchedule } from "./services/pc-sale.js?v=164";
+import { createPcSaleForm } from "../pc-management/sale-form.js?v=166";
+import { saleDate } from "./services/pc-sale.js?v=166";
+import {
+  additionalCostNeedsDuration, durableAdditionalCostSchedules, durableCostSchedule,
+  durableMonthlyCostAt, durableSaleSchedule,
+} from "./services/durable-cost.js?v=166";
 
 const EDITING_ITEM_ID_KEY = "monthlyApplianceBook.editingItemId";
 const FROM_HIDDEN = new URLSearchParams(window.location.search).get("from") === "hidden";
@@ -160,22 +165,14 @@ function parseCurrencyInputValue(value) {
   return Number.isFinite(amount) && amount > 0 ? amount : 0;
 }
 
-function calculateAdditionalCostInputTotal() {
-  const rows = additionalCostList.querySelectorAll(".additional-cost-row");
-  return [...rows].reduce((total, row) => {
-    const amountInput = row.querySelector(".additional-cost-amount");
-    if (!(amountInput instanceof HTMLInputElement)) return total;
-    return total + parseCurrencyInputValue(amountInput.value);
-  }, 0);
-}
-
 function formCostItem() {
   return {
     purchaseDate: purchaseDateInput.value,
-    purchasePrice: parseCurrencyInputValue(purchasePriceInput.value) + calculateAdditionalCostInputTotal(),
+    purchasePrice: parseCurrencyInputValue(purchasePriceInput.value),
     yearsOfUse: Number(yearsOfUseInput.value),
     endOfUseDate: endOfUseDateInput.value,
     monthlyCostRounding: state.editingId ? state.monthlyCostRounding : "truncate-final",
+    additionalCosts: collectAdditionalCosts(),
   };
 }
 
@@ -183,23 +180,41 @@ const saleForm = createPcSaleForm({
   form,
   itemLabel: "商品",
   getItem: formCostItem,
+  calculateSchedule: durableSaleSchedule,
   setEndOfUseDate: value => { endOfUseDateInput.value = value; updateEndedUseStyle(); },
   onChange: () => { state.isDirty = true; updateCalculationResult(); },
 });
 
 function updateCalculationResult() {
   const item = formCostItem();
-  const schedule = pcCostSchedule(item);
-  const rawMonthly = item.yearsOfUse > 0 ? item.purchasePrice / (item.yearsOfUse * 12) : 0;
-  calculationTotal.textContent = formatCurrency(item.purchasePrice);
-  calculationMonthlyCost.textContent = formatMonthlyCost(schedule?.monthly ?? rawMonthly);
+  const schedule = durableCostSchedule(item);
+  for (const row of additionalCostList.children) {
+    const date = row.querySelector(".additional-cost-date").value;
+    const duration = row.querySelector(".additional-cost-months");
+    duration.parentElement.hidden = !additionalCostNeedsDuration(schedule, date);
+    duration.required = !duration.parentElement.hidden;
+  }
+  const total = item.purchasePrice + calculateAdditionalCostTotal(item);
+  const rawMonthly = item.yearsOfUse > 0 ? total / (item.yearsOfUse * 12) : 0;
+  const dated = item.additionalCosts.some(cost => cost.expenseDate);
+  const scheduledItem = {
+    ...item,
+    additionalCosts: item.additionalCosts.filter(cost => cost.expenseMonths || !additionalCostNeedsDuration(schedule, cost.expenseDate)),
+  };
+  const sale = saleForm.getSale();
+  const monthly = dated ? durableMonthlyCostAt({ ...scheduledItem, sale }, new Date()) : schedule?.monthly;
+  calculationTotal.textContent = formatCurrency(total);
+  calculationMonthlyCost.textContent = formatMonthlyCost(monthly ?? rawMonthly);
+  document.getElementById("calculation-monthly-label").textContent = dated ? "現在の月額コスト" : "月額コスト";
   const adjustment = document.getElementById("calculation-adjustment");
   adjustment.parentElement.hidden = state.pcManagementLinked;
-  adjustment.textContent = schedule ? formatCurrency(schedule.adjustment) : "—";
-  const sale = saleForm.getSale();
-  const sold = sale && pcSaleSchedule({ ...item, sale });
+  const costs = durableAdditionalCostSchedules(scheduledItem, schedule);
+  const adjustmentTotal = costs.reduce((sum, cost) => sum + cost.adjustment, schedule?.adjustment ?? 0);
+  adjustment.textContent = schedule ? formatCurrency(adjustmentTotal) : "—";
+  const sold = sale && durableSaleSchedule({ ...scheduledItem, sale });
   document.getElementById("calculation-adjustment-note").textContent = sold
     ? sold.expired ? "売却前の最終月に調整済み" : "売却後の残額に引継ぎ（重複加算なし）"
+    : dated ? "本体・追加費用それぞれの最終月で調整"
     : schedule ? `${schedule.adjustment < 0 ? "最終月に差引" : "最終月に加算"}（最終月 ${formatMonthlyCost(schedule.finalMonthly)}）` : "最終月に調整";
   saleForm.refresh();
 }
@@ -208,6 +223,10 @@ function createAdditionalCostRow(cost = {}) {
   const row = document.createElement("div");
   row.className = "additional-cost-row";
   row.dataset.id = cost.id || createId();
+  if (cost.id && !cost.expenseDate) {
+    row.dataset.legacyAmount = String(cost.amount);
+    row.dataset.legacyMemo = cost.memo;
+  }
   if (Number.isFinite(Number(cost.createdAt))) {
     row.dataset.createdAt = String(cost.createdAt);
   }
@@ -240,7 +259,31 @@ function createAdditionalCostRow(cost = {}) {
   deleteButton.type = "button";
   deleteButton.textContent = "削除";
 
-  row.append(amountInput, memoInput, deleteButton);
+  const dateLabel = document.createElement("label");
+  dateLabel.textContent = "支出日";
+  const dateInput = document.createElement("input");
+  dateInput.className = "additional-cost-date";
+  dateInput.type = "date";
+  dateInput.required = row.dataset.legacyAmount === undefined;
+  const today = new Date();
+  dateInput.value = cost.expenseDate ?? `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  dateLabel.appendChild(dateInput);
+
+  const durationLabel = document.createElement("label");
+  durationLabel.textContent = "追加費用の使用予定期間（月）";
+  durationLabel.hidden = true;
+  const durationInput = document.createElement("input");
+  durationInput.className = "additional-cost-months";
+  durationInput.type = "number";
+  durationInput.inputMode = "numeric";
+  durationInput.min = "1";
+  durationInput.max = "1200";
+  durationInput.step = "1";
+  durationInput.placeholder = "2年なら24";
+  durationInput.value = cost.expenseMonths ?? "";
+  durationLabel.appendChild(durationInput);
+
+  row.append(amountInput, memoInput, deleteButton, dateLabel, durationLabel);
   return row;
 }
 
@@ -266,7 +309,7 @@ function renderAdditionalCosts(costs) {
   updateCalculationResult();
 }
 
-function collectAdditionalCosts() {
+function collectAdditionalCosts({ forSave = false } = {}) {
   const costs = [];
   const rows = additionalCostList.querySelectorAll(".additional-cost-row");
   for (const row of rows) {
@@ -278,15 +321,41 @@ function collectAdditionalCosts() {
     const memo = row.dataset.encodedMemo || memoInput.value.trim();
     const createdAt = Number(row.dataset.createdAt);
     if (!rawAmount && !memo) continue;
+    const durationInput = row.querySelector(".additional-cost-months");
 
     costs.push({
       id: row.dataset.id || createId(),
       amount: rawAmount ? Number(rawAmount) : Number.NaN,
       memo,
       createdAt: Number.isFinite(createdAt) ? createdAt : null,
+      expenseDate: row.querySelector(".additional-cost-date").value,
+      expenseMonths: !forSave || !durationInput.parentElement.hidden ? Number(durationInput.value) || null : null,
     });
   }
   return costs;
+}
+
+function validateAdditionalCostDates(item) {
+  const schedule = durableCostSchedule(item);
+  for (const row of additionalCostList.children) {
+    const amount = row.querySelector(".additional-cost-amount").value;
+    const memo = row.dataset.encodedMemo || row.querySelector(".additional-cost-memo").value.trim();
+    if (!amount && !memo) continue;
+    const value = row.querySelector(".additional-cost-date").value;
+    if (!value && amount === row.dataset.legacyAmount && memo === row.dataset.legacyMemo) continue;
+    if (!saleDate(value)) return "追加費用の支出日を入力してください。";
+    if (!schedule) return "追加費用の月割りに使う購入日・購入価格・使用予定年数を確認してください。";
+    if (!Number.isSafeInteger(Number(amount))) return "追加費用の金額は整数で入力してください。";
+    if (value < item.purchaseDate) return "追加費用の支出日は購入日以降にしてください。";
+    if (item.sale && value > item.sale.date) return "追加費用の支出日は売却日以前にしてください。";
+    if (additionalCostNeedsDuration(schedule, value)) {
+      const months = Number(row.querySelector(".additional-cost-months").value);
+      if (!Number.isInteger(months) || months < 1 || months > 1200) {
+        return "使用予定期間後の追加費用には、1〜1200か月の使用予定期間を入力してください。";
+      }
+    }
+  }
+  return null;
 }
 
 function fillForm(item) {
@@ -359,10 +428,6 @@ form.addEventListener("input", () => {
 form.addEventListener("change", () => {
   state.isDirty = true;
 });
-purchasePriceInput.addEventListener("input", updateCalculationResult);
-yearsOfUseInput.addEventListener("input", updateCalculationResult);
-additionalCostList.addEventListener("input", updateCalculationResult);
-additionalCostList.addEventListener("change", updateCalculationResult);
 
 endOfUseDateInput.addEventListener("input", () => {
   updateEndedUseStyle();
@@ -398,9 +463,9 @@ form.addEventListener("submit", async (event) => {
     hideFromTimeline: hideFromTimelineInput.checked,
     excludeFromSummary: state.excludeFromSummary,
     pcManagementLinked: usePcManagement || (!useFormData && state.pcManagementLinked),
-    additionalCosts: collectAdditionalCosts(),
+    additionalCosts: collectAdditionalCosts({ forSave: true }),
   };
-  const validation = validateItem(item);
+  const validation = validateItem(item) || validateAdditionalCostDates(item);
   if (validation) {
     formError.textContent = validation;
     return;

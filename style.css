@@ -209,6 +209,14 @@ textarea:focus {
   min-width: 0;
 }
 
+.additional-cost-row label {
+  grid-column: 1 / -1;
+}
+
+.additional-cost-row label[hidden] {
+  display: none;
+}
+
 .form-error {
   min-height: 20px;
   margin: 8px 0 0;

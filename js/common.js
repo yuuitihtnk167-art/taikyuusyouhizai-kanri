@@ -464,6 +464,8 @@ export function normalizeAdditionalCosts(value) {
     amount: Number(cost?.amount ?? 0),
     memo: String(cost?.memo ?? ""),
     createdAt: Number.isFinite(Number(cost?.createdAt)) ? Number(cost.createdAt) : null,
+    expenseDate: String(cost?.expenseDate ?? ""),
+    expenseMonths: cost?.expenseMonths == null ? null : Number(cost.expenseMonths),
   }));
 }
 
