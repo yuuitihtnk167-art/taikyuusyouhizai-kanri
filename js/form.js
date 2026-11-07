@@ -283,7 +283,7 @@ function createAdditionalCostRow(cost = {}) {
   durationInput.value = cost.expenseMonths ?? "";
   durationLabel.appendChild(durationInput);
 
-  row.append(amountInput, memoInput, deleteButton, dateLabel, durationLabel);
+  row.append(dateLabel, amountInput, memoInput, deleteButton, durationLabel);
   return row;
 }
 

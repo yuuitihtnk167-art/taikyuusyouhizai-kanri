@@ -167,6 +167,8 @@ test("expense form requires a date and shows a required duration only for a late
     list.appendChild(row);
     const date = row.querySelector(".additional-cost-date");
     const months = row.querySelector(".additional-cost-months");
+    assert.equal(row.children[0], date.parentElement);
+    assert.equal(row.children[1], row.querySelector(".additional-cost-amount"));
     assert.match(date.value, /^\d{4}-\d{2}-\d{2}$/);
     row.querySelector(".additional-cost-amount").value = "12000";
     date.value = "";
