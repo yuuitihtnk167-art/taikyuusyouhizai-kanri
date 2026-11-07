@@ -128,7 +128,7 @@ test("changing the closing date does not drop a saved expense at the end of the 
   } finally { values.clear(); }
 });
 
-test("expense form requires a date and shows a required duration only for a late expense", () => {
+test("expense form validates late expenses and indicates when monthly costs end", () => {
   const form = readFileSync(new URL("../js/form.js", import.meta.url), "utf8");
   const names = ["updateCalculationResult", "createAdditionalCostRow", "collectAdditionalCosts", "validateAdditionalCostDates"];
   const functions = names.map(name => {
@@ -149,13 +149,20 @@ test("expense form requires a date and shows a required duration only for a late
   const item = { purchaseDate: "2026-01-01", purchasePrice: 12000, yearsOfUse: 1, monthlyCostRounding: "truncate-final" };
   const list = new Element();
   const adjustment = new Element();
+  const completed = new Element();
+  const monthlyCost = new Element();
+  let today = new Date(2027, 1, 15);
+  class FormDate extends Date {
+    constructor() { super(today.getTime()); }
+  }
   adjustment.parentElement = new Element();
   const context = createContext({
     item, HTMLInputElement: Element, additionalCostList: list, additionalCostNeedsDuration, durableAdditionalCostSchedules,
-    durableCostSchedule, durableMonthlyCostAt, durableSaleSchedule, saleDate, createId: () => "new",
+    durableCostSchedule, durableMonthlyCostAt, durableSaleSchedule, saleDate, shouldExcludeUnderusedMonthlyCost, createId: () => "new",
     pcPartMemoDisplayText: value => value ?? "", decodePcPartMemo: () => false,
     formCostItem: () => ({ ...item, additionalCosts: runInContext("collectAdditionalCosts()", context) }),
-    calculationTotal: new Element(), calculationMonthlyCost: new Element(), formatMonthlyCost: String, formatCurrency: String,
+    Date: FormDate, calculationTotal: new Element(), calculationMonthlyCost: monthlyCost,
+    calculationMonthlyCompleted: completed, formatMonthlyCost: String, formatCurrency: String,
     calculateAdditionalCostTotal: ({ additionalCosts }) => additionalCosts.reduce((sum, cost) => sum + cost.amount, 0),
     saleForm: { getSale: () => null, refresh() {} }, state: {},
     document: { createElement: () => new Element(), getElementById: () => adjustment },
@@ -170,6 +177,9 @@ test("expense form requires a date and shows a required duration only for a late
     assert.equal(row.children[0], date.parentElement);
     assert.equal(row.children[1], row.querySelector(".additional-cost-amount"));
     assert.match(date.value, /^\d{4}-\d{2}-\d{2}$/);
+    runInContext("updateCalculationResult()", context);
+    assert.equal(completed.hidden, false);
+    assert.equal(monthlyCost.textContent, "1000");
     row.querySelector(".additional-cost-amount").value = "12000";
     date.value = "";
     assert.match(runInContext("validateAdditionalCostDates(item)", context), /支出日を入力/);
@@ -183,8 +193,20 @@ test("expense form requires a date and shows a required duration only for a late
     assert.equal(months.required, true);
     assert.match(runInContext("validateAdditionalCostDates(item)", context), /使用予定期間を入力/);
     months.value = "24";
+    runInContext("updateCalculationResult()", context);
+    assert.equal(completed.hidden, true);
+    assert.equal(monthlyCost.textContent, "500");
+    values.set("monthlyApplianceBook.excludeUnderusedMonthlyCost", "true");
+    item.endOfUseDate = "2027-02-14";
+    runInContext("updateCalculationResult()", context);
+    assert.equal(completed.hidden, false);
+    delete item.endOfUseDate;
     assert.equal(runInContext("validateAdditionalCostDates(item)", context), null);
     assert.equal(runInContext("collectAdditionalCosts({ forSave: true })", context)[0].expenseMonths, 24);
+    today = new Date(2029, 0, 1);
+    runInContext("updateCalculationResult()", context);
+    assert.equal(completed.hidden, false);
+    assert.equal(monthlyCost.textContent, "1000");
     date.value = "2026-12-31";
     runInContext("updateCalculationResult()", context);
     assert.equal(months.parentElement.hidden, true);

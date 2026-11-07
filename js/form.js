@@ -15,6 +15,7 @@ import {
 } from "./common.js?v=166";
 import { isLocalMode } from "./platform/local-db.js";
 import { onAuthChanged, registerServiceWorker } from "./services/auth.js";
+import { shouldExcludeUnderusedMonthlyCost } from "./services/app-settings.js";
 import { loadItem, saveItem } from "./storage/durable-items/service.js?v=166";
 
 import { createPcSaleForm } from "../pc-management/sale-form.js?v=166";
@@ -54,6 +55,7 @@ const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
 const calculationTotal = document.getElementById("calculation-total");
 const calculationMonthlyCost = document.getElementById("calculation-monthly-cost");
+const calculationMonthlyCompleted = document.getElementById("calculation-monthly-completed");
 
 function sessionStorageGetItem(key) {
   try {
@@ -201,17 +203,26 @@ function updateCalculationResult() {
     ...item,
     additionalCosts: item.additionalCosts.filter(cost => cost.expenseMonths || !additionalCostNeedsDuration(schedule, cost.expenseDate)),
   };
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const sale = saleForm.getSale();
-  const monthly = dated ? durableMonthlyCostAt({ ...scheduledItem, sale }, new Date()) : schedule?.monthly;
+  const sold = sale && durableSaleSchedule({ ...scheduledItem, sale });
+  const costs = durableAdditionalCostSchedules(scheduledItem, schedule);
+  const afterSale = sold && now >= sold.sold;
+  const useEnded = saleDate(item.endOfUseDate);
+  const excludeAfterUse = useEnded && now > useEnded && shouldExcludeUnderusedMonthlyCost();
+  const activeAdditionalCost = !excludeAfterUse && costs.some(cost => cost.start <= now && now < cost.end);
+  const completed = afterSale ? now >= sold.end : schedule && now >= schedule.end && !activeAdditionalCost;
+  const showCurrentCost = !completed && (dated || afterSale);
+  const monthly = showCurrentCost ? durableMonthlyCostAt({ ...scheduledItem, sale }, now) : schedule?.monthly;
   calculationTotal.textContent = formatCurrency(total);
   calculationMonthlyCost.textContent = formatMonthlyCost(monthly ?? rawMonthly);
-  document.getElementById("calculation-monthly-label").textContent = dated ? "現在の月額コスト" : "月額コスト";
+  calculationMonthlyCompleted.hidden = state.pcManagementLinked || !completed;
+  document.getElementById("calculation-monthly-label").textContent = showCurrentCost ? "現在の月額コスト" : "月額コスト";
   const adjustment = document.getElementById("calculation-adjustment");
   adjustment.parentElement.hidden = state.pcManagementLinked;
-  const costs = durableAdditionalCostSchedules(scheduledItem, schedule);
   const adjustmentTotal = costs.reduce((sum, cost) => sum + cost.adjustment, schedule?.adjustment ?? 0);
   adjustment.textContent = schedule ? formatCurrency(adjustmentTotal) : "—";
-  const sold = sale && durableSaleSchedule({ ...scheduledItem, sale });
   document.getElementById("calculation-adjustment-note").textContent = sold
     ? sold.expired ? "売却前の最終月に調整済み" : "売却後の残額に引継ぎ（重複加算なし）"
     : dated ? "本体・追加費用それぞれの最終月で調整"

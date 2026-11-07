@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="style.css?v=166" />
+    <link rel="stylesheet" href="style.css?v=167" />
     <link rel="stylesheet" href="pc-management/pwa.css?v=164" />
   </head>
   <body>
@@ -81,7 +81,10 @@
             </div>
             <div>
               <span id="calculation-monthly-label">月額コスト</span>
-              <strong id="calculation-monthly-cost">¥0 /月</strong>
+              <div class="calculation-monthly-value">
+                <strong id="calculation-monthly-cost">¥0 /月</strong>
+                <span id="calculation-monthly-completed" hidden>計上終了</span>
+              </div>
             </div>
             <div>
               <span>調整分</span>
@@ -122,6 +125,6 @@
         </form>
       </section>
     </main>
-    <script type="module" src="js/form.js?v=166"></script>
+    <script type="module" src="js/form.js?v=167"></script>
   </body>
 </html>
