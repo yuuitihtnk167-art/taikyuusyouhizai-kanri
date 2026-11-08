@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="../style.css?v=160" />
+    <link rel="stylesheet" href="../style.css?v=168" />
     <link rel="stylesheet" href="pwa.css?v=164" />
   </head>
   <body>
@@ -34,7 +34,7 @@
             <option value="sub">サブPC</option>
           </select>
           <label for="spec-detail">スペック（詳細入力欄）</label>
-          <textarea id="spec-detail" rows="4"></textarea>
+          <textarea id="spec-detail" rows="1"></textarea>
           <label for="purchase-date">購入日</label>
           <input id="purchase-date" type="date" required />
           <label for="purchase-price">購入価格（円）</label>
@@ -44,7 +44,7 @@
           <label for="end-of-use-date">使用終了日</label>
           <input id="end-of-use-date" type="date" />
           <label for="memo">メモ</label>
-          <input id="memo" type="text" autocomplete="off" placeholder="メモ" />
+          <textarea id="memo" rows="1" autocomplete="off" placeholder="メモ"></textarea>
 
           <section id="pc-sale-controls" class="pc-sale-controls" aria-label="売却の操作" hidden>
             <div class="pc-sale-actions">
@@ -117,6 +117,6 @@
       </section>
     </main>
     <script type="module" src="pwa.js"></script>
-    <script type="module" src="app.js?v=165"></script>
+    <script type="module" src="app.js?v=168"></script>
   </body>
 </html>

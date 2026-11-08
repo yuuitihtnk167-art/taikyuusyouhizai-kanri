@@ -1,3 +1,4 @@
+import { createExpandableText, enhanceExpandableTextarea } from "../js/services/expandable-text.js?v=168";
 import { createTimelineDayControls, shiftTimelineDay } from "../js/services/timeline-day-controls.js?v=158";
 import { normalizePcSale, pcCostSchedule, pcCostMonthlyCostAt, pcSaleSchedule, pcSaleMonthlyCostAt, dateFromMonthPosition, pcItemBeforeSale } from "../js/services/pc-sale.js?v=164";
 import { createPcSaleForm } from "./sale-form.js?v=165";
@@ -120,6 +121,8 @@ const state = {
 let purchaseGraph = null;
 let graphViewport = null;
 let saleForm = null;
+const resetSpecPreview = elements.specDetail && enhanceExpandableTextarea(elements.specDetail);
+const resetMemoPreview = elements.memo && enhanceExpandableTextarea(elements.memo);
 window.addEventListener("storage", (event) => {
   if (event.key === HOLIDAY_UPDATE_KEY || event.key === null) updateTimelineMarkerDate();
 });
@@ -1110,6 +1113,7 @@ function renderSpecList() {
   `;
 
   const tbody = table.querySelector("tbody");
+  const specPreviews = [];
   for (const row of rows) {
     const tr = document.createElement("tr");
     for (const key of [
@@ -1123,7 +1127,11 @@ function renderSpecList() {
       "monthlyCost",
     ]) {
       const td = document.createElement("td");
-      if (key === "partName" || key === "specDetail") {
+      if (key === "specDetail") {
+        const preview = createExpandableText(row.specDetail);
+        td.appendChild(preview.element);
+        specPreviews.push(preview);
+      } else if (key === "partName") {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "spec-list-value-button";
@@ -1143,6 +1151,7 @@ function renderSpecList() {
 
   scroll.appendChild(table);
   elements.specListContent.append(scroll);
+  specPreviews.forEach((preview) => preview.refresh());
 }
 
 function csvValue(value) {
@@ -1226,6 +1235,8 @@ function resetForm() {
   if (!elements.form) return;
   state.editingId = null;
   elements.form.reset();
+  resetSpecPreview();
+  resetMemoPreview();
   elements.id.value = "";
   elements.pcName.value = "main";
   elements.yearsOfUse.value = "10";
@@ -1255,6 +1266,8 @@ function fillForm(item) {
   elements.yearsOfUse.value = item.yearsOfUse;
   elements.endOfUseDate.value = item.endOfUseDate;
   elements.memo.value = item.memo;
+  resetSpecPreview();
+  resetMemoPreview();
   elements.hideFromTimeline.checked = Boolean(item.hideFromTimeline);
   elements.submitButton.textContent = "更新する";
   elements.formError.textContent = "";
