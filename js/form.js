@@ -1,3 +1,4 @@
+import { enhanceExpandableTextarea } from "./services/expandable-text.js?v=168";
 import {
   validateItem,
   createId,
@@ -50,6 +51,7 @@ const purchasePriceInput = document.getElementById("purchase-price");
 const yearsOfUseInput = document.getElementById("years-of-use");
 const endOfUseDateInput = document.getElementById("end-of-use-date");
 const memoInput = document.getElementById("memo");
+const resetMemoPreview = enhanceExpandableTextarea(memoInput);
 const hideFromTimelineInput = document.getElementById("hide-from-timeline");
 const addCostButton = document.getElementById("add-cost-button");
 const additionalCostList = document.getElementById("additional-cost-list");
@@ -391,6 +393,7 @@ function fillForm(item) {
   yearsOfUseInput.value = item.yearsOfUse;
   endOfUseDateInput.value = item.endOfUseDate;
   memoInput.value = item.memo;
+  resetMemoPreview();
   hideFromTimelineInput.checked = Boolean(item.hideFromTimeline);
   state.excludeFromSummary = Boolean(item.excludeFromSummary);
   state.pcManagementLinked = Boolean(item.pcManagementLinked);

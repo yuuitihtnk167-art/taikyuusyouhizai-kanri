@@ -2034,6 +2034,51 @@ button {
   min-width: 260px;
 }
 
+textarea.expandable-text-field {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  height: calc(1.5em + 22px);
+  max-height: calc(7.5em + 22px);
+  overflow: hidden;
+  line-height: 1.5;
+  resize: none;
+  white-space: pre;
+}
+
+textarea.expandable-text-field.is-expanded {
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.expandable-text-preview {
+  display: block;
+  width: 232px;
+  max-height: 1.5em;
+  overflow: hidden;
+  font-weight: 700;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.expandable-text-preview[role="button"] {
+  cursor: pointer;
+}
+
+.expandable-text-preview:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.expandable-text-preview.is-expanded {
+  max-height: 7.5em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .spec-list-value-button {
   display: block;
   width: 100%;

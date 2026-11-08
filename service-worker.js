@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v167";
+const CACHE_NAME = "durable-goods-pwa-v168";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -11,16 +11,18 @@ const APP_SHELL = [
   "style.css?v=130",
   "style.css?v=160",
   "style.css?v=167",
+  "style.css?v=168",
   "assets/login-hero.png",
   "js/common.js",
   "js/common.js?v=166",
   "js/login.js",
   "js/list.js?v=166",
-  "js/form.js?v=167",
+  "js/form.js?v=168",
   "js/settings.js?v=166",
   "js/platform/firebase.js",
   "js/platform/local-db.js",
   "js/services/app-settings.js",
+  "js/services/expandable-text.js?v=168",
   "js/services/monthly-summary.js?v=158",
   "js/services/japanese-holidays.js?v=156",
   "js/services/japanese-holiday-calendar.js?v=157",
@@ -55,7 +57,7 @@ const APP_SHELL = [
   "pc-management/pwa.js",
   "pc-management/settings.js",
   "pc-management/styles.css",
-  "pc-management/app.js?v=165",
+  "pc-management/app.js?v=168",
   "pc-management/sale-form.js?v=165",
   "pc-management/sale-form.js?v=166",
   "pc-management/icons/icon-192.png",
