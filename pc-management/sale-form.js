@@ -1,7 +1,7 @@
 import { normalizePcSale, pcSaleSchedule, pcSaleItemWithRecord } from "../js/services/pc-sale.js?v=164";
 
 // Confirm/cancel only edit the form draft. The existing Update button saves it.
-export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, itemLabel = "パーツ" }) {
+export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, itemLabel = "パーツ", calculateSchedule = pcSaleSchedule }) {
   const controls = form.querySelector("#pc-sale-controls");
   const result = form.querySelector("#pc-sale-result");
   const find = (name) => form.querySelector(`[data-sale="${name}"]`);
@@ -22,9 +22,9 @@ export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, ite
     find("open").textContent = record ? "売却内容を変更" : "売却";
     find("open").setAttribute("aria-expanded", String(editing));
     const sale = editing ? draft() : record;
-    const schedule = sale && pcSaleSchedule({ ...getItem(), sale });
+    const schedule = sale && calculateSchedule({ ...getItem(), sale });
     // An invalid installment input must stay visible so it can be corrected.
-    const fallback = editing && pcSaleSchedule({ ...getItem(), sale: { ...sale, months: 12 } });
+    const fallback = editing && calculateSchedule({ ...getItem(), sale: { ...sale, months: 12 } });
     find("months-field").hidden = !(schedule ?? fallback)?.expired;
     find("confirm").disabled = !schedule;
     result.hidden = !enabled || (!editing && !record);
@@ -34,7 +34,10 @@ export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, ite
     if (!schedule) return;
     const accountedAdjustment = schedule.accounted - schedule.beforeMonthly * schedule.elapsed;
     const adjustmentTerm = accountedAdjustment ? ` ${accountedAdjustment < 0 ? "−" : "＋"} ${yen(Math.abs(accountedAdjustment))}（通常分の最終月調整）` : "";
-    find("formula").textContent = `計上済み：${yen(schedule.beforeMonthly)} × ${schedule.elapsed}か月${adjustmentTerm} ＝ ${yen(schedule.accounted)}\n残額：${yen(Number(getItem().purchasePrice))} − ${yen(schedule.accounted)} ＝ ${yen(schedule.remaining)}\n売却後月額：(${yen(schedule.remaining)} − ${yen(sale.amount)}) ÷ ${schedule.months}か月 → ${yen(schedule.monthly)}`;
+    const accounted = getItem().additionalCosts?.some(cost => cost.expenseDate)
+      ? yen(schedule.accounted)
+      : `${yen(schedule.beforeMonthly)} × ${schedule.elapsed}か月${adjustmentTerm} ＝ ${yen(schedule.accounted)}`;
+    find("formula").textContent = `計上済み：${accounted}\n残額：${yen(schedule.accounted + schedule.remaining)} − ${yen(schedule.accounted)} ＝ ${yen(schedule.remaining)}\n売却後月額：(${yen(schedule.remaining)} − ${yen(sale.amount)}) ÷ ${schedule.months}か月 → ${yen(schedule.monthly)}`;
     find("sale-price").textContent = yen(sale.amount);
     find("balance-label").textContent = schedule.balance < 0 ? "回収超過額" : "売却後の残金";
     find("balance").textContent = yen(Math.abs(schedule.balance));
@@ -56,7 +59,7 @@ export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, ite
   });
   find("cancel").addEventListener("click", () => { editing = false; refresh(); });
   find("confirm").addEventListener("click", () => {
-    if (!pcSaleSchedule({ ...getItem(), sale: draft() })) return;
+    if (!calculateSchedule({ ...getItem(), sale: draft() })) return;
     const item = pcSaleItemWithRecord({ ...getItem(), sale: record }, draft());
     record = item.sale;
     setEndOfUseDate(item.endOfUseDate);
@@ -80,7 +83,7 @@ export function createPcSaleForm({ form, getItem, setEndOfUseDate, onChange, ite
     getSale() { return record ? { ...record } : null; },
     validationError() {
       if (editing) return "売却内容の「決定」または「キャンセル」を押してから更新してください。";
-      if (record && !pcSaleSchedule({ ...getItem(), sale: record })) return "購入日・使用予定年数と売却内容を確認してください。";
+      if (record && !calculateSchedule({ ...getItem(), sale: record })) return "購入日・使用予定年数・追加費用と売却内容を確認してください。";
       if (record && (!getItem().endOfUseDate || getItem().endOfUseDate > record.date)) return `売却した${itemLabel}の使用終了日は、売却日以前にしてください。`;
       return null;
     },

@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="style.css?v=130" />
+    <link rel="stylesheet" href="style.css?v=168" />
     <link rel="stylesheet" href="pc-management/pwa.css?v=164" />
   </head>
   <body>
@@ -39,7 +39,7 @@
           <label for="end-of-use-date">使用終了日</label>
           <input id="end-of-use-date" type="date" />
           <label for="memo">メモ</label>
-          <input id="memo" type="text" autocomplete="off" placeholder="メモ" />
+          <textarea id="memo" rows="1" autocomplete="off" placeholder="メモ"></textarea>
 
           <section class="additional-costs-section" aria-labelledby="additional-costs-title">
             <div class="section-heading">
@@ -73,15 +73,18 @@
             <p class="pc-sale-note">売却内容の決定・変更・削除は、下の「更新する」で保存されます。</p>
           </section>
 
-          <p class="pc-sale-note">月額コストは購入価格と追加費用の合計から計算します。</p>
+          <p class="pc-sale-note">追加費用は支出月から使用予定の最終月まで月割りします。使用予定期間を過ぎた支出は、追加費用ごとに使用予定期間を入力してください。</p>
           <section class="calculation-result pc-cost-result" aria-label="計算結果">
             <div>
               <span>合計</span>
               <strong id="calculation-total">¥0</strong>
             </div>
             <div>
-              <span>月額コスト</span>
-              <strong id="calculation-monthly-cost">¥0 /月</strong>
+              <span id="calculation-monthly-label">月額コスト</span>
+              <div class="calculation-monthly-value">
+                <strong id="calculation-monthly-cost">¥0 /月</strong>
+                <span id="calculation-monthly-completed" hidden>計上終了</span>
+              </div>
             </div>
             <div>
               <span>調整分</span>
@@ -122,6 +125,6 @@
         </form>
       </section>
     </main>
-    <script type="module" src="js/form.js?v=165"></script>
+    <script type="module" src="js/form.js?v=168"></script>
   </body>
 </html>
