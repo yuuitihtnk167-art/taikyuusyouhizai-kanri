@@ -1,4 +1,4 @@
-const CACHE_NAME = "durable-goods-pwa-v165";
+const CACHE_NAME = "durable-goods-pwa-v167";
 const BASE_URL = new URL(self.registration.scope);
 const APP_SHELL = [
   "./",
@@ -10,6 +10,7 @@ const APP_SHELL = [
   "settings.html",
   "style.css?v=130",
   "style.css?v=160",
+  "style.css?v=167",
   "assets/login-hero.png",
   "js/common.js",
   "js/common.js?v=165",

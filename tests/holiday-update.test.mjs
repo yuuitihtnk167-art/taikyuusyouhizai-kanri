@@ -33,7 +33,7 @@ test("downloaded additions and removals affect the next input-date calculation, 
   assert.equal(japaneseHolidayStatus(new Date(2026, 10, 3)).isHoliday, false);
   const position = dateMonthPosition(new Date(2026, 9, 25));
   const settings = { mode: "monthly", day: 15, adjustToPreviousWeekday: true };
-  assert.equal(monthlySummaryReference(position, settings).date.getDate(), 12);
+  assert.equal(monthlySummaryReference(position, settings).date.getDate(), 11);
   const persisted = entries.get(HOLIDAY_UPDATE_KEY);
   const reloaded = new Map([[HOLIDAY_UPDATE_KEY, persisted]]);
   assert.equal(getHolidayUpdate({ getItem: (key) => reloaded.get(key) }).holidays.has("2026-11-13"), true);

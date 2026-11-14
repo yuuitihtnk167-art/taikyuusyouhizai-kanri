@@ -33,9 +33,8 @@ function periodStartDate(year, month, day) {
   return new Date(year, month, Math.min(day, lastDay));
 }
 
-function adjustedClosingDate(year, month, settings) {
-  const date = periodStartDate(year, month + 1, settings.day);
-  date.setDate(date.getDate() - 1);
+function adjustedStartDate(year, month, settings) {
+  const date = periodStartDate(year, month, settings.day);
   let holidaysKnown = true;
   let holidaysSupported = true;
   if (settings.adjustToPreviousWeekday !== false) {
@@ -58,19 +57,20 @@ export function monthlySummaryReference(monthPosition, settings = getMonthlySumm
     return { selectedMonth, position: monthPosition, date: null, startDate: null, inputDate: null, holidaysKnown: true };
   }
 
-  const closing = adjustedClosingDate(year, month, settings);
-  const previousClosing = adjustedClosingDate(year, month - 1, settings);
-  const startDate = new Date(previousClosing.date);
-  startDate.setDate(startDate.getDate() + 1);
+  const start = adjustedStartDate(year, month, settings);
+  const nextStart = adjustedStartDate(year, month + 1, settings);
+  // The input date is the last calendar day before the next adjusted payday.
+  const closingDate = new Date(nextStart.date);
+  closingDate.setDate(closingDate.getDate() - 1);
   return {
     selectedMonth,
-    position: dateMonthPosition(closing.date),
-    markerPosition: dateMonthPosition(periodStartDate(year, month, settings.day)),
-    date: closing.date,
-    startDate,
-    inputDate: new Date(closing.date),
-    holidaysKnown: closing.holidaysKnown && previousClosing.holidaysKnown,
-    holidaysSupported: closing.holidaysSupported && previousClosing.holidaysSupported,
+    position: dateMonthPosition(closingDate),
+    markerPosition: dateMonthPosition(start.date),
+    date: closingDate,
+    startDate: start.date,
+    inputDate: new Date(closingDate),
+    holidaysKnown: start.holidaysKnown && nextStart.holidaysKnown,
+    holidaysSupported: start.holidaysSupported && nextStart.holidaysSupported,
   };
 }
 

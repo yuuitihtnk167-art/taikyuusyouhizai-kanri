@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="stylesheet" href="style.css?v=160" />
+    <link rel="stylesheet" href="style.css?v=167" />
   </head>
   <body>
     <main class="app">
@@ -27,7 +27,7 @@
           <select id="monthly-summary-day" aria-describedby="monthly-summary-description"></select>
         </div>
         <div>
-          <label for="monthly-summary-adjustment">家計簿入力日が土日・祝日の場合</label>
+          <label for="monthly-summary-adjustment">区切り日（給料日）が土日・祝日の場合</label>
           <select id="monthly-summary-adjustment">
             <option value="previous">直前の平日に繰り上げる</option>
             <option value="none">変更しない</option>
@@ -35,16 +35,39 @@
         </div>
         <output id="monthly-summary-preview" class="monthly-summary-preview" aria-label="今月の家計簿入力日"></output>
         <p id="monthly-summary-status" role="status"></p>
-        <p id="monthly-summary-description">設定日の前日を締め日とし、土日・祝日は設定に応じて直前の平日に繰り上げます。前月分の調整後の締め日の翌日から、選択月分の調整後の締め日までが対象期間です。15日設定の2026年10月分は10月15日〜11月13日となり、11月14日の購入は11月分から含めます。家計簿入力日時点の月額合計を「入力金額」として表示します。画面上部の月額合計・総購入額・登録数は青い線が示す日付で計算し、入力金額とは別に表示します。日割り計算は行いません。設定日がない月は、その月の末日を区切り日として、その前日を締め日にします。</p>
-        <p>家計簿入力日は翌月の区切り日の前日を基に、休日調整した締め日です。土日・祝日の場合は、設定に応じて直前の平日に繰り上げます。家計簿入力日・締め日・集計日は同じ日です。年月分・家計簿入力日・入力金額は、青い線の日付が休日調整後の家計簿入力日当日までは同じ月分を表示し、その翌日に次回分へ切り替わります。公式発表済みの祝日を基にし、未発表の年は2099年まで現行ルールで計算します。</p>
-        <p>この設定は家電簿とPC管理で共通です。変更すると自動保存されます。端末・ブラウザごとの設定で、同期・バックアップの対象外です。過去月も現在の設定と登録データで再計算されます。</p>
+        <p id="monthly-summary-description">区切り日から1か月分を集計し、次の区切り日の前日に家計簿へ入力します。</p>
+        <details class="settings-help">
+          <summary>集計期間と入力金額について</summary>
+          <div class="settings-help-content">
+            <div>
+              <h3>給料日を1か月の始まりに</h3>
+              <p>区切り日には給料日を設定してください。土日・祝日の繰り上げは区切り日に適用します。家計簿入力日は、調整後の次の区切り日の前日です。入力日自体は、土日・祝日でも繰り上げません。</p>
+              <p>例：毎月15日・休日は繰り上げの場合、2026年10月分は10月15日〜11月12日です。次の給料日が11月13日に繰り上がるため、入力日は11月12日になります。</p>
+              <p>設定した日がない月は、その月の末日を基に区切り日を調整します。</p>
+            </div>
+            <div>
+              <h3>家計簿に入力する金額</h3>
+              <p>期間の最終日時点で集計対象となる商品の月割り額を合計します。過去に購入した商品も対象に含み、日割り計算はしません。</p>
+              <p>青い線を動かすと、その日が属する期間の入力日・入力金額を表示します。区切り日に次の月分へ切り替わります。画面上部の月額合計・総購入額・登録数は、青い線の日付時点の値です。</p>
+            </div>
+            <div>
+              <h3>設定の保存について</h3>
+              <p>家電簿とPC管理で共通です。変更は自動保存され、過去月も現在の設定と登録データで再計算されます。設定は端末・ブラウザごとに保存され、同期・バックアップには含まれません。</p>
+            </div>
+          </div>
+        </details>
         <div class="holiday-update-section">
           <h3>祝日データの確認・更新</h3>
-          <p>下のボタンを押すと通信して最新の祝日データを確認し、この端末・ブラウザに保存します。家電簿とPC管理の家計簿入力日・入力金額に反映されます。登録した商品データは変更しません。通信できない場合は、現在のデータを使い続けます。</p>
-          <p>取得先：<a href="https://holidays-jp.github.io/" target="_blank" rel="noopener noreferrer">Holidays JP API</a>（前年・今年・翌年）。それ以外の年は、アプリ内の祝日データで計算します。将来の祝日は変更される場合があります。</p>
           <button id="holiday-update-button" type="button" class="ghost-button">祝日データを更新</button>
           <p id="holiday-last-checked">最終確認日：未確認</p>
           <p id="holiday-update-status" role="status" aria-live="polite"></p>
+          <details class="settings-help">
+            <summary>祝日データの更新について</summary>
+            <div class="settings-help-content">
+              <p>ボタンを押すと最新の祝日データを取得し、この端末・ブラウザに保存します。区切り日・家計簿入力日・入力金額に反映されます。登録した商品データは変更しません。通信できない場合は、保存済みのデータを使います。</p>
+              <p>取得先：<a href="https://holidays-jp.github.io/" target="_blank" rel="noopener noreferrer">Holidays JP API</a>（前年・今年・翌年）。それ以外の年はアプリ内の祝日データを使い、未発表の年は2099年まで現行ルールで計算します。将来の祝日は変更される場合があります。</p>
+            </div>
+          </details>
         </div>
       </section>
 
