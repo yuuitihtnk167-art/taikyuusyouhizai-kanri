@@ -301,6 +301,48 @@ button {
   line-height: 1.6;
 }
 
+.settings-help {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-help > summary {
+  padding: 12px 14px;
+  color: var(--primary-strong);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.settings-help > summary:hover {
+  background: var(--bg);
+}
+
+.settings-help > summary:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.settings-help-content,
+.settings-help-content > div {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-help-content {
+  padding: 0 14px 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings-help-content h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
 .holiday-update-section {
   display: grid;
   gap: 10px;

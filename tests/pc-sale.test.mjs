@@ -98,7 +98,8 @@ test("month-end and leap-day sales count paid accounting periods instead of anni
   const leap = pcSaleSchedule({ ...item, purchaseDate: "2024-02-29", sale: { date: "2025-02-28", amount: 12000 } });
   assert.equal(leap.expired, true);
   assert.equal(leap.end.getMonth(), 1);
-  assert.equal(leap.end.getDate(), 14);
+  // The next adjusted payday is February 13, so the last input date is February 12.
+  assert.equal(leap.end.getDate(), 13);
   for (let day = 1; day <= 31; day++) {
     const position = 2026 * 12 + 9 + (day - 1) / 31;
     assert.equal(dateFromMonthPosition(position).getDate(), day);
